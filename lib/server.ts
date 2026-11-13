@@ -18,8 +18,8 @@ const db = (key: string) =>
 
 /** Bypasses RLS: only for writes the server has validated itself. */
 export function adminDb() {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY belum diatur di server.");
-  return db(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!process.env.SUPABASE_SECRET_KEY) throw new Error("SUPABASE_SECRET_KEY belum diatur di server.");
+  return db(process.env.SUPABASE_SECRET_KEY);
 }
 
 /** The Supabase user behind `Authorization: Bearer <access token>`, or null. */
@@ -27,7 +27,7 @@ export async function requestUser(req: Request) {
   const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
   if (!token) return null;
   try {
-    const { data } = await db(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!).auth.getUser(token);
+    const { data } = await db(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!).auth.getUser(token);
     return data.user;
   } catch (e) {
     console.error("auth check failed", e);

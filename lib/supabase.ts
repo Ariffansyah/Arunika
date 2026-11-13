@@ -32,7 +32,7 @@ let client: SupabaseClient | null = null;
 
 // Created lazily so prerendering works without env vars; only called from effects and handlers.
 export function supabase() {
-  client ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  client ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!);
   return client;
 }
 
