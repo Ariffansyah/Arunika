@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, type ComponentRef } from "react";
 import type { Group, Mesh } from "three";
 import Character, { preloadCharacters, type Look } from "@/components/Character";
+import Scenery from "@/components/campus/Scenery";
 import { Backdrop, Buildings, Coast, Props, Terrain } from "@/components/campus/World";
 import { ASSEMBLY, GRID, H, SPAWN, W, elevationAt, tileElevation } from "@/lib/campus";
 import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
@@ -27,12 +28,6 @@ function useRoute() {
     return { pts, cum };
   }, []);
 }
-
-// Deterministic scatter so the surroundings look the same on every load.
-const rand = (i: number) => {
-  const x = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-  return x - Math.floor(x);
-};
 
 function Tick({ clockRef, paused }: { clockRef: Clock; paused: boolean }) {
   useFrame((_, dt) => {
@@ -135,130 +130,6 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
   );
 }
 
-function Flag({ clockRef }: { clockRef: Clock }) {
-  const flag = useRef<Group>(null);
-  useFrame(() => {
-    if (flag.current) flag.current.rotation.y = Math.sin(clockRef.current * 2.1) * 0.18;
-  });
-  const [x, z] = [20.5, 24.5];
-  return (
-    <group position={[x, elevationAt(x, z), z]}>
-      <mesh position={[0, 2.6, 0]} castShadow>
-        <cylinderGeometry args={[0.05, 0.07, 5.2, 8]} />
-        <meshStandardMaterial color="#d8dde3" metalness={0.4} roughness={0.4} />
-      </mesh>
-      <group ref={flag} position={[0.05, 4.6, 0]}>
-        <mesh position={[0.6, 0.2, 0]}>
-          <planeGeometry args={[1.2, 0.4]} />
-          <meshStandardMaterial color="#d7261e" side={2} />
-        </mesh>
-        <mesh position={[0.6, -0.2, 0]}>
-          <planeGeometry args={[1.2, 0.4]} />
-          <meshStandardMaterial color="#f7f7f2" side={2} />
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
-type PalmSpec = { x: number; z: number; h: number; lean: number; turn: number };
-
-function Palm({ x, z, h, lean, turn }: PalmSpec) {
-  return (
-    <group position={[x, 0.05, z]} rotation={[0, turn, lean]}>
-      <mesh position={[0, h / 2, 0]} castShadow>
-        <cylinderGeometry args={[0.1, 0.17, h, 6]} />
-        <meshStandardMaterial color="#8a6a48" />
-      </mesh>
-      {Array.from({ length: 7 }, (_, i) => (
-        <group key={i} position={[0, h, 0]} rotation={[0, (i / 7) * Math.PI * 2, 0]}>
-          <mesh position={[0.75, -0.18, 0]} rotation={[0, 0, -0.45]} castShadow>
-            <boxGeometry args={[1.6, 0.04, 0.32]} />
-            <meshStandardMaterial color={i % 2 ? "#3f8a3e" : "#4f9a46"} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
-
-type HouseSpec = { x: number; z: number; w: number; d: number; wall: string; turn: number };
-
-function House({ x, z, w, d, wall, turn }: HouseSpec) {
-  return (
-    <group position={[x, 0, z]} rotation-y={turn}>
-      <mesh position={[0, 0.65, 0]} castShadow receiveShadow>
-        <boxGeometry args={[w, 1.3, d]} />
-        <meshStandardMaterial color={wall} />
-      </mesh>
-      <group position={[0, 1.75, 0]} scale={[(w + 0.4) / Math.SQRT2, 1, (d + 0.4) / Math.SQRT2]}>
-        <mesh rotation-y={Math.PI / 4} castShadow>
-          <coneGeometry args={[1, 0.9, 4]} />
-          <meshStandardMaterial color="#a8472a" flatShading />
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
-const WALLS = ["#efe2c8", "#e6d3b0", "#d9e3e0", "#f0d9c4"];
-
-function Surroundings() {
-  const { houses, palms } = useMemo(() => {
-    // Village belts west, north and east of the school wall; the south side is the beach.
-    const houses: HouseSpec[] = Array.from({ length: 26 }, (_, i) => {
-      const band = i % 3;
-      const r = rand(i);
-      const q = rand(i + 50);
-      return {
-        x: band === 0 ? -4 - r * 16 : band === 1 ? -6 + r * (W + 12) : W + 4 + r * 16,
-        z: band === 1 ? -4 - q * 14 : -6 + q * (H + 4),
-        w: 1.6 + rand(i + 9) * 1.2,
-        d: 1.4 + rand(i + 19),
-        wall: WALLS[i % WALLS.length],
-        turn: Math.round(rand(i + 7) * 3) * (Math.PI / 2) + (rand(i + 3) - 0.5) * 0.3,
-      };
-    });
-    const palms: PalmSpec[] = Array.from({ length: 16 }, (_, i) => ({
-      x: -8 + (i / 15) * (W + 16) + (rand(i + 70) - 0.5) * 2,
-      z: H + 1.2 + rand(i + 90) * 2.2,
-      h: 2.8 + rand(i + 30) * 1.6,
-      lean: (rand(i + 40) - 0.5) * 0.35,
-      turn: rand(i + 60) * Math.PI * 2,
-    }));
-    return { houses, palms };
-  }, []);
-
-  return (
-    <>
-      {/* Grass apron north of the beach line so the campus doesn't float in the fog. */}
-      <mesh rotation-x={-Math.PI / 2} position={[W / 2, 0.03, (H - 160) / 2]} receiveShadow>
-        <planeGeometry args={[320, 160 + H]} />
-        <meshStandardMaterial color="#6f8f4c" />
-      </mesh>
-      {houses.map((h, i) => (
-        <House key={i} {...h} />
-      ))}
-      {palms.map((p, i) => (
-        <Palm key={i} {...p} />
-      ))}
-      {/* Volcano and ridge on the horizon; the fog turns them into dawn silhouettes. */}
-      <mesh position={[W / 2 - 40, 24, -190]}>
-        <cylinderGeometry args={[5, 70, 48, 14]} />
-        <meshStandardMaterial color="#7d8794" flatShading />
-      </mesh>
-      <mesh position={[W / 2 + 60, 12, -170]}>
-        <coneGeometry args={[60, 24, 12]} />
-        <meshStandardMaterial color="#7a8a86" flatShading />
-      </mesh>
-      <mesh position={[W / 2 - 120, 10, -150]}>
-        <coneGeometry args={[55, 20, 12]} />
-        <meshStandardMaterial color="#7a8a86" flatShading />
-      </mesh>
-    </>
-  );
-}
-
 function AssemblyRings() {
   return ASSEMBLY.map(([x, z]) => (
     <mesh key={`${x}-${z}`} rotation-x={-Math.PI / 2} position={[x + 0.5, tileElevation(x, z) + 0.05, z + 0.5]}>
@@ -275,12 +146,11 @@ export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; st
   return (
     <Canvas shadows dpr={[1, 1.75]} frameloop={paused ? "demand" : "always"} camera={{ fov: 36, near: 0.5, far: 600 }}>
       <Backdrop sky={[-25, 4, -100]} light={[W / 2 + 32, 20, H / 2 - 26]} fog={[60, 260]} />
-      <Surroundings />
+      <Scenery />
       <Terrain />
       <Coast />
       <Props />
       <Buildings risks={{}} showRisk={false} />
-      <Flag clockRef={clockRef} />
       <AssemblyRings />
       <Route clockRef={clockRef} pts={pts} />
       <Suspense fallback={null}>

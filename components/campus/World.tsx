@@ -2,15 +2,17 @@
 
 import { Html, Line, Sky } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import {
   BufferAttribute,
   Color,
   Object3D,
   PlaneGeometry,
   type DirectionalLight,
+  type Group,
   type InstancedMesh,
   type Mesh,
+  type MeshStandardMaterial,
 } from "three";
 import {
   ASSEMBLY,
@@ -30,9 +32,11 @@ import {
 import { waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
+import Model, { M } from "@/components/Model";
 import Avatar from "./Avatar";
-import { getState, predict, setState, useDrill } from "./drillStore";
+import { getState, openChat, player, predict, useDrill } from "./drillStore";
 import Player from "./Player";
+import Scenery from "./Scenery";
 import RemotePlayers from "./RemotePlayers";
 import type { Peer } from "./useRoom";
 
@@ -66,12 +70,12 @@ export function Terrain() {
 export function Coast() {
   return (
     <>
-      <mesh rotation-x={-Math.PI / 2} position={[W / 2, 0.02, H + 2]} receiveShadow>
-        <planeGeometry args={[W + 60, 4]} />
+      <mesh rotation-x={-Math.PI / 2} position={[W / 2, 0.02, H + 3.5]} receiveShadow>
+        <planeGeometry args={[W + 120, 7]} />
         <meshStandardMaterial color="#d9c38e" />
       </mesh>
-      <mesh rotation-x={-Math.PI / 2} position={[W / 2, -0.1, H + 34]}>
-        <planeGeometry args={[W + 120, 60]} />
+      <mesh rotation-x={-Math.PI / 2} position={[W / 2, -0.1, H + 37]}>
+        <planeGeometry args={[W + 160, 60]} />
         <meshStandardMaterial color="#1e4f7a" roughness={0.3} />
       </mesh>
     </>
@@ -115,11 +119,7 @@ const FENCE: Placed[] = findTiles("=").flatMap(([x, z]) => {
   ];
 });
 
-const TREE_GREENS = ["#3f8f5a", "#2f7d55", "#4c9a52"];
-const TREES: Placed[] = findTiles("T").map(([x, z]) => {
-  const s = 0.8 + ((x * 37 + z * 17) % 10) / 20;
-  return { x, z, sx: s, sy: s, sz: s, color: TREE_GREENS[(x + z) % TREE_GREENS.length] };
-});
+const TREES = findTiles("T");
 
 export function Props() {
   return (
@@ -128,14 +128,17 @@ export function Props() {
         <boxGeometry args={[1, 0.85, 1]} />
         <meshStandardMaterial color="#efe6d4" />
       </Instanced>
-      <Instanced items={TREES} y={0.6}>
-        <cylinderGeometry args={[0.12, 0.16, 1.2, 6]} />
-        <meshStandardMaterial color="#6b4a2f" />
-      </Instanced>
-      <Instanced items={TREES} y={1.7}>
-        <icosahedronGeometry args={[0.9, 0]} />
-        <meshStandardMaterial color="#ffffff" flatShading />
-      </Instanced>
+      <Suspense fallback={null}>
+        {TREES.map(([x, z], i) => (
+          <Model
+            key={`${x}-${z}`}
+            src={M.trees[i % M.trees.length]}
+            fit={{ height: 2.3 + ((x * 37 + z * 17) % 10) / 14 }}
+            position={[x + 0.5, tileElevation(x, z), z + 0.5]}
+            rotation-y={(x * 13 + z * 7) % 6}
+          />
+        ))}
+      </Suspense>
     </>
   );
 }
@@ -144,45 +147,126 @@ const riskColor = (r: number) => new Color("#efe3c8").lerp(new Color("#e0473c"),
 
 const RECTS = buildingRects();
 
-export function Buildings({ risks, showRisk }: { risks: Record<string, number>; showRisk: boolean }) {
-  return Object.entries(RECTS).map(([id, r]) => {
-    const b = BUILDINGS[id];
-    const w = r.x1 - r.x0 + 1;
-    const d = r.z1 - r.z0 + 1;
-    const h = b.floors * 1.5;
-    const base = Math.min(tileElevation(r.x0, r.z0), tileElevation(r.x1, r.z1)) - 0.1;
-    return (
-      <group key={id} position={[r.x0 + w / 2, base, r.z0 + d / 2]}>
-        <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
-          <boxGeometry args={[w - 0.1, h, d - 0.1]} />
-          <meshStandardMaterial color={showRisk ? riskColor(risks[id]) : "#efe3c8"} />
-        </mesh>
-        {Array.from({ length: b.floors }, (_, f) => (
-          <mesh key={f} position={[0, f * 1.5 + 0.85, d / 2 - 0.02]}>
-            <boxGeometry args={[w * 0.8, 0.45, 0.06]} />
-            <meshStandardMaterial color="#2b4a6b" />
-          </mesh>
-        ))}
-        {/* A 4-sided cone turned 45° is a hip roof; the outer scale stretches it to the footprint. */}
-        <group position={[0, h + 0.6, 0]} scale={[(w + 0.6) / Math.SQRT2, 1, (d + 0.6) / Math.SQRT2]}>
-          <mesh rotation-y={Math.PI / 4} castShadow>
-            <coneGeometry args={[1, 1.2, 4]} />
-            <meshStandardMaterial color="#b4532a" flatShading />
-          </mesh>
-        </group>
-        {showRisk && (
-          <Html position={[0, h + 1.8, 0]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
-            <div className="whitespace-nowrap rounded bg-malam/90 px-2 py-1 text-center text-xs text-pasir">
-              <div className="font-semibold">{b.name}</div>
-              <div>
-                Risiko rusak <strong className={risks[id] >= 60 ? "text-bahaya" : "text-fajar"}>{risks[id]}%</strong>
-              </div>
-            </div>
-          </Html>
-        )}
-      </group>
-    );
+const FLOOR_H = 1.5;
+
+/** A school block: classrooms behind a columned front corridor (selasar) under an overhanging tiled roof. */
+function SchoolBuilding({
+  id,
+  risk,
+  showRisk,
+  fade,
+}: {
+  id: string;
+  risk: number;
+  showRisk: boolean;
+  fade: boolean;
+}) {
+  const ref = useRef<Group>(null);
+  const opacity = useRef(1);
+  const r = RECTS[id];
+  const b = BUILDINGS[id];
+  const w = r.x1 - r.x0 + 1;
+  const d = r.z1 - r.z0 + 1;
+  const h = b.floors * FLOOR_H;
+  const base = Math.min(tileElevation(r.x0, r.z0), tileElevation(r.x1, r.z1)) - 0.1;
+  // The corridor runs along the south face, the side the camera looks at.
+  const core = d - 1.1;
+  const front = d / 2 - 0.55;
+  const bays = Math.max(2, Math.round(w / 1.7));
+
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g || !fade) return;
+    // The camera sits south of the player and above; a block just south of the player hides them, so it fades.
+    const behind = player.z < r.z0 + 0.5 && player.z > r.z0 - 6 && player.x > r.x0 - 1.5 && player.x < r.x1 + 2.5;
+    const target = behind ? 0.28 : 1;
+    if (Math.abs(opacity.current - target) < 0.01) return;
+    opacity.current += (target - opacity.current) * (1 - Math.exp(-dt * 10));
+    const see = opacity.current < 0.99;
+    g.traverse((o) => {
+      const m = (o as Mesh).material as MeshStandardMaterial | undefined;
+      if (!m || Array.isArray(m)) return;
+      // Opaque shaders are compiled to ignore alpha, so switching modes needs a recompile.
+      if (m.transparent !== see) {
+        m.transparent = see;
+        m.needsUpdate = true;
+      }
+      m.opacity = opacity.current;
+    });
   });
+
+  return (
+    <group ref={ref} position={[r.x0 + w / 2, base, r.z0 + d / 2]}>
+      {/* Classrooms */}
+      <mesh position={[0, h / 2, -0.55]} castShadow receiveShadow>
+        <boxGeometry args={[w - 0.1, h, core]} />
+        <meshStandardMaterial color={showRisk ? riskColor(risk) : "#efe3c8"} />
+      </mesh>
+      <mesh position={[0, 0.3, -0.55]}>
+        <boxGeometry args={[w - 0.05, 0.6, core + 0.05]} />
+        <meshStandardMaterial color="#9a8467" />
+      </mesh>
+      {b.floors > 1 && (
+        <mesh position={[0, FLOOR_H, front - 0.5]} castShadow receiveShadow>
+          <boxGeometry args={[w - 0.1, 0.16, 1.1]} />
+          <meshStandardMaterial color="#d9cdb4" />
+        </mesh>
+      )}
+      {/* Windows and doors on each floor, facing the corridor */}
+      {Array.from({ length: b.floors }, (_, f) =>
+        Array.from({ length: bays }, (_, i) => {
+          const x = -w / 2 + (w / bays) * (i + 0.5);
+          const door = f === 0 && i % 3 === 1;
+          return (
+            <group key={`${f}-${i}`} position={[x, f * FLOOR_H, core / 2 - 0.55 + 0.03]}>
+              <mesh position={[0, door ? 0.55 : 0.85, 0]}>
+                <boxGeometry args={[door ? 0.55 : 0.85, door ? 1.05 : 0.55, 0.05]} />
+                <meshStandardMaterial color={door ? "#7a4a2b" : "#2b4a6b"} />
+              </mesh>
+              {!door && (
+                <mesh position={[0, 0.85, 0.01]}>
+                  <boxGeometry args={[0.04, 0.55, 0.06]} />
+                  <meshStandardMaterial color="#e9f1f5" />
+                </mesh>
+              )}
+            </group>
+          );
+        }),
+      )}
+      {/* Corridor floor and columns */}
+      <mesh position={[0, 0.06, front]} receiveShadow>
+        <boxGeometry args={[w, 0.12, 1.1]} />
+        <meshStandardMaterial color="#cdbfa6" />
+      </mesh>
+      {Array.from({ length: bays + 1 }, (_, i) => (
+        <mesh key={i} position={[-w / 2 + 0.12 + ((w - 0.24) / bays) * i, h / 2, front + 0.42]} castShadow>
+          <boxGeometry args={[0.16, h, 0.16]} />
+          <meshStandardMaterial color="#f6f2ea" />
+        </mesh>
+      ))}
+      {/* A 4-sided cone turned 45° is a hip roof; the outer scale stretches it over walls and corridor. */}
+      <group position={[0, h + 0.55, 0.1]} scale={[(w + 0.7) / Math.SQRT2, 1, (d + 0.9) / Math.SQRT2]}>
+        <mesh rotation-y={Math.PI / 4} castShadow>
+          <coneGeometry args={[1, 1.1, 4]} />
+          <meshStandardMaterial color="#b4532a" flatShading />
+        </mesh>
+      </group>
+      {showRisk && (
+        <Html position={[0, h + 1.8, 0]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
+          <div className="whitespace-nowrap rounded bg-malam/90 px-2 py-1 text-center text-xs text-pasir">
+            <div className="font-semibold">{b.name}</div>
+            <div>
+              Risiko rusak <strong className={risk >= 60 ? "text-bahaya" : "text-fajar"}>{risk}%</strong>
+            </div>
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+export function Buildings({ risks, showRisk, fade = false }: { risks: Record<string, number>; showRisk: boolean; fade?: boolean }) {
+  return Object.keys(RECTS).map((id) => <SchoolBuilding key={id} id={id} risk={risks[id] ?? 0} showRisk={showRisk} fade={fade} />);
 }
 
 function AssemblyPoints({ safe }: { safe: Tile[] }) {
@@ -196,11 +280,7 @@ function AssemblyPoints({ safe }: { safe: Tile[] }) {
           <ringGeometry args={[1.3, 1.6, 32]} />
           <meshStandardMaterial color={phase !== "idle" && !ok ? "#e0473c" : "#34c47c"} />
         </mesh>
-        <mesh position={[0, 1, -1.6]} castShadow>
-          <cylinderGeometry args={[0.05, 0.05, 2, 6]} />
-          <meshStandardMaterial color="#cfd6de" />
-        </mesh>
-        <Html position={[0, 2.3, -1.6]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
+        <Html position={[0, 2.5, -1.7]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
           <div className="whitespace-nowrap rounded bg-[#11663a] px-2 py-1 text-center text-xs font-bold text-white">
             {ASSEMBLY_NAMES[tileAt(x, z)]}
             {phase !== "idle" && !ok && <div className="font-semibold text-[#ffd2cc]">Tidak aman</div>}
@@ -212,16 +292,27 @@ function AssemblyPoints({ safe }: { safe: Tile[] }) {
 }
 
 function Warden() {
-  const near = useDrill((s) => s.nearWarden && !s.chatOpen);
+  const near = useDrill((s) => s.nearWarden && !s.chatOpen && s.phase !== "running");
+  const ref = useRef<Group>(null);
   const [x, z] = WARDEN;
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g) return;
+    // Turns to whoever walks up, then back to watching the yard.
+    const target = getState().nearWarden ? Math.atan2(player.x - (x + 0.5), player.z - (z + 0.5)) : Math.PI / 4;
+    const d = Math.atan2(Math.sin(target - g.rotation.y), Math.cos(target - g.rotation.y));
+    g.rotation.y += d * (1 - Math.exp(-dt * 7));
+  });
   return (
-    <group position={[x + 0.5, tileElevation(x, z), z + 0.5]} rotation-y={Math.PI / 4}>
-      <Avatar look="j" name="Petugas Keselamatan" anim={() => (getState().chatOpen ? "emote-yes" : "idle")} />
+    <group position={[x + 0.5, tileElevation(x, z), z + 0.5]}>
+      <group ref={ref} rotation-y={Math.PI / 4}>
+        <Avatar look="j" name="Petugas Keselamatan" anim={() => (getState().chatOpen ? "emote-yes" : "idle")} />
+      </group>
       {near && (
         <Html position={[0, 2.4, 0]} center zIndexRange={[30, 0]}>
           <button
             type="button"
-            onClick={() => setState({ chatOpen: true })}
+            onClick={openChat}
             className="min-h-11 whitespace-nowrap rounded-md bg-pasir px-3 text-sm font-semibold text-malam hover:bg-white active:translate-y-px"
           >
             Tanya petugas (E)
@@ -245,7 +336,7 @@ function Water() {
   return (
     <mesh ref={ref} rotation-x={-Math.PI / 2} position={[W / 2, 0, H / 2]} visible={false}>
       <planeGeometry args={[W + 80, H + 80]} />
-      <meshStandardMaterial color="#2f6f9f" transparent opacity={0.72} roughness={0.2} />
+      <meshPhongMaterial color="#3a8fc6" specular="#ffe2c2" shininess={70} transparent opacity={0.7} />
     </mesh>
   );
 }
@@ -337,10 +428,11 @@ export default function World({
   return (
     <Canvas shadows dpr={[1, 2]} camera={{ fov: 45, near: 0.1, far: 400 }} aria-label="Kampus sekolah">
       <Backdrop />
+      <Scenery />
       <Terrain />
       <Coast />
       <Props />
-      <Buildings risks={risks} showRisk={showRisk} />
+      <Buildings risks={risks} showRisk={showRisk} fade />
       <AssemblyPoints safe={goals} />
       <Warden />
       {showRisk && <HazardOverlay hazards={hazards} />}
