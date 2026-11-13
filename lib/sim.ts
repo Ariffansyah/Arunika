@@ -21,7 +21,7 @@ export type Structure = { floors: number; material: Material; built_year: number
 export const SCENARIO_LABEL = { banjir: "Banjir Rob", gempa: "Gempa Bumi" } as const;
 
 export const INTENSITY = {
-  gempa: { range: [5, 8] as [number, number], step: 0.1, label: "Magnitudo", unit: "M" },
+  gempa: { range: [5, 8] as [number, number], step: 0.1, label: "Magnitudo", unit: "" },
   banjir: { range: [0.5, 2] as [number, number], step: 0.1, label: "Tinggi air", unit: "m" },
 };
 

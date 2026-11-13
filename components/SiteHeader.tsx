@@ -1,14 +1,14 @@
 import Link from "next/link";
 
 const LINKS = [
-  { href: "/kampus", label: "Kampus 3D" },
+  { href: "/kampus", label: "Kampus" },
   { href: "/analisis", label: "Analisis" },
   { href: "/dashboard", label: "Dasbor" },
 ];
 
-export default function SiteHeader() {
+export default function SiteHeader({ overlay = false }: { overlay?: boolean }) {
   return (
-    <header className="border-b border-malam-3">
+    <header className={overlay ? "absolute inset-x-0 top-0 z-10" : "border-b border-malam-3"}>
       <nav
         aria-label="Navigasi utama"
         className="mx-auto flex max-w-6xl items-center gap-x-5 px-4 py-2 sm:gap-x-7 sm:px-6"
@@ -20,7 +20,7 @@ export default function SiteHeader() {
           <Link
             key={l.href}
             href={l.href}
-            className="flex min-h-11 items-center text-sm font-medium text-redup hover:text-pasir active:text-fajar"
+            className={`flex min-h-11 items-center text-sm font-medium hover:text-pasir active:text-fajar ${overlay ? "text-pasir/85" : "text-redup"}`}
           >
             {l.label}
           </Link>

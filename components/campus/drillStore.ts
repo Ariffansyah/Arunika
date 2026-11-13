@@ -72,9 +72,9 @@ export function schoolModel(school: School | null) {
 }
 
 /** AI prediction for a scenario: per-building risk, hazard tiles at full intensity, safe assembly points. */
-export function predict(s: Scenario, school: School | null) {
+export function predict(s: Scenario, school: School | null, year?: number) {
   const { main, site } = schoolModel(school);
-  const risks = campusRisks(main, site, s);
+  const risks = campusRisks(main, site, s, year);
   const hazards = hazardTiles(s, risks);
   return { risks, hazards, goals: safeAssembly(s, hazards) };
 }

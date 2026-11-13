@@ -2,8 +2,20 @@ import { ASSEMBLY, GRID, H, W, buildingRects, type Tile } from "@/lib/campus";
 
 const FILL: Record<string, string> = { h: "#1f4a3a", g: "#24533f", "=": "#3a4f6e" };
 
-/** Top-down SVG of the campus grid, with an optional evacuation route drawn on top. */
-export default function CampusPlan({ route, label, children }: { route?: Tile[]; label: string; children?: React.ReactNode }) {
+/** Top-down SVG of the campus grid, with optional hazard tiles and an evacuation route drawn on top. */
+export default function CampusPlan({
+  route,
+  hazards,
+  hazardColor = "#3b82c4",
+  label,
+  children,
+}: {
+  route?: Tile[];
+  hazards?: Set<number>;
+  hazardColor?: string;
+  label: string;
+  children?: React.ReactNode;
+}) {
   const rects = buildingRects();
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="block h-auto w-full">
@@ -19,6 +31,10 @@ export default function CampusPlan({ route, label, children }: { route?: Tile[];
       {GRID.flatMap((row, z) =>
         [...row].map((c, x) => (c === "T" ? <circle key={`t${x}-${z}`} cx={x + 0.5} cy={z + 0.5} r={0.45} fill="#2f7d55" /> : null)),
       )}
+      {hazards &&
+        [...hazards].map((i) => (
+          <rect key={`h${i}`} x={i % W} y={Math.floor(i / W)} width={1} height={1} fill={hazardColor} opacity={0.42} />
+        ))}
       {ASSEMBLY.map(([x, z]) => (
         <circle key={`a${x}`} cx={x + 0.5} cy={z + 0.5} r={0.8} fill="none" stroke="#34c47c" strokeWidth={0.25} />
       ))}

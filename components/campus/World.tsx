@@ -36,7 +36,7 @@ import type { Peer } from "./useRoom";
 
 const GROUND: Record<string, string> = { ".": "#a59f8a", h: "#4f8a4a", g: "#5f9b4c", A: "#4f8a4a", B: "#5f9b4c" };
 
-function Terrain() {
+export function Terrain() {
   const geometry = useMemo(() => {
     const geo = new PlaneGeometry(W, H, W * 2, H * 2);
     const pos = geo.attributes.position;
@@ -61,7 +61,7 @@ function Terrain() {
   );
 }
 
-function Coast() {
+export function Coast() {
   return (
     <>
       <mesh rotation-x={-Math.PI / 2} position={[W / 2, 0.02, H + 2]} receiveShadow>
@@ -94,7 +94,7 @@ function Instanced({ tiles, y, children }: { tiles: Tile[]; y: number; children:
   );
 }
 
-function Props() {
+export function Props() {
   const fences = useMemo(() => findTiles("="), []);
   const trees = useMemo(() => findTiles("T"), []);
   return (
@@ -119,7 +119,7 @@ const riskColor = (r: number) => new Color("#efe3c8").lerp(new Color("#e0473c"),
 
 const RECTS = buildingRects();
 
-function Buildings({ risks, showRisk }: { risks: Record<string, number>; showRisk: boolean }) {
+export function Buildings({ risks, showRisk }: { risks: Record<string, number>; showRisk: boolean }) {
   return Object.entries(RECTS).map(([id, r]) => {
     const b = BUILDINGS[id];
     const w = r.x1 - r.x0 + 1;
@@ -276,6 +276,18 @@ function Sun() {
   );
 }
 
+/** Dawn sky, haze and light shared by the game and the landing scene. */
+export function Backdrop() {
+  return (
+    <>
+      <Sky sunPosition={[100, 6, -60]} turbidity={7} rayleigh={2.2} mieCoefficient={0.008} />
+      <fog attach="fog" args={["#d9b08c", 45, 140]} />
+      <hemisphereLight args={["#ffe2c2", "#22324f", 0.9]} />
+      <Sun />
+    </>
+  );
+}
+
 export default function World({
   me,
   peers,
@@ -290,11 +302,8 @@ export default function World({
   const { risks, hazards, goals } = useMemo(() => predict(scenario, school), [scenario, school]);
 
   return (
-    <Canvas shadows dpr={[1, 2]} camera={{ fov: 45, near: 0.1, far: 400 }} aria-label="Kampus sekolah 3D">
-      <Sky sunPosition={[100, 6, -60]} turbidity={7} rayleigh={2.2} mieCoefficient={0.008} />
-      <fog attach="fog" args={["#d9b08c", 45, 140]} />
-      <hemisphereLight args={["#ffe2c2", "#22324f", 0.9]} />
-      <Sun />
+    <Canvas shadows dpr={[1, 2]} camera={{ fov: 45, near: 0.1, far: 400 }} aria-label="Kampus sekolah">
+      <Backdrop />
       <Terrain />
       <Coast />
       <Props />
