@@ -35,5 +35,27 @@ export async function requestUser(req: Request) {
   }
 }
 
-export const text = (body: string, status: number) =>
-  new Response(body, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+export const text = (body: string, status: number, headers: Record<string, string> = {}) =>
+  new Response(body, { status, headers: { "Content-Type": "text/plain; charset=utf-8", ...headers } });
+
+/** Counts this request for the user; returns a 429 once they pass `limit` in the current window, else null. */
+export async function rateLimit(userId: string, bucket: string, limit: number, windowS: number) {
+  try {
+    const { data, error } = await adminDb().rpc("hit_rate_limit", {
+      p_user: userId,
+      p_bucket: bucket,
+      p_limit: limit,
+      p_window_s: windowS,
+    });
+    if (error) throw error;
+    if (data === true) return null;
+    const retry = windowS - (Math.floor(Date.now() / 1000) % windowS);
+    return text(`Terlalu banyak permintaan. Coba lagi dalam ${Math.ceil(retry / 60)} menit.`, 429, {
+      "Retry-After": String(retry),
+    });
+  } catch (e) {
+    // Fail closed: the limit exists to cap AI spend, so an unreachable counter must not mean unlimited calls.
+    console.error("rate limit", e);
+    return text("Layanan sedang sibuk. Coba lagi sebentar lagi.", 503);
+  }
+}

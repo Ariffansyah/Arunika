@@ -77,10 +77,37 @@ left join lateral (
   limit 1
 ) a on true;
 
+-- Per-user request counter for the AI routes (fixed windows). Only the server calls it, with the service role.
+create table if not exists public.rate_limits (
+  user_id uuid not null,
+  bucket text not null,
+  window_start timestamptz not null,
+  hits int not null default 0,
+  primary key (user_id, bucket, window_start)
+);
+
+-- Counts one hit and returns true while the caller is still within p_limit for the current window.
+create or replace function public.hit_rate_limit(p_user uuid, p_bucket text, p_limit int, p_window_s int)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  delete from rate_limits where user_id = p_user and bucket = p_bucket and window_start < now() - interval '1 day';
+  insert into rate_limits as r (user_id, bucket, window_start, hits)
+  values (p_user, p_bucket, to_timestamp(floor(extract(epoch from now()) / p_window_s) * p_window_s), 1)
+  on conflict (user_id, bucket, window_start) do update set hits = r.hits + 1
+  returning hits <= p_limit;
+$$;
+
+revoke all on function public.hit_rate_limit(uuid, text, int, int) from public, anon, authenticated;
+grant execute on function public.hit_rate_limit(uuid, text, int, int) to service_role;
+
 alter table public.schools enable row level security;
 alter table public.profiles enable row level security;
 alter table public.drill_results enable row level security;
 alter table public.assessments enable row level security;
+alter table public.rate_limits enable row level security;
 
 drop policy if exists "schools readable" on public.schools;
 create policy "schools readable" on public.schools for select to authenticated using (true);

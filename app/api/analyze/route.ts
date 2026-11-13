@@ -1,5 +1,5 @@
 import { ASSESSMENT_SCHEMA, HAZARDS, parseAssessment, type Assessment } from "@/lib/assessment";
-import { VISION_MODEL, adminDb, groq, requestUser, text } from "@/lib/server";
+import { VISION_MODEL, adminDb, groq, rateLimit, requestUser, text } from "@/lib/server";
 
 const TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -33,6 +33,8 @@ export async function POST(req: Request) {
   if (!(file instanceof File)) return text("Foto tidak ditemukan.", 400);
   if (!TYPES.includes(file.type)) return text("Format foto harus JPG, PNG, atau WebP.", 400);
   if (file.size > MAX_BYTES) return text("Ukuran foto maksimal 5 MB.", 400);
+  const limited = await rateLimit(user.id, "analyze", 8, 60 * 60);
+  if (limited) return limited;
 
   try {
     const image = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString("base64")}`;
