@@ -79,7 +79,7 @@ export default function IndonesiaMap({
   onSelect: (id: string) => void;
 }) {
   return (
-    <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 26, 22], fov: 40 }} aria-label="Peta 3D sekolah di Indonesia">
+    <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 26, 22], fov: 40 }} aria-label="Peta sekolah di Indonesia">
       <color attach="background" args={["#0d1828"]} />
       <hemisphereLight args={["#ffe2c2", "#0d1828", 1.1]} />
       <directionalLight position={[20, 30, -10]} color="#ffc48a" intensity={1.8} castShadow />

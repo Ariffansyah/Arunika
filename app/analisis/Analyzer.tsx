@@ -122,7 +122,7 @@ function Form({ me }: { me: Me }) {
           disabled={!file || state.kind === "loading"}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-fajar px-5 font-semibold text-malam hover:bg-fajar-tua active:translate-y-px disabled:opacity-60"
         >
-          {state.kind === "loading" ? "Menganalisis foto…" : "Analisis foto ini"}
+          {state.kind === "loading" ? "Menganalisis foto…" : "Analisis"}
         </button>
       </form>
 

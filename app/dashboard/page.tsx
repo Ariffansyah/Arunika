@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import Dashboard from "./Dashboard";
 
-export const metadata: Metadata = { title: "Dasbor Kesiapan" };
+export const metadata: Metadata = { title: "Dasbor" };
 
 export default function DashboardPage() {
   return (

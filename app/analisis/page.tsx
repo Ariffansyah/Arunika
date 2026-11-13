@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import SiteHeader from "@/components/SiteHeader";
 import Analyzer from "./Analyzer";
 
-export const metadata: Metadata = { title: "Analisis Struktur" };
+export const metadata: Metadata = { title: "Analisis" };
 
 export default function AnalisisPage() {
   return (

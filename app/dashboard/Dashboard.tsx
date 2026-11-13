@@ -11,7 +11,7 @@ import { supabase, type School } from "@/lib/supabase";
 
 const IndonesiaMap = dynamic(() => import("@/components/dashboard/IndonesiaMap"), {
   ssr: false,
-  loading: () => <p className="p-4 text-redup">Memuat peta 3D…</p>,
+  loading: () => <p className="p-4 text-redup">Memuat peta…</p>,
 });
 
 type Row = School & {
@@ -147,7 +147,7 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
         href={`/kampus?room=${row.id}`}
         className="inline-flex min-h-11 items-center rounded-md border border-malam-3 px-4 font-semibold hover:border-redup active:translate-y-px"
       >
-        Latihan evakuasi di ruang sekolah ini
+        Latihan di ruang ini
       </Link>
     </section>
   );

@@ -103,7 +103,7 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
         </div>
       </fieldset>
       <label className="block text-sm font-semibold" htmlFor="intensity">
-        {meta.label}: {scenario.intensity.toFixed(1)} {meta.unit}
+        {`${meta.label}: ${scenario.intensity.toFixed(1)} ${meta.unit}`.trim()}
         <input
           id="intensity"
           type="range"
@@ -116,7 +116,7 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
         />
       </label>
       <button type="submit" className={`${primary} w-full`}>
-        Mulai simulasi untuk semua di ruang ini
+        Mulai simulasi
       </button>
       <p className="leading-loose text-redup">
         Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Merunduk <kbd>C</kbd> · Tanya petugas <kbd>E</kbd>
@@ -346,7 +346,7 @@ export default function Hud({
               }
             >
               <Link2 aria-hidden="true" className="size-4" />
-              {copied ? "Tautan disalin" : "Salin tautan ruang"}
+              {copied ? "Tautan disalin" : "Salin tautan"}
             </button>
           </div>
           <form
