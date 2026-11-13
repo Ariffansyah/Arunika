@@ -30,7 +30,15 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
     const ch = sb.channel(`room:${room}`, { config: { presence: { key: me.id }, broadcast: { self: false } } });
     channel.current = ch;
 
-    ch.on("presence", { event: "sync" }, () => {
+    let joined = false;
+    let last = "";
+    let lastAt = 0;
+
+    ch.on("presence", { event: "join" }, () => {
+      // Positions are only broadcast on change, so a newcomer would never see someone standing still.
+      last = "";
+    })
+      .on("presence", { event: "sync" }, () => {
       const state = ch.presenceState<{ name: string; avatar: number }>();
       const list = Object.entries(state)
         .filter(([id]) => id !== me.id)
@@ -55,19 +63,24 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
       })
       .subscribe(async (st) => {
         if (st === "SUBSCRIBED") {
+          joined = true;
           setStatus("online");
           await ch.track({ name: me.name, avatar: me.avatar });
         } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
+          joined = false;
           setStatus("offline");
         }
       });
 
-    // 5 Hz and only after movement keeps us well inside Supabase's free-tier message quota.
-    let last = "";
+    // 5 Hz, only after movement (plus a slow heartbeat), keeps us well inside Supabase's free-tier message quota.
+    // Sending before the channel joins would fall back to one HTTP request per message.
     const timer = setInterval(() => {
+      if (!joined) return;
       const msg = `${player.x.toFixed(2)},${player.z.toFixed(2)},${player.crouch}`;
-      if (msg === last) return;
+      const now = Date.now();
+      if (msg === last && now - lastAt < 3000) return;
       last = msg;
+      lastAt = now;
       ch.send({ type: "broadcast", event: "pos", payload: { id: me.id, x: player.x, z: player.z, c: player.crouch } });
     }, 200);
 

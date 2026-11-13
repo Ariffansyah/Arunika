@@ -7,7 +7,7 @@ import { WARDEN, elevationAt, idx, isBlocked } from "@/lib/campus";
 import { DRILL_LIMIT_S, PLAYER_SPEED, QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
 import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
-import { finishDrill, getState, input, player, run, setState } from "./drillStore";
+import { finishDrill, getState, input, openChat, player, resetInput, run, setState } from "./drillStore";
 
 const RADIUS = 0.3;
 const KEYS: Record<string, keyof typeof input> = {
@@ -34,32 +34,35 @@ export default function Player({ look, name }: { look: Look; name: string }) {
 
   useEffect(() => {
     reducedMotion.current = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const set = (down: boolean) => (e: KeyboardEvent) => {
+    const onDown = (e: KeyboardEvent) => {
       if (typing(e)) return;
       const k = KEYS[e.code];
       if (k) {
-        input[k] = down;
+        input[k] = true;
         e.preventDefault();
-      } else if (down && e.code === "KeyE" && getState().nearWarden) {
-        setState({ chatOpen: true });
+      } else if (e.code === "KeyE" && getState().nearWarden && !getState().chatOpen) {
+        openChat();
         e.preventDefault();
       }
     };
-    const onDown = set(true);
-    const onUp = set(false);
-    const reset = () => Object.keys(input).forEach((k) => (input[k as keyof typeof input] = false));
+    // Releases always count, even inside a text field, so a key held while focus moves can't stay pressed.
+    const onUp = (e: KeyboardEvent) => {
+      const k = KEYS[e.code];
+      if (k) input[k] = false;
+    };
     window.addEventListener("keydown", onDown);
     window.addEventListener("keyup", onUp);
-    window.addEventListener("blur", reset);
+    window.addEventListener("blur", resetInput);
     return () => {
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
-      window.removeEventListener("blur", reset);
+      window.removeEventListener("blur", resetInput);
     };
   }, []);
 
   useFrame((_, delta) => {
-    const dt = Math.min(delta, 0.1);
+    // Up to 0.25 s per frame keeps slow devices at full speed (the drill clock is wall time); bigger gaps are pauses.
+    const dt = Math.min(delta, 0.25);
     const s = getState();
     const running = s.phase === "running";
     const t = running ? (Date.now() - s.startAt) / 1000 : 0;
@@ -79,8 +82,13 @@ export default function Player({ look, name }: { look: Look; name: string }) {
       const speed = PLAYER_SPEED * (depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1);
       const ox = player.x;
       const oz = player.z;
-      if (free(player.x + dx * speed * dt, player.z)) player.x += dx * speed * dt;
-      if (free(player.x, player.z + dz * speed * dt)) player.z += dz * speed * dt;
+      // Small steps so a long frame can't carry the player through a wall corner.
+      const steps = Math.ceil(dt / 0.04);
+      const step = (speed * dt) / steps;
+      for (let i = 0; i < steps; i++) {
+        if (free(player.x + dx * step, player.z)) player.x += dx * step;
+        if (free(player.x, player.z + dz * step)) player.z += dz * step;
+      }
       player.heading = Math.atan2(dx, dz);
       if (running && t >= 0) run.walked += Math.hypot(player.x - ox, player.z - oz);
     }

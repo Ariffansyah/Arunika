@@ -58,7 +58,25 @@ export const useDrill = <T,>(select: (s: State) => T) =>
 export const player = { x: SPAWN[0] + 0.5, z: SPAWN[1] + 0.5, heading: 0, crouch: false, moving: false, wading: false };
 export const input = { up: false, down: false, left: false, right: false, crouch: false };
 export const remotes = new Map<string, { x: number; z: number; crouch: boolean; at: number }>();
-export const run = { hazards: new Set<number>(), goals: [] as Tile[], walked: 0, hazardS: 0, coverS: 0, hintUsed: false, optimalLen: 0 };
+export const run = {
+  hazards: new Set<number>(),
+  goals: [] as Tile[],
+  walked: 0,
+  hazardS: 0,
+  coverS: 0,
+  hintUsed: false,
+  optimalLen: 0,
+  optimalRoute: null as Tile[] | null,
+};
+
+export const resetInput = () => Object.keys(input).forEach((k) => (input[k as keyof typeof input] = false));
+
+/** Opening the chat moves focus to a text field, so held movement keys are released first. */
+export function openChat() {
+  if (getState().phase === "running") return;
+  resetInput();
+  setState({ chatOpen: true });
+}
 
 const DEFAULT_SITE: Site = { soil: "sedang", coast_km: 1, rain_30d_mm: 250 };
 const DEFAULT_MAIN: Structure = { floors: 2, material: "beton_bertulang", built_year: 2000 };
@@ -82,9 +100,27 @@ export function predict(s: Scenario, school: School | null, year?: number) {
 export const playerTile = (): Tile => [Math.floor(player.x), Math.floor(player.z)];
 
 export function startDrill(scenario: Scenario, school: School | null, delayMs = 1500) {
+  // Everyone starts in the corridor by the classrooms; starting where you stand would let a drill begin at a safe point.
+  Object.assign(player, {
+    x: SPAWN[0] + 0.5 + (Math.random() * 3 - 1.5),
+    z: SPAWN[1] + 0.5 + (Math.random() * 1.6 - 0.8),
+    heading: 0,
+    crouch: false,
+    moving: false,
+    wading: false,
+  });
   const { hazards, goals } = predict(scenario, school);
   const route = bestRoute(GRID, playerTile(), goals, hazards);
-  Object.assign(run, { hazards, goals, walked: 0, hazardS: 0, coverS: 0, hintUsed: false, optimalLen: route ? pathLength(route) : 0 });
+  Object.assign(run, {
+    hazards,
+    goals,
+    walked: 0,
+    hazardS: 0,
+    coverS: 0,
+    hintUsed: false,
+    optimalLen: route ? pathLength(route) : 0,
+    optimalRoute: route,
+  });
   setState({ phase: "running", scenario, startAt: Date.now() + delayMs, route, showRoute: false, result: null, chatOpen: false });
 }
 
@@ -107,5 +143,6 @@ export function finishDrill(reached: boolean) {
     coverS: run.coverS,
     hintUsed: run.hintUsed,
   };
-  setState({ phase: "done", showRoute: true, result: { ...stats, score: scoreDrill(stats) } });
+  // The results show the optimal route from the start, not whatever hint was last drawn.
+  setState({ phase: "done", route: run.optimalRoute, showRoute: true, result: { ...stats, score: scoreDrill(stats) } });
 }

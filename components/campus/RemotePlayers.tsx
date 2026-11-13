@@ -20,7 +20,8 @@ function Remote({ peer }: { peer: Peer }) {
     g.visible = Boolean(target);
     if (!target) return;
     const s = shown.current;
-    if (Number.isNaN(s.x)) Object.assign(s, target);
+    // First sighting, or a jump such as everyone returning to the start: place them instead of sliding across the map.
+    if (Number.isNaN(s.x) || Math.hypot(target.x - s.x, target.z - s.z) > 4) Object.assign(s, { x: target.x, z: target.z });
     // Positions arrive at ~5 Hz; ease toward them so movement looks continuous.
     const k = Math.min(1, dt * 10);
     const nx = s.x + (target.x - s.x) * k;

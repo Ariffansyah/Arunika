@@ -38,6 +38,12 @@ function Column({ s, selected, onSelect }: { s: MapSchool; selected: boolean; on
   const [x, z] = at(s.lon, s.lat);
   const h = 0.6 + (s.exposure / 100) * 5;
   const [hover, setHover] = useState(false);
+  useEffect(
+    () => () => {
+      document.body.style.cursor = "";
+    },
+    [],
+  );
   return (
     <group position={[x, 0.25, z]}>
       <mesh

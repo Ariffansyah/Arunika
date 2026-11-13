@@ -32,6 +32,8 @@ function siren(seconds = 3) {
     osc.start();
     osc.stop(ctx.currentTime + seconds);
     osc.onended = () => ctx.close();
+    // A drill started by someone else arrives without a click here, so the context may begin suspended.
+    void ctx.resume();
   } catch {
     // Audio is a cue, not a requirement; the on-screen instruction carries the same message.
   }
@@ -43,8 +45,14 @@ function useDrillClock() {
   const [t, setT] = useState(0);
   useEffect(() => {
     if (phase !== "running") return;
-    const id = setInterval(() => setT((Date.now() - startAt) / 1000), 100);
-    return () => clearInterval(id);
+    const tick = () => setT((Date.now() - startAt) / 1000);
+    // First reading on the next frame, so a new drill never shows the previous drill's time.
+    const raf = requestAnimationFrame(tick);
+    const id = setInterval(tick, 100);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(id);
+    };
   }, [phase, startAt]);
   return phase === "running" ? t : 0;
 }
@@ -63,7 +71,7 @@ function Minimap() {
   }, []);
   const route = useDrill((s) => (s.showRoute ? s.route : null));
   return (
-    <div className="w-40 overflow-hidden rounded-md border border-malam-3 sm:w-52">
+    <div className="w-28 overflow-hidden rounded-md border border-malam-3 sm:w-52">
       <CampusPlan route={route ?? undefined} label="Peta mini kampus dengan posisi kamu">
         <circle ref={dot} r={0.8} fill="#f4ecdc" stroke="#0d1828" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
       </CampusPlan>
@@ -262,10 +270,11 @@ function TouchPad() {
     },
     onPointerUp: () => (input[k] = false),
     onPointerCancel: () => (input[k] = false),
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
   const pad = "flex size-12 items-center justify-center rounded-md bg-malam/85 text-pasir active:bg-malam-3 touch-none select-none";
   return (
-    <div className="pointer-events-auto absolute right-3 bottom-3 hidden grid-cols-3 gap-1 pointer-coarse:grid">
+    <div className="pointer-events-auto absolute right-3 bottom-3 hidden grid-cols-[3rem_auto_3rem] justify-items-center gap-1 pointer-coarse:grid">
       <span />
       <button type="button" aria-label="Maju" className={pad} {...hold("up")}>
         <ChevronUp aria-hidden="true" />
@@ -274,7 +283,7 @@ function TouchPad() {
       <button type="button" aria-label="Kiri" className={pad} {...hold("left")}>
         <ChevronLeft aria-hidden="true" />
       </button>
-      <button type="button" className={`${pad} text-xs font-bold`} {...hold("crouch")}>
+      <button type="button" className={`${pad} w-auto px-2.5 text-xs font-bold`} {...hold("crouch")}>
         Merunduk
       </button>
       <button type="button" aria-label="Kanan" className={pad} {...hold("right")}>
@@ -308,7 +317,7 @@ export default function Hud({
   const showRisk = useDrill((s) => s.showRisk);
   const t = useDrillClock();
   const router = useRouter();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -320,7 +329,7 @@ export default function Hud({
   return (
     <div className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-3 p-3">
       <div className="flex items-start justify-between gap-3">
-        <div className={`${panel} pointer-events-auto max-w-xs space-y-2 text-sm`}>
+        <div className={`${panel} pointer-events-auto min-w-0 max-w-xs space-y-2 text-sm`}>
           <div className="flex items-center gap-3">
             <Link href="/" className="font-extrabold text-pasir">
               Arunika<span className="text-fajar">.</span>
@@ -339,18 +348,19 @@ export default function Hud({
               type="button"
               className={`${ghost} min-h-9 px-3`}
               onClick={() =>
-                navigator.clipboard
-                  .writeText(`${location.origin}/kampus?room=${encodeURIComponent(room)}`)
-                  .then(() => setCopied(true))
-                  .catch(() => setCopied(false))
+                // The clipboard API is missing on plain-http pages; that throws synchronously, so start from a promise.
+                Promise.resolve()
+                  .then(() => navigator.clipboard.writeText(`${location.origin}/kampus?room=${encodeURIComponent(room)}`))
+                  .then(() => setCopied("ok"))
+                  .catch(() => setCopied("fail"))
               }
             >
               <Link2 aria-hidden="true" className="size-4" />
-              {copied ? "Tautan disalin" : "Salin tautan"}
+              {copied === "ok" ? "Tautan disalin" : copied === "fail" ? "Gagal menyalin" : "Salin tautan"}
             </button>
           </div>
           <form
-            className="flex gap-2"
+            className="hidden gap-2 sm:flex"
             onSubmit={(e) => {
               e.preventDefault();
               const code = String(new FormData(e.currentTarget).get("room")).trim();
@@ -382,12 +392,14 @@ export default function Hud({
             className={`${btn} min-h-10 border px-3 text-sm ${showRisk ? "border-fajar bg-fajar text-malam" : "border-malam-3 bg-malam/90 text-pasir hover:border-redup"}`}
           >
             <Layers aria-hidden="true" className="size-4" />
-            Lapisan risiko AI
+            <span className="sm:hidden">Risiko AI</span>
+            <span className="hidden sm:inline">Lapisan risiko AI</span>
           </button>
         </div>
       </div>
 
-      <div className={`${panel} pointer-events-auto w-full max-w-sm text-sm`}>
+      {/* On touch screens the panel sits above the movement pad instead of under it. */}
+      <div className={`${panel} pointer-events-auto w-full max-w-sm text-sm pointer-coarse:mb-[10.5rem]`}>
         {phase === "idle" && <ScenarioPicker onStart={onStart} />}
         {phase === "running" && <Instruction t={t} />}
         {phase === "done" && result && <Results result={result} room={room} schoolId={school?.id ?? null} />}

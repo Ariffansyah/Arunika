@@ -42,6 +42,11 @@ export default function WardenChat() {
     () => Boolean(getRecognition()),
     () => false,
   );
+  const canSpeak = useSyncExternalStore(
+    () => () => {},
+    () => "speechSynthesis" in window,
+    () => false,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -81,7 +86,7 @@ export default function WardenChat() {
         reply += decoder.decode(value, { stream: true });
         setMsgs([...history, { role: "model", text: reply }]);
       }
-      if (voice && reply) speak(reply);
+      if (voice && canSpeak && reply) speak(reply);
     } catch (e) {
       setMsgs(history);
       setError(e instanceof Error ? e.message : String(e));
@@ -112,6 +117,7 @@ export default function WardenChat() {
         <h2 id="warden-title" className="mr-auto font-bold">
           Petugas Keselamatan (AI)
         </h2>
+        {canSpeak && (
         <button
           type="button"
           aria-pressed={voice}
@@ -124,6 +130,7 @@ export default function WardenChat() {
         >
           {voice ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}
         </button>
+        )}
         <button
           type="button"
           aria-label="Tutup percakapan"
