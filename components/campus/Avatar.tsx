@@ -9,18 +9,16 @@ export default function Avatar({
   name,
   anim,
   self = false,
-  wheelchair = false,
 }: {
   look: Look;
   name: string;
   anim: () => Anim;
   self?: boolean;
-  wheelchair?: boolean;
 }) {
   return (
     <>
       <Suspense fallback={null}>
-        <Character look={look} anim={anim} wheelchair={wheelchair} />
+        <Character look={look} anim={anim} />
       </Suspense>
       <Html position={[0, 1.8, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
         <span

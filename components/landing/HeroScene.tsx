@@ -96,17 +96,7 @@ function Route({ clockRef, pts }: { clockRef: Clock; pts: Pts }) {
   return <Line ref={ref} points={points} color="#ff8a3d" lineWidth={6} dashed dashSize={0.7} gapSize={0.4} />;
 }
 
-// One student evacuates in a wheelchair: an inclusive drill plans for every learner.
-const STUDENTS: { look: Look; wheelchair?: boolean }[] = [
-  { look: "female-c" },
-  { look: "male-a" },
-  { look: "female-b" },
-  { look: "female-e", wheelchair: true },
-  { look: "male-f" },
-  { look: "female-f" },
-  { look: "male-a" },
-  { look: "female-b" },
-];
+const STUDENTS: Look[] = ["female-c", "male-a", "female-b", "female-e", "male-f", "female-f", "male-a", "female-b"];
 preloadCharacters(["female-c", "male-a", "female-b", "female-e", "male-f", "female-f"]);
 
 function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; cum: number[]; delay: number; i: number }) {
@@ -134,21 +124,7 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
   });
   return (
     <group ref={ref}>
-      <Character
-        look={STUDENTS[i].look}
-        wheelchair={STUDENTS[i].wheelchair}
-        height={1.55}
-        speed={1.3}
-        anim={() =>
-          STUDENTS[i].wheelchair
-            ? walking.current
-              ? "wheelchair-move-forward"
-              : "wheelchair-sit"
-            : walking.current
-              ? "walk"
-              : "idle"
-        }
-      />
+      <Character look={STUDENTS[i]} height={1.55} speed={1.3} anim={() => (walking.current ? "walk" : "idle")} />
     </group>
   );
 }

@@ -28,14 +28,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 // Profile `avatar` (0-5) picks one of these characters; see components/Character.tsx.
-export const AVATARS: { look: Look; wheelchair: boolean }[] = [
-  { look: "female-c", wheelchair: false },
-  { look: "male-a", wheelchair: false },
-  { look: "female-b", wheelchair: false },
-  { look: "male-f", wheelchair: false },
-  { look: "female-f", wheelchair: false },
-  { look: "female-e", wheelchair: true },
-];
+export const AVATARS: Look[] = ["female-c", "male-a", "female-b", "male-f", "female-f", "female-e"];
 export const avatarOf = (i: number) => AVATARS[i] ?? AVATARS[0];
 
 let client: SupabaseClient | null = null;

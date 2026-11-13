@@ -37,14 +37,9 @@ function Remote({ peer }: { peer: Peer }) {
   return (
     <group ref={ref} visible={false}>
       <Avatar
-        look={avatarOf(peer.avatar).look}
-        wheelchair={avatarOf(peer.avatar).wheelchair}
+        look={avatarOf(peer.avatar)}
         name={peer.name}
-        anim={() => {
-          const s = shown.current;
-          if (avatarOf(peer.avatar).wheelchair) return s.moving ? "wheelchair-move-forward" : "wheelchair-sit";
-          return s.crouch ? "crouch" : s.moving ? "sprint" : "idle";
-        }}
+        anim={() => (shown.current.crouch ? "crouch" : shown.current.moving ? "sprint" : "idle")}
       />
     </group>
   );

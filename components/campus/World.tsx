@@ -13,6 +13,7 @@ import {
   type InstancedMesh,
   type Mesh,
   type MeshStandardMaterial,
+  type Vector3,
 } from "three";
 import {
   ASSEMBLY,
@@ -30,11 +31,12 @@ import {
   tileElevation,
   type Tile,
 } from "@/lib/campus";
-import { waterLevel } from "@/lib/sim";
+import { QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
 import Model, { M } from "@/components/Model";
 import Avatar from "./Avatar";
+import { Beacons, Classmates, FloodDebris, QuakeDebris } from "./Effects";
 import { getState, openChat, player, predict, useDrill } from "./drillStore";
 import Player from "./Player";
 import Scenery from "./Scenery";
@@ -125,7 +127,33 @@ const FENCE: Placed[] = findTiles("=").flatMap(([x, z]) => {
 
 const TREES = findTiles("T");
 
-export function Props() {
+function Tree({ x, z, i, fade }: { x: number; z: number; i: number; fade: boolean }) {
+  const ref = useRef<Group>(null);
+  const opacity = useRef(1);
+  const camera = useThree((s) => s.camera);
+  const height = 2.3 + ((x * 37 + z * 17) % 10) / 14;
+  useFrame((_, dt) => {
+    const g = ref.current;
+    if (!g || !fade) return;
+    const target = hides(camera.position, tileElevation(x, z) + height, x - 0.2, z - 0.2, x + 1.2, z + 1.2) ? 0.3 : 1;
+    if (Math.abs(opacity.current - target) < 0.01) return;
+    opacity.current += (target - opacity.current) * (1 - Math.exp(-dt * 10));
+    fadeTo(g, opacity.current);
+  });
+  return (
+    <group ref={ref}>
+      <Model
+        src={M.trees[i % M.trees.length]}
+        fit={{ height }}
+        ownMaterials={fade}
+        position={[x + 0.5, tileElevation(x, z), z + 0.5]}
+        rotation-y={(x * 13 + z * 7) % 6}
+      />
+    </group>
+  );
+}
+
+export function Props({ fade = false }: { fade?: boolean }) {
   return (
     <>
       <Instanced items={FENCE} y={0.42}>
@@ -134,13 +162,7 @@ export function Props() {
       </Instanced>
       <Suspense fallback={null}>
         {TREES.map(([x, z], i) => (
-          <Model
-            key={`${x}-${z}`}
-            src={M.trees[i % M.trees.length]}
-            fit={{ height: 2.3 + ((x * 37 + z * 17) % 10) / 14 }}
-            position={[x + 0.5, tileElevation(x, z), z + 0.5]}
-            rotation-y={(x * 13 + z * 7) % 6}
-          />
+          <Tree key={`${x}-${z}`} x={x} z={z} i={i} fade={fade} />
         ))}
       </Suspense>
     </>
@@ -148,6 +170,51 @@ export function Props() {
 }
 
 const riskColor = (r: number) => new Color("#efe3c8").lerp(new Color("#e0473c"), r / 100);
+
+// Liang-Barsky clip of the camera-to-player sight line against a footprint; returns where it enters, or null.
+function sightEnters(cam: Vector3, x0: number, z0: number, x1: number, z1: number) {
+  const dx = player.x - cam.x;
+  const dz = player.z - cam.z;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [p, q] of [
+    [-dx, cam.x - x0],
+    [dx, x1 - cam.x],
+    [-dz, cam.z - z0],
+    [dz, z1 - cam.z],
+  ]) {
+    if (p === 0) {
+      if (q < 0) return null;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) t0 = Math.max(t0, r);
+    else t1 = Math.min(t1, r);
+    if (t0 > t1) return null;
+  }
+  return t0 < 0.95 ? t0 : null;
+}
+
+function hides(cam: Vector3, top: number, x0: number, z0: number, x1: number, z1: number) {
+  const t = sightEnters(cam, x0, z0, x1, z1);
+  if (t === null) return false;
+  const eye = elevationAt(player.x, player.z) + 1;
+  return cam.y + (eye - cam.y) * t < top;
+}
+
+function fadeTo(g: Group, opacity: number) {
+  const see = opacity < 0.99;
+  g.traverse((o) => {
+    const m = (o as Mesh).material as MeshStandardMaterial | undefined;
+    if (!m || Array.isArray(m)) return;
+    // Opaque shaders are compiled to ignore alpha, so switching modes needs a recompile.
+    if (m.transparent !== see) {
+      m.transparent = see;
+      m.needsUpdate = true;
+    }
+    m.opacity = opacity;
+  });
+}
 
 const RECTS = buildingRects();
 
@@ -177,25 +244,22 @@ function SchoolBuilding({
   const front = d / 2 - 0.55;
   const bays = Math.max(2, Math.round(w / 1.7));
 
+  const camera = useThree((s) => s.camera);
   useFrame((_, dt) => {
     const g = ref.current;
-    if (!g || !fade) return;
-    // The camera is south of and above the player, so a block just south of them hides them.
-    const behind = player.z < r.z0 + 0.5 && player.z > r.z0 - 6 && player.x > r.x0 - 1.5 && player.x < r.x1 + 2.5;
-    const target = behind ? 0.28 : 1;
+    if (!g) return;
+    const s = getState();
+    const t = (Date.now() - s.startAt) / 1000;
+    const shaking = s.phase === "running" && s.scenario.kind === "gempa" && t >= 0 && t < QUAKE_SHAKE_S;
+    // Weaker blocks visibly sway more: the risk model, shown rather than told.
+    const sway = shaking ? (0.004 + (risk / 100) * 0.03) * (s.scenario.intensity - 4) * 0.5 : 0;
+    g.rotation.z = Math.sin(t * 17 + r.x0) * sway;
+    g.rotation.x = Math.cos(t * 13 + r.z0) * sway * 0.6;
+    if (!fade) return;
+    const target = hides(camera.position, base + h + 1.1, r.x0 - 0.1, r.z0 - 0.1, r.x1 + 1.1, r.z1 + 1.1) ? 0.28 : 1;
     if (Math.abs(opacity.current - target) < 0.01) return;
     opacity.current += (target - opacity.current) * (1 - Math.exp(-dt * 10));
-    const see = opacity.current < 0.99;
-    g.traverse((o) => {
-      const m = (o as Mesh).material as MeshStandardMaterial | undefined;
-      if (!m || Array.isArray(m)) return;
-      // Opaque shaders are compiled to ignore alpha, so switching modes needs a recompile.
-      if (m.transparent !== see) {
-        m.transparent = see;
-        m.needsUpdate = true;
-      }
-      m.opacity = opacity.current;
-    });
+    fadeTo(g, opacity.current);
   });
 
   return (
@@ -324,18 +388,29 @@ function Warden() {
 
 function Water() {
   const ref = useRef<Mesh>(null);
+  const baseRef = useRef<Float32Array | null>(null);
   useFrame(() => {
     const s = getState();
     const m = ref.current;
     if (!m) return;
     const level = s.phase === "idle" ? 0 : waterLevel(s.scenario, s.phase === "running" ? (Date.now() - s.startAt) / 1000 : Infinity);
     m.visible = level > 0;
+    if (!m.visible) return;
     m.position.y = level;
+    const t = Date.now() / 1000;
+    const pos = m.geometry.attributes.position;
+    baseRef.current ??= Float32Array.from(pos.array);
+    const b = baseRef.current;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setZ(i, Math.sin(b[i * 3] * 0.5 + t * 1.4) * 0.05 + Math.sin(b[i * 3 + 1] * 0.7 - t * 1.1) * 0.04);
+    }
+    pos.needsUpdate = true;
+    m.geometry.computeVertexNormals();
   });
   return (
     <mesh ref={ref} rotation-x={-Math.PI / 2} position={[W / 2, 0, H / 2]} visible={false}>
-      <planeGeometry args={[W + 80, H + 80]} />
-      <meshPhongMaterial color="#3a8fc6" specular="#ffe2c2" shininess={70} transparent opacity={0.7} />
+      <planeGeometry args={[W + 80, H + 80, 80, 64]} />
+      <meshPhongMaterial color="#3a8fc6" specular="#ffe2c2" shininess={70} transparent opacity={0.72} />
     </mesh>
   );
 }
@@ -415,7 +490,7 @@ export default function World({
   peers,
   school,
 }: {
-  me: { name: string; look: Look; wheelchair: boolean };
+  me: { name: string; look: Look };
   peers: Peer[];
   school: School | null;
 }) {
@@ -429,14 +504,18 @@ export default function World({
       <Scenery />
       <Terrain />
       <Coast />
-      <Props />
+      <Props fade />
       <Buildings risks={risks} showRisk={showRisk} fade />
+      <Classmates />
+      <QuakeDebris />
+      <FloodDebris />
+      <Beacons />
       <AssemblyPoints safe={goals} />
       <Warden />
       {showRisk && <HazardOverlay hazards={hazards} />}
       <Route />
       <Water />
-      <Player look={me.look} wheelchair={me.wheelchair} name={me.name} />
+      <Player look={me.look} name={me.name} />
       <RemotePlayers peers={peers} />
     </Canvas>
   );

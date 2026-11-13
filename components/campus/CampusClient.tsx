@@ -36,7 +36,7 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
   return (
     <div className="fixed inset-0">
       <h1 className="sr-only">Kampus {me.school?.name ?? ""}</h1>
-      <World me={{ name: self.name, ...avatarOf(self.avatar) }} peers={peers} school={me.school} />
+      <World me={{ name: self.name, look: avatarOf(self.avatar) }} peers={peers} school={me.school} />
       <Hud room={room} peers={peers} status={status} school={me.school} onStart={onStart} />
       <WardenChat />
     </div>

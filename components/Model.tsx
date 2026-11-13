@@ -3,7 +3,7 @@
 import { useGLTF } from "@react-three/drei";
 import type { ThreeElements } from "@react-three/fiber";
 import { useMemo } from "react";
-import { Box3, Vector3, type Mesh } from "three";
+import { Box3, Vector3, type Material, type Mesh } from "three";
 
 // Kenney kits (CC0), see the LICENSE.txt next to each kit in public/models.
 export const M = {
@@ -25,7 +25,12 @@ export const M = {
 
 type Fit = { height?: number; width?: number };
 
-export default function Model({ src, fit, ...props }: { src: string; fit?: Fit } & ThreeElements["group"]) {
+export default function Model({
+  src,
+  fit,
+  ownMaterials = false,
+  ...props
+}: { src: string; fit?: Fit; ownMaterials?: boolean } & ThreeElements["group"]) {
   const { scene } = useGLTF(src);
   const height = fit?.height;
   const width = fit?.width;
@@ -35,12 +40,14 @@ export default function Model({ src, fit, ...props }: { src: string; fit?: Fit }
       if ((o as Mesh).isMesh) {
         o.castShadow = true;
         o.receiveShadow = true;
+        // Clones share materials; anything faded on its own needs a private copy.
+        if (ownMaterials) (o as Mesh).material = ((o as Mesh).material as Material).clone();
       }
     });
     const size = new Box3().setFromObject(obj).getSize(new Vector3());
     const scale = height ? height / size.y : width ? width / Math.max(size.x, size.z) : 1;
     return { obj, scale };
-  }, [scene, height, width]);
+  }, [scene, height, width, ownMaterials]);
   return (
     <group {...props}>
       <primitive object={obj} scale={scale} />

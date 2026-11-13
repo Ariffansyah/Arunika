@@ -39,6 +39,37 @@ function siren(seconds = 3) {
   }
 }
 
+function rumble(seconds: number) {
+  try {
+    const ctx = new AudioContext();
+    const n = Math.floor(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < n; i++) {
+      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      data[i] = last * 3.5;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const low = ctx.createBiquadFilter();
+    low.type = "lowpass";
+    low.frequency.value = 140;
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.55, now + 0.4);
+    gain.gain.setValueAtTime(0.55, now + seconds - 1);
+    gain.gain.linearRampToValueAtTime(0, now + seconds);
+    src.connect(low).connect(gain).connect(ctx.destination);
+    src.start();
+    src.onended = () => ctx.close();
+    void ctx.resume();
+  } catch {
+    // Sound is a cue only; the shaking camera and the instruction carry the same message.
+  }
+}
+
 function useDrillClock() {
   const phase = useDrill((s) => s.phase);
   const startAt = useDrill((s) => s.startAt);
@@ -321,9 +352,10 @@ export default function Hud({
 
   useEffect(() => {
     if (phase !== "running") return;
-    const at = startAt + (scenario.kind === "gempa" ? QUAKE_SHAKE_S * 1000 : 0) - Date.now();
-    const id = setTimeout(() => siren(), Math.max(0, at));
-    return () => clearTimeout(id);
+    const quake = scenario.kind === "gempa";
+    const ids = [setTimeout(() => siren(), Math.max(0, startAt + (quake ? QUAKE_SHAKE_S * 1000 : 0) - Date.now()))];
+    if (quake) ids.push(setTimeout(() => rumble(QUAKE_SHAKE_S), Math.max(0, startAt - Date.now())));
+    return () => ids.forEach(clearTimeout);
   }, [phase, startAt, scenario.kind]);
 
   return (
