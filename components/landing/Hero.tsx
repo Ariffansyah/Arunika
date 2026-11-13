@@ -21,20 +21,21 @@ export default function Hero() {
 
   return (
     // The gradient matches the dawn sky, so nothing flashes while the 3D chunk loads.
-    <section className="relative isolate flex h-[100svh] min-h-[600px] items-end overflow-hidden bg-[linear-gradient(180deg,#1d2c4b_0%,#4a4a66_55%,#b86f50_100%)]">
+    <section className="relative isolate flex h-[100svh] min-h-[600px] items-end overflow-hidden bg-[linear-gradient(180deg,#1d2c4b_0%,#4a4a66_55%,#b86f50_100%)] lg:items-center">
       <div className="absolute inset-0 -z-10">
         <HeroScene paused={paused} startAt={6} />
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-28 bg-[linear-gradient(180deg,rgb(13_24_40/0.75),transparent)]"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-28 bg-[linear-gradient(180deg,rgb(13_24_40/0.7),transparent)]"
       />
+      {/* Text sits on the dark side of the fade; the campus keeps its colour on the other side. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-3/4 bg-[linear-gradient(0deg,#0d1828_8%,rgb(13_24_40/0.82)_40%,transparent)]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[62%] bg-[linear-gradient(0deg,#0d1828_10%,rgb(13_24_40/0.8)_45%,transparent)] lg:inset-y-0 lg:left-0 lg:h-auto lg:w-[62%] lg:bg-[linear-gradient(90deg,#0d1828_0%,rgb(13_24_40/0.86)_40%,rgb(13_24_40/0.4)_70%,transparent)]"
       />
-      <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 sm:pb-20">
-        <h1 className="max-w-4xl text-5xl font-extrabold leading-[1] tracking-[-0.035em] text-balance sm:text-7xl lg:text-[5.5rem]">
+      <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 sm:pb-20 lg:pb-0">
+        <h1 className="max-w-[11ch] text-5xl font-extrabold leading-[1] tracking-[-0.035em] sm:text-7xl lg:text-[5.25rem]">
           Latihan evakuasi <span className="text-fajar">sebelum</span> bencana datang.
         </h1>
         <div className="mt-9 flex flex-wrap gap-3">

@@ -13,6 +13,10 @@ export default function MasukPage() {
     <main className="grid min-h-[100svh] flex-1 lg:grid-cols-[1.2fr_1fr]">
       <div className="relative hidden overflow-hidden bg-[linear-gradient(180deg,#1d2c4b_0%,#4a4a66_55%,#b86f50_100%)] lg:block">
         <StillScene />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgb(13_24_40/0.7),transparent)]"
+        />
         <Link href="/" className={`absolute top-6 left-8 ${logo}`}>
           Arunika<span className="text-fajar">.</span>
         </Link>

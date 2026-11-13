@@ -16,6 +16,7 @@ import {
   ASSEMBLY,
   ASSEMBLY_NAMES,
   BUILDINGS,
+  GRID,
   H,
   W,
   WARDEN,
@@ -76,40 +77,63 @@ export function Coast() {
   );
 }
 
-function Instanced({ tiles, y, children }: { tiles: Tile[]; y: number; children: React.ReactNode }) {
+type Placed = { x: number; z: number; sx?: number; sy?: number; sz?: number; color?: string };
+
+function Instanced({ items, y, children }: { items: Placed[]; y: number; children: React.ReactNode }) {
   const ref = useRef<InstancedMesh>(null);
   useLayoutEffect(() => {
+    const mesh = ref.current!;
     const o = new Object3D();
-    tiles.forEach(([x, z], i) => {
-      o.position.set(x + 0.5, tileElevation(x, z) + y, z + 0.5);
+    const c = new Color();
+    items.forEach((it, i) => {
+      o.position.set(it.x + 0.5, tileElevation(it.x, it.z) + y * (it.sy ?? 1), it.z + 0.5);
+      o.scale.set(it.sx ?? 1, it.sy ?? 1, it.sz ?? 1);
       o.updateMatrix();
-      ref.current!.setMatrixAt(i, o.matrix);
+      mesh.setMatrixAt(i, o.matrix);
+      if (it.color) mesh.setColorAt(i, c.set(it.color));
     });
-    ref.current!.instanceMatrix.needsUpdate = true;
-  }, [tiles, y]);
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [items, y]);
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, tiles.length]} castShadow receiveShadow>
+    <instancedMesh ref={ref} args={[undefined, undefined, items.length]} castShadow receiveShadow>
       {children}
     </instancedMesh>
   );
 }
 
+// A thin wall segment per fence tile, turned to follow its neighbours; corners get both directions.
+// tileAt pads the outside of the map with fence, so neighbours are read from GRID directly.
+const isFence = (x: number, z: number) => GRID[z]?.[x] === "=";
+const FENCE: Placed[] = findTiles("=").flatMap(([x, z]) => {
+  const along = isFence(x - 1, z) || isFence(x + 1, z);
+  const across = isFence(x, z - 1) || isFence(x, z + 1);
+  return [
+    ...(along ? [{ x, z, sz: 0.22 }] : []),
+    ...(across || !along ? [{ x, z, sx: 0.22 }] : []),
+  ];
+});
+
+const TREE_GREENS = ["#3f8f5a", "#2f7d55", "#4c9a52"];
+const TREES: Placed[] = findTiles("T").map(([x, z]) => {
+  const s = 0.8 + ((x * 37 + z * 17) % 10) / 20;
+  return { x, z, sx: s, sy: s, sz: s, color: TREE_GREENS[(x + z) % TREE_GREENS.length] };
+});
+
 export function Props() {
-  const fences = useMemo(() => findTiles("="), []);
-  const trees = useMemo(() => findTiles("T"), []);
   return (
     <>
-      <Instanced tiles={fences} y={0.35}>
-        <boxGeometry args={[1, 0.7, 1]} />
-        <meshStandardMaterial color="#e9e1cf" />
+      <Instanced items={FENCE} y={0.42}>
+        <boxGeometry args={[1, 0.85, 1]} />
+        <meshStandardMaterial color="#efe6d4" />
       </Instanced>
-      <Instanced tiles={trees} y={0.6}>
+      <Instanced items={TREES} y={0.6}>
         <cylinderGeometry args={[0.12, 0.16, 1.2, 6]} />
         <meshStandardMaterial color="#6b4a2f" />
       </Instanced>
-      <Instanced tiles={trees} y={1.7}>
+      <Instanced items={TREES} y={1.7}>
         <icosahedronGeometry args={[0.9, 0]} />
-        <meshStandardMaterial color="#2f7d55" flatShading />
+        <meshStandardMaterial color="#ffffff" flatShading />
       </Instanced>
     </>
   );
@@ -226,10 +250,10 @@ function Water() {
 }
 
 function HazardOverlay({ hazards }: { hazards: Set<number> }) {
-  const tiles = useMemo(() => [...hazards].map((i): Tile => [i % W, Math.floor(i / W)]), [hazards]);
-  if (!tiles.length) return null;
+  const items = useMemo(() => [...hazards].map((i): Placed => ({ x: i % W, z: Math.floor(i / W) })), [hazards]);
+  if (!items.length) return null;
   return (
-    <Instanced tiles={tiles} y={0.06}>
+    <Instanced items={items} y={0.06}>
       <boxGeometry args={[0.96, 0.04, 0.96]} />
       <meshBasicMaterial color="#e0473c" transparent opacity={0.45} />
     </Instanced>
@@ -251,7 +275,7 @@ function Route() {
   );
 }
 
-function Sun() {
+function Sun({ position = [W / 2 + 30, 22, H / 2 - 18] }: { position?: [number, number, number] }) {
   const ref = useRef<DirectionalLight>(null);
   const scene = useThree((s) => s.scene);
   useLayoutEffect(() => {
@@ -263,7 +287,7 @@ function Sun() {
   return (
     <directionalLight
       ref={ref}
-      position={[W / 2 + 30, 22, H / 2 - 18]}
+      position={position}
       color="#ffc48a"
       intensity={2.2}
       castShadow
@@ -277,13 +301,21 @@ function Sun() {
 }
 
 /** Dawn sky, haze and light shared by the game and the landing scene. */
-export function Backdrop() {
+export function Backdrop({
+  sky = [100, 6, -60],
+  light,
+  fog = [45, 140],
+}: {
+  sky?: [number, number, number];
+  light?: [number, number, number];
+  fog?: [number, number];
+}) {
   return (
     <>
-      <Sky sunPosition={[100, 6, -60]} turbidity={7} rayleigh={2.2} mieCoefficient={0.008} />
-      <fog attach="fog" args={["#d9b08c", 45, 140]} />
+      <Sky sunPosition={sky} turbidity={7} rayleigh={2.2} mieCoefficient={0.008} />
+      <fog attach="fog" args={["#d9b08c", ...fog]} />
       <hemisphereLight args={["#ffe2c2", "#22324f", 0.9]} />
-      <Sun />
+      <Sun position={light} />
     </>
   );
 }
