@@ -1,17 +1,20 @@
 "use client";
 
+import { Check, Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AVATAR_COLORS, ROLE_LABEL, supabase, type Role, type School } from "@/lib/supabase";
 
-const input =
-  "mt-1 block min-h-11 w-full rounded-md border border-malam-3 bg-malam-2 px-3 text-pasir placeholder:text-redup/70 focus-visible:border-fajar";
+const label = "block text-sm font-medium";
+const field =
+  "mt-1.5 block min-h-12 w-full rounded-md border border-malam-3 bg-malam-2 px-3 text-pasir placeholder:text-redup hover:border-redup focus-visible:border-fajar";
 const primary =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-md bg-fajar px-5 font-semibold text-malam hover:bg-fajar-tua active:translate-y-px disabled:opacity-60";
+  "inline-flex min-h-12 w-full items-center justify-center rounded-md bg-fajar px-5 font-semibold text-malam hover:bg-fajar-tua active:translate-y-px disabled:opacity-60";
 const secondary =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-md border border-malam-3 px-5 font-semibold hover:border-redup active:translate-y-px disabled:opacity-60";
+  "inline-flex min-h-12 w-full items-center justify-center rounded-md border border-malam-3 px-5 font-semibold hover:border-redup active:translate-y-px disabled:opacity-60";
 
 type Stage = "loading" | "auth" | "profile";
+type Mode = "masuk" | "daftar";
 
 // Resolve against our own origin so "//host" or "/\host" can't send users to another site.
 function safeNext(raw: string | null) {
@@ -23,12 +26,28 @@ function safeNext(raw: string | null) {
   }
 }
 
+// Supabase answers in English; translate the cases people actually run into.
+function friendly(e: unknown) {
+  const m = e instanceof Error ? e.message : String(e);
+  if (/invalid login credentials/i.test(m)) return "Email atau kata sandi salah.";
+  if (/already registered|already exists/i.test(m)) return "Email ini sudah terdaftar. Pilih Masuk.";
+  if (/email not confirmed/i.test(m)) return "Email belum dikonfirmasi. Buka tautan di email kamu dulu.";
+  if (/anonymous sign-ins are disabled/i.test(m)) return "Masuk sebagai tamu belum diaktifkan di Supabase.";
+  if (/password should be at least/i.test(m)) return "Kata sandi minimal 6 karakter.";
+  if (/rate limit|too many/i.test(m)) return "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.";
+  if (/supabaseUrl is required|supabaseKey is required|failed to fetch/i.test(m))
+    return "Tidak bisa terhubung ke server. Periksa koneksi atau konfigurasi Supabase.";
+  return m;
+}
+
 export default function LoginFlow() {
   const router = useRouter();
   const params = useSearchParams();
   const raw = params.get("next");
 
   const [stage, setStage] = useState<Stage>("loading");
+  const [mode, setMode] = useState<Mode>("masuk");
+  const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,7 +61,7 @@ export default function LoginFlow() {
       if (profile) router.replace(safeNext(raw));
       else setStage("profile");
     })().catch((e) => {
-      setError(`Supabase belum siap: ${e instanceof Error ? e.message : e}`);
+      setError(friendly(e));
       setStage("auth");
     });
   }, [router, raw]);
@@ -50,10 +69,11 @@ export default function LoginFlow() {
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       await fn();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendly(e));
     } finally {
       setBusy(false);
     }
@@ -64,69 +84,108 @@ export default function LoginFlow() {
 
   return (
     <div>
-      <h1 className="text-3xl font-extrabold">Masuk ke Arunika</h1>
+      <h1 className="sr-only">Masuk atau daftar</h1>
+      <fieldset>
+        <legend className="sr-only">Pilih</legend>
+        <div className="flex gap-8">
+          {(["masuk", "daftar"] as const).map((m) => (
+            <label
+              key={m}
+              className="relative pb-2 text-4xl font-extrabold tracking-tight text-redup hover:text-pasir has-checked:text-pasir has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-fajar"
+            >
+              <input
+                type="radio"
+                name="mode"
+                className="peer sr-only"
+                checked={mode === m}
+                onChange={() => {
+                  setMode(m);
+                  setError(null);
+                  setNotice(null);
+                }}
+              />
+              {m === "masuk" ? "Masuk" : "Daftar"}
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 rounded-full bg-fajar opacity-0 peer-checked:opacity-100" />
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <form
-        className="mt-8 space-y-4"
+        className="mt-10 space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
           const form = new FormData(e.currentTarget);
-          const email = String(form.get("email"));
+          const email = String(form.get("email")).trim();
           const password = String(form.get("password"));
-          const signup = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "daftar";
           run(async () => {
             const sb = supabase();
-            const res = signup
-              ? await sb.auth.signUp({ email, password })
-              : await sb.auth.signInWithPassword({ email, password });
+            const res =
+              mode === "daftar"
+                ? await sb.auth.signUp({ email, password })
+                : await sb.auth.signInWithPassword({ email, password });
             if (res.error) throw res.error;
-            if (!res.data.session) return setNotice("Akun dibuat. Buka email konfirmasi, lalu masuk di sini.");
+            if (!res.data.session) {
+              setMode("masuk");
+              setNotice(`Akun dibuat. Buka tautan konfirmasi yang dikirim ke ${email}, lalu masuk.`);
+              return;
+            }
             setStage("profile");
           });
         }}
       >
-        <label className="block text-sm font-medium" htmlFor="email">
+        <label className={label} htmlFor="email">
           Email
-          <input id="email" name="email" type="email" required autoComplete="email" className={input} />
+          <input id="email" name="email" type="email" required autoComplete="email" className={field} />
         </label>
-        <label className="block text-sm font-medium" htmlFor="password">
-          Kata sandi
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={6}
-            autoComplete="current-password"
-            className={input}
-          />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <button type="submit" value="masuk" disabled={busy} className={primary}>
-            Masuk
-          </button>
-          <button type="submit" value="daftar" disabled={busy} className={secondary}>
-            Daftar akun baru
-          </button>
+        <div>
+          <label className={label} htmlFor="password">
+            {mode === "daftar" ? "Kata sandi, minimal 6 karakter" : "Kata sandi"}
+          </label>
+          <div className="relative mt-1.5">
+            <input
+              id="password"
+              name="password"
+              type={show ? "text" : "password"}
+              required
+              minLength={6}
+              autoComplete={mode === "masuk" ? "current-password" : "new-password"}
+              className={`${field} mt-0 pr-12`}
+            />
+            <button
+              type="button"
+              onClick={() => setShow(!show)}
+              aria-label={show ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+              className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-md text-redup hover:text-pasir"
+            >
+              {show ? <EyeOff aria-hidden="true" className="size-5" /> : <Eye aria-hidden="true" className="size-5" />}
+            </button>
+          </div>
         </div>
+        <button type="submit" disabled={busy} className={primary}>
+          {busy ? "Memproses…" : mode === "masuk" ? "Masuk" : "Buat akun"}
+        </button>
       </form>
 
-      <div className="mt-8 border-t border-malam-3 pt-8">
-        <button
-          type="button"
-          disabled={busy}
-          className={secondary}
-          onClick={() =>
-            run(async () => {
-              const { error } = await supabase().auth.signInAnonymously();
-              if (error) throw error;
-              setStage("profile");
-            })
-          }
-        >
-          Masuk sebagai tamu
-        </button>
+      <div aria-hidden="true" className="my-7 flex items-center gap-4 text-redup">
+        <span className="h-px flex-1 bg-malam-3" />
+        atau
+        <span className="h-px flex-1 bg-malam-3" />
       </div>
+      <button
+        type="button"
+        disabled={busy}
+        className={secondary}
+        onClick={() =>
+          run(async () => {
+            const { error } = await supabase().auth.signInAnonymously();
+            if (error) throw error;
+            setStage("profile");
+          })
+        }
+      >
+        Coba sebagai tamu
+      </button>
 
       {notice && (
         <p role="status" className="mt-6 text-aman">
@@ -152,12 +211,12 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
       .from("schools")
       .select("*")
       .order("name")
-      .then(({ data, error }) => (error ? setError(error.message) : setSchools(data)));
+      .then(({ data, error }) => (error ? setError(friendly(error)) : setSchools(data)));
   }, []);
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
         const form = new FormData(e.currentTarget);
@@ -177,20 +236,20 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
           if (error) throw error;
           onDone();
         })()
-          .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+          .catch((e) => setError(friendly(e)))
           .finally(() => setBusy(false));
       }}
     >
-      <h1 className="text-3xl font-extrabold">Profil kamu</h1>
+      <h1 className="text-4xl font-extrabold tracking-tight">Lengkapi profil</h1>
 
-      <label className="block text-sm font-medium" htmlFor="display_name">
-        Nama yang dilihat teman satu ruang
-        <input id="display_name" name="display_name" required minLength={2} maxLength={40} className={input} />
+      <label className={label} htmlFor="display_name">
+        Nama yang dilihat teman
+        <input id="display_name" name="display_name" required minLength={2} maxLength={40} autoComplete="nickname" className={field} />
       </label>
 
       <fieldset>
-        <legend className="text-sm font-medium">Warna avatar</legend>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <legend className={label}>Warna avatar</legend>
+        <div className="mt-2 flex flex-wrap gap-2.5">
           {AVATAR_COLORS.map((c, i) => (
             <label key={c} className="relative">
               <input type="radio" name="avatar" value={i} defaultChecked={i === 0} className="peer sr-only" />
@@ -198,16 +257,21 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
               <span
                 aria-hidden="true"
                 style={{ background: c }}
-                className="block size-11 rounded-full border-2 border-transparent peer-checked:border-pasir peer-focus-visible:outline-2 peer-focus-visible:outline-fajar"
+                className="block size-11 rounded-full ring-offset-2 ring-offset-malam hover:ring-2 hover:ring-malam-3 peer-checked:ring-2 peer-checked:ring-pasir peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-fajar"
+              />
+              <Check
+                aria-hidden="true"
+                strokeWidth={3}
+                className="pointer-events-none absolute inset-0 m-auto size-5 text-malam opacity-0 peer-checked:opacity-100"
               />
             </label>
           ))}
         </div>
       </fieldset>
 
-      <label className="block text-sm font-medium" htmlFor="school_id">
+      <label className={label} htmlFor="school_id">
         Sekolah
-        <select id="school_id" name="school_id" required className={input} disabled={!schools}>
+        <select id="school_id" name="school_id" required className={field} disabled={!schools}>
           {!schools && <option value="">{error ? "Gagal memuat sekolah" : "Memuat daftar sekolah…"}</option>}
           {schools?.length === 0 && <option value="">Belum ada sekolah. Jalankan supabase/schema.sql.</option>}
           {schools?.map((s) => (
@@ -218,9 +282,9 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
         </select>
       </label>
 
-      <label className="block text-sm font-medium" htmlFor="role">
+      <label className={label} htmlFor="role">
         Peran
-        <select id="role" name="role" className={input} defaultValue="siswa">
+        <select id="role" name="role" className={field} defaultValue="siswa">
           {Object.entries(ROLE_LABEL).map(([v, l]) => (
             <option key={v} value={v}>
               {l}
@@ -230,7 +294,7 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
       </label>
 
       <button type="submit" disabled={busy || !schools?.length} className={primary}>
-        Simpan profil
+        {busy ? "Menyimpan…" : "Simpan dan lanjut"}
       </button>
       {error && (
         <p role="alert" className="text-bahaya">
