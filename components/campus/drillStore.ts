@@ -71,7 +71,7 @@ export const run = {
 
 export const resetInput = () => Object.keys(input).forEach((k) => (input[k as keyof typeof input] = false));
 
-/** Opening the chat moves focus to a text field, so held movement keys are released first. */
+// The chat takes focus, so held movement keys are released first.
 export function openChat() {
   if (getState().phase === "running") return;
   resetInput();
@@ -89,7 +89,6 @@ export function schoolModel(school: School | null) {
   };
 }
 
-/** AI prediction for a scenario: per-building risk, hazard tiles at full intensity, safe assembly points. */
 export function predict(s: Scenario, school: School | null, year?: number) {
   const { main, site } = schoolModel(school);
   const risks = campusRisks(main, site, s, year);

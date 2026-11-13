@@ -43,7 +43,6 @@ const SOIL: Record<Soil, number> = { keras: 0, sedang: 0.6, lunak: 1.4 };
 
 const logistic = (z: number) => 100 / (1 + Math.exp(-z));
 
-/** Risk 0-100 that a structure is badly damaged or unusable in the scenario. */
 export function structureRisk(b: Structure, site: Site, s: Scenario, year = new Date().getFullYear()) {
   const age = Math.max(0, year - b.built_year);
   const z =
@@ -59,7 +58,6 @@ export function structureRisk(b: Structure, site: Site, s: Scenario, year = new 
   return Math.round(logistic(z));
 }
 
-/** Risk per campus building id, using the school's main material and build year. */
 export function campusRisks(main: Structure, site: Site, s: Scenario, year?: number) {
   const out: Record<string, number> = {};
   for (const [id, b] of Object.entries(BUILDINGS)) {
@@ -73,7 +71,6 @@ export function campusRisks(main: Structure, site: Site, s: Scenario, year?: num
   return out;
 }
 
-/** Tiles to avoid: below the water line for floods, the debris band around weak buildings for quakes. */
 export function hazardTiles(s: Scenario, risks: Record<string, number>, waterLevel = s.intensity) {
   const out = new Set<number>();
   for (let z = 0; z < H; z++) {
@@ -97,7 +94,6 @@ function nearChar(x: number, z: number, c: string, r: number) {
   return false;
 }
 
-/** Assembly points that stay safe: above the water (with margin) or outside any debris band. */
 export function safeAssembly(s: Scenario, hazards: Set<number>): Tile[] {
   return ASSEMBLY.filter(([x, z]) =>
     s.kind === "banjir" ? tileElevation(x, z) > s.intensity + 0.2 : !hazards.has(idx(x, z)),
@@ -116,7 +112,6 @@ const DIRS: [number, number, number][] = [
   [-1, -1, Math.SQRT2],
 ];
 
-/** A* over the grid (8-way, no corner cutting) to the nearest goal; hazard tiles cost extra. */
 export function bestRoute(grid: string[], start: Tile, goals: Tile[], hazards: Set<number>): Tile[] | null {
   if (!goals.length) return null;
   const w = grid[0].length;
@@ -189,7 +184,6 @@ export type DrillStats = {
   hintUsed: boolean;
 };
 
-/** 1000 base, minus time/path/hazard/hint penalties, plus up to 200 for taking cover during shaking. */
 export function scoreDrill(d: DrillStats) {
   if (!d.reached) return 0;
   const optimalTime = (d.scenario.kind === "gempa" ? QUAKE_SHAKE_S : 0) + d.optimalLen / PLAYER_SPEED;
@@ -203,6 +197,5 @@ export function scoreDrill(d: DrillStats) {
   return Math.round(Math.min(1200, Math.max(0, score)));
 }
 
-/** Flood water height t seconds into a drill (rises linearly, then holds). */
 export const waterLevel = (s: Scenario, t: number) =>
   s.kind === "banjir" ? s.intensity * Math.min(1, Math.max(0, t / FLOOD_RISE_S)) : 0;

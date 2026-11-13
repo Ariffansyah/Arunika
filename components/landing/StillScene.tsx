@@ -12,7 +12,7 @@ const subscribe = (cb: () => void) => {
   return () => mq.removeEventListener("change", cb);
 };
 
-/** One still frame of the campus mid-evacuation; only mounted where the panel is visible, so phones skip WebGL. */
+// Mounted only where the panel shows, so phones skip WebGL.
 export default function StillScene() {
   const wide = useSyncExternalStore(subscribe, () => matchMedia(WIDE).matches, () => false);
   return wide ? (

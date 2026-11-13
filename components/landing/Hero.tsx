@@ -29,7 +29,6 @@ export default function Hero() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-28 bg-[linear-gradient(180deg,rgb(13_24_40/0.7),transparent)]"
       />
-      {/* Text sits on the dark side of the fade; the campus keeps its colour on the other side. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[62%] bg-[linear-gradient(0deg,#0d1828_10%,rgb(13_24_40/0.8)_45%,transparent)] lg:inset-y-0 lg:left-0 lg:h-auto lg:w-[62%] lg:bg-[linear-gradient(90deg,#0d1828_0%,rgb(13_24_40/0.86)_40%,rgb(13_24_40/0.4)_70%,transparent)]"

@@ -398,7 +398,6 @@ export default function Hud({
         </div>
       </div>
 
-      {/* On touch screens the panel sits above the movement pad instead of under it. */}
       <div className={`${panel} pointer-events-auto w-full max-w-sm text-sm pointer-coarse:mb-[10.5rem]`}>
         {phase === "idle" && <ScenarioPicker onStart={onStart} />}
         {phase === "running" && <Instruction t={t} />}

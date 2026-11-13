@@ -64,7 +64,7 @@ export const ASSESSMENT_SCHEMA = {
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 600) : null);
 const oneOf = <T extends string>(list: readonly T[], v: unknown) => (list.includes(v as T) ? (v as T) : null);
 
-/** Model output is untrusted: keep only well-formed fields, reject the whole thing if the core is missing. */
+// Model output is untrusted: keep only well-formed fields, reject it if the core is missing.
 export function parseAssessment(raw: unknown): Assessment | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;

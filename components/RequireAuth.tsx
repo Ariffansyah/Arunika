@@ -14,7 +14,6 @@ export function Notice({ children, tone = "info" }: { children: React.ReactNode;
   );
 }
 
-/** Loads the session and profile in the browser; sends visitors without either to /masuk. */
 export default function RequireAuth({ children }: { children: (me: Me) => React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState<string | null>(null);

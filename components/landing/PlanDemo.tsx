@@ -11,7 +11,6 @@ const HAZARD_COLOR = { banjir: "#3b82c4", gempa: "#e0473c" };
 const never = () => () => {};
 const thisYear = () => new Date().getFullYear();
 
-/** The real risk model and A* router, driven by a slider: no precomputed frames. */
 export default function PlanDemo() {
   const [scenario, setScenario] = useState<Scenario>({ kind: "banjir", intensity: 1 });
   // Prerendering may not read the clock. The year only sets building age, which the default flood view ignores,

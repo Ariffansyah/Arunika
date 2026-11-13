@@ -22,7 +22,7 @@ type Row = School & {
   readiness: number | null;
 };
 
-// Status colours are validated for the dark surface and always shown with an icon and a label.
+// Status colours always ship with an icon and a label, never colour alone.
 const STATUS = [
   { min: 70, label: "Siap", color: "#2fae6b", Icon: CircleCheck },
   { min: 45, label: "Perlu penguatan", color: "#d9a520", Icon: TriangleAlert },
@@ -31,7 +31,7 @@ const STATUS = [
 const NO_DATA = { min: -1, label: "Belum ada data", color: "#6b7a90", Icon: CircleDashed };
 const statusOf = (r: number | null) => (r === null ? NO_DATA : STATUS.find((s) => r >= s.min)!);
 
-/** Worst of a reference quake (M 6.5) and a 1 m tidal flood, from the same model the drills use. */
+// Worst of a reference quake (M 6.5) and a 1 m tidal flood.
 function exposure(s: School) {
   const main = { floors: s.floors, material: s.material, built_year: s.built_year };
   const site = { soil: s.soil, coast_km: s.coast_km, rain_30d_mm: s.rain_30d_mm };

@@ -25,7 +25,6 @@ export const M = {
 
 type Fit = { height?: number; width?: number };
 
-/** A static model, cloned so one file can be placed many times; `fit` scales it to a size in tiles. */
 export default function Model({ src, fit, ...props }: { src: string; fit?: Fit } & ThreeElements["group"]) {
   const { scene } = useGLTF(src);
   const height = fit?.height;

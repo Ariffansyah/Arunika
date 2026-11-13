@@ -16,13 +16,12 @@ export function groq() {
 const db = (key: string) =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { persistSession: false } });
 
-/** Bypasses RLS: only for writes the server has validated itself. */
+// Bypasses RLS: only for writes the server has validated itself.
 export function adminDb() {
   if (!process.env.SUPABASE_SECRET_KEY) throw new Error("SUPABASE_SECRET_KEY belum diatur di server.");
   return db(process.env.SUPABASE_SECRET_KEY);
 }
 
-/** The Supabase user behind `Authorization: Bearer <access token>`, or null. */
 export async function requestUser(req: Request) {
   const token = req.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
   if (!token) return null;
@@ -38,7 +37,6 @@ export async function requestUser(req: Request) {
 export const text = (body: string, status: number, headers: Record<string, string> = {}) =>
   new Response(body, { status, headers: { "Content-Type": "text/plain; charset=utf-8", ...headers } });
 
-/** Counts this request for the user; returns a 429 once they pass `limit` in the current window, else null. */
 export async function rateLimit(userId: string, bucket: string, limit: number, windowS: number) {
   try {
     const { data, error } = await adminDb().rpc("hit_rate_limit", {
