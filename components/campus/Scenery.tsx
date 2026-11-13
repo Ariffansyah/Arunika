@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { Suspense, useRef } from "react";
 import type { Group } from "three";
 import Model, { M, preloadModels } from "@/components/Model";
+import Decor from "./Decor";
 import { ASSEMBLY, H, W, elevationAt } from "@/lib/campus";
 
 preloadModels([...M.palms, ...M.trees, ...M.bushes, ...M.flowers, ...M.houses, M.tent, M.tentFrame, M.sign, M.crate, M.barrel, M.ambulance, M.police, M.cone]);
@@ -16,7 +17,6 @@ const rand = (i: number) => {
 
 type Spot = { src: string; x: number; z: number; ry: number; size: number };
 
-// Village in streets west, north and east of the school wall, facing the school; the south side is road and beach.
 const HOUSES: Spot[] = [
   ...Array.from({ length: 11 }, (_, i) => ({ x: -5 + i * 4.6, z: -5, ry: 0 })),
   ...Array.from({ length: 8 }, (_, i) => ({ x: -3 + i * 6.3, z: -12, ry: Math.PI })),
@@ -43,7 +43,6 @@ const PALMS: Spot[] = Array.from({ length: 18 }, (_, i) => ({
   size: 3 + rand(i + 30) * 1.6,
 }));
 
-// Shrubs along the inside of the south and west walls, clear of the gate.
 const BUSHES: Spot[] = [
   ...[2.5, 5, 7.5, 10.5, 13, 15.5, 24.5, 27.5, 30.5, 33, 36].map((x) => ({ x, z: 26.3 })),
   ...[15.5, 18, 20.5, 23, 25.5].map((z) => ({ x: 1.6, z })),
@@ -82,7 +81,6 @@ function Road() {
   );
 }
 
-/** Emergency response parked outside the gate, with cones marking the way out. */
 function Responders() {
   return (
     <>
@@ -95,7 +93,6 @@ function Responders() {
   );
 }
 
-/** An evacuation camp on the hill: tents, a signpost and supply crates around the assembly point. */
 function Camp() {
   const items: { src: string; x: number; z: number; ry: number; h: number }[] = [
     { src: M.tent, x: 34.6, z: 2.4, ry: 0, h: 1.5 },
@@ -150,12 +147,10 @@ function Flag() {
 function Horizon() {
   return (
     <>
-      {/* Grass apron north of the beach line so the campus doesn't float in the fog. */}
       <mesh rotation-x={-Math.PI / 2} position={[W / 2, 0.03, (H - 160) / 2]} receiveShadow>
         <planeGeometry args={[320, 160 + H]} />
         <meshStandardMaterial color="#6f8f4c" />
       </mesh>
-      {/* Volcano and ridge on the horizon; the fog turns them into dawn silhouettes. */}
       <mesh position={[W / 2 - 40, 24, -190]}>
         <cylinderGeometry args={[5, 70, 48, 14]} />
         <meshStandardMaterial color="#7d8794" flatShading />
@@ -172,13 +167,13 @@ function Horizon() {
   );
 }
 
-/** Everything around and on the campus that isn't part of the simulation: shared by the game and the landing page. */
 export default function Scenery() {
   return (
     <>
       <Horizon />
       <Road />
       <Flag />
+      <Decor />
       <Suspense fallback={null}>
         <Spots spots={HOUSES} by="width" />
         <Spots spots={VILLAGE_TREES} by="height" />

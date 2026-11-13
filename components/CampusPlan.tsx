@@ -1,8 +1,8 @@
-import { ASSEMBLY, GRID, H, W, buildingRects, type Tile } from "@/lib/campus";
+import { ASSEMBLY, GRID, H, W, buildingRects, surfaceAt, type Tile } from "@/lib/campus";
 
 const FILL: Record<string, string> = { h: "#1f4a3a", g: "#24533f", "=": "#3a4f6e" };
+const SURFACE_FILL = { paving: "#2a3d5c", court: "#264d7a" };
 
-/** Top-down SVG of the campus grid, with optional hazard tiles and an evacuation route drawn on top. */
 export default function CampusPlan({
   route,
   hazards,
@@ -22,7 +22,10 @@ export default function CampusPlan({
       <rect width={W} height={H} fill="#1b2c45" />
       {GRID.flatMap((row, z) =>
         [...row].map((c, x) =>
-          FILL[c] ? <rect key={`${x}-${z}`} x={x} y={z} width={1.02} height={1.02} fill={FILL[c]} /> : null,
+          {
+            const fill = FILL[c] ?? (surfaceAt(x, z) ? SURFACE_FILL[surfaceAt(x, z)!] : undefined);
+            return fill ? <rect key={`${x}-${z}`} x={x} y={z} width={1.02} height={1.02} fill={fill} /> : null;
+          },
         ),
       )}
       {Object.entries(rects).map(([id, r]) => (

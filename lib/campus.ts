@@ -1,6 +1,5 @@
-// One grid drives rendering, collision and evacuation routing.
-// Row 0 is the north fence (hill side), row 27 the south fence facing the coast.
-//   = fence   . yard   h hill   g field   T tree   1-4 buildings
+// North (row 0) is the hill side, south (row 27) faces the coast.
+//   = fence   . yard   h hill   g field   T tree   1-4 classroom blocks   5 canteen   6 musholla
 //   A/B assembly points   S spawn   W warden NPC   G gate
 export const GRID = [
   "========================================",
@@ -18,16 +17,16 @@ export const GRID = [
   "=..2222222222..........................=",
   "=..2222222222...gggggggggggg...T.......=",
   "=...............gggggggggggg...........=",
-  "=...............gggggggggggg........T..=",
-  "=............T..gggggggggggg...........=",
-  "=..444444.......gggggBgggggg...........=",
+  "=...............gggggggggggg....6666.T.=",
+  "=............T..gggggggggggg....6666...=",
+  "=..444444.......gggggBgggggg....6666...=",
+  "=..444444.......gggggggggggg....6666...=",
   "=..444444.......gggggggggggg...........=",
+  "=..444444.......gggggggggggg..T........=",
   "=..444444.......gggggggggggg...........=",
-  "=..444444.......gggggggggggg.....T.....=",
-  "=..444444.......gggggggggggg...........=",
-  "=...............gggggggggggg...........=",
-  "=......................................=",
-  "=.........T.................T..........=",
+  "=...............gggggggggggg...555555..=",
+  "=..............................555555..=",
+  "=.........T.................T..555555..=",
   "=......................................=",
   "=......................................=",
   "===================GG===================",
@@ -53,6 +52,8 @@ export const BUILDINGS: Record<string, Building> = {
   "2": { name: "Gedung Kelas B", floors: 1, material: "bata_tanpa_tulangan", yearOffset: -8 },
   "3": { name: "Kantor Guru & TU", floors: 1, material: "beton_bertulang", yearOffset: 15 },
   "4": { name: "Perpustakaan", floors: 1, material: "kayu", yearOffset: -12 },
+  "5": { name: "Kantin", floors: 1, material: "baja_ringan", yearOffset: 6 },
+  "6": { name: "Musholla", floors: 1, material: "beton_bertulang", yearOffset: 10 },
 };
 
 export const ASSEMBLY_NAMES: Record<string, string> = {
@@ -60,13 +61,12 @@ export const ASSEMBLY_NAMES: Record<string, string> = {
   B: "Titik Kumpul Lapangan",
 };
 
-export const BLOCKED_CHARS = "=TW1234";
+export const BLOCKED_CHARS = "=TW123456";
 
 export const tileAt = (x: number, z: number) => GRID[z]?.[x] ?? "=";
 export const isBlocked = (x: number, z: number) => BLOCKED_CHARS.includes(tileAt(x, z));
 export const idx = (x: number, z: number) => z * W + x;
 
-// Ground height in metres: a gentle slope up from the coast plus the hill in the north-east.
 export function elevationAt(x: number, z: number) {
   const slope = 0.1 + (H - 1 - z) * 0.02;
   const hill = 3 * Math.exp(-((x - 34.5) ** 2 + (z - 5.5) ** 2) / 30);
@@ -74,6 +74,16 @@ export function elevationAt(x: number, z: number) {
 }
 
 export const tileElevation = (x: number, z: number) => elevationAt(x + 0.5, z + 0.5);
+
+// Paint only: collision and routing ignore surfaces.
+export function surfaceAt(x: number, z: number): "paving" | "court" | null {
+  if (!".S".includes(tileAt(x, z))) return null;
+  if (x >= 24 && x <= 28 && z >= 1 && z <= 6) return "court";
+  const courtyard = z >= 7 && z <= 9 && x >= 2 && x <= 27;
+  const walkway = x >= 14 && x <= 15 && z >= 7 && z <= 26;
+  const ceremonyYard = z >= 23 && z <= 26 && x >= 15 && x <= 26;
+  return courtyard || walkway || ceremonyYard ? "paving" : null;
+}
 
 export function findTiles(chars: string): Tile[] {
   const out: Tile[] = [];
