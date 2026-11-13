@@ -2,8 +2,8 @@ import Link from "next/link";
 
 const LINKS = [
   { href: "/kampus", label: "Kampus 3D" },
-  { href: "/analisis", label: "Analisis Struktur" },
-  { href: "/dashboard", label: "Dasbor Kesiapan" },
+  { href: "/analisis", label: "Analisis" },
+  { href: "/dashboard", label: "Dasbor" },
 ];
 
 export default function SiteHeader() {
@@ -11,7 +11,7 @@ export default function SiteHeader() {
     <header className="border-b border-malam-3">
       <nav
         aria-label="Navigasi utama"
-        className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6"
+        className="mx-auto flex max-w-6xl items-center gap-x-5 px-4 py-2 sm:gap-x-7 sm:px-6"
       >
         <Link href="/" className="mr-auto text-lg font-extrabold tracking-tight text-pasir">
           Arunika<span className="text-fajar">.</span>

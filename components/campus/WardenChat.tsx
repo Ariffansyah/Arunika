@@ -109,12 +109,9 @@ export default function WardenChat() {
       className="absolute inset-x-3 bottom-3 top-24 flex flex-col rounded-lg border border-malam-3 bg-malam/96 shadow-xl sm:inset-x-auto sm:right-3 sm:w-96"
     >
       <header className="flex items-center gap-2 border-b border-malam-3 p-3">
-        <div className="mr-auto">
-          <h2 id="warden-title" className="font-bold">
-            Petugas Keselamatan
-          </h2>
-          <p className="text-xs text-redup">Asisten AI. Untuk keadaan darurat nyata, hubungi 112.</p>
-        </div>
+        <h2 id="warden-title" className="mr-auto font-bold">
+          Petugas Keselamatan (AI)
+        </h2>
         <button
           type="button"
           aria-pressed={voice}
@@ -140,7 +137,10 @@ export default function WardenChat() {
       <div ref={listRef} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto p-3 text-sm leading-relaxed">
         {msgs.length === 0 && (
           <div className="space-y-2">
-            <p className="text-redup">Tanyakan apa saja soal evakuasi, pertolongan pertama, atau bangunan sekolah yang aman.</p>
+            <p className="text-redup">
+              Tanyakan apa saja soal evakuasi, pertolongan pertama, atau bangunan sekolah yang aman. Untuk keadaan darurat
+              nyata, hubungi 112.
+            </p>
             {SUGGESTIONS.map((s) => (
               <button
                 key={s}

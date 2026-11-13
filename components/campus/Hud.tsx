@@ -118,8 +118,8 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
       <button type="submit" className={`${primary} w-full`}>
         Mulai simulasi untuk semua di ruang ini
       </button>
-      <p className="text-xs leading-relaxed text-redup">
-        Gerak: WASD atau panah · Merunduk: C · Tanya petugas: E saat di dekatnya
+      <p className="leading-loose text-redup">
+        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Merunduk <kbd>C</kbd> · Tanya petugas <kbd>E</kbd>
       </p>
     </form>
   );
@@ -132,14 +132,14 @@ function Instruction({ t }: { t: number }) {
   const shaking = scenario.kind === "gempa" && t < QUAKE_SHAKE_S;
   return (
     <div className="space-y-3">
-      <p role="status" className={`text-lg font-extrabold leading-snug ${shaking ? "text-bahaya" : "text-fajar"}`}>
+      <p role="status" className={`font-bold leading-snug ${shaking ? "text-bahaya" : "text-fajar"}`}>
         {scenario.kind === "gempa"
           ? shaking
             ? "Gempa! Merunduk, lindungi kepala, bertahan. Tahan C atau tombol Merunduk."
             : "Guncangan berhenti. Jauhi gedung dan menuju titik kumpul yang aman."
           : "Air laut naik. Segera menuju tempat yang lebih tinggi."}
       </p>
-      <p className="text-sm text-redup">
+      <p className="tabular-nums text-redup">
         Waktu {t.toFixed(1)} dtk
         {scenario.kind === "banjir" && <> · Tinggi air {waterLevel(scenario, t).toFixed(2)} m</>}
       </p>
@@ -194,6 +194,8 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
   }, [result, room, schoolId, startAt]);
 
   const lines: [string, string][] = [
+    ["Skenario", SCENARIO_LABEL[result.scenario.kind]],
+    ["Hasil", result.reached ? "Sampai di titik kumpul" : "Tidak sampai di titik kumpul aman"],
     ["Waktu", `${result.timeS.toFixed(1)} dtk`],
     ["Jarak ditempuh", `${result.walked.toFixed(0)} petak (jalur optimal ${result.optimalLen.toFixed(0)})`],
     ["Di zona bahaya", `${result.hazardS.toFixed(1)} dtk`],
@@ -201,17 +203,15 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
       ? [["Berlindung saat guncangan", `${Math.min(result.coverS, QUAKE_SHAKE_S).toFixed(1)} / ${QUAKE_SHAKE_S} dtk`] as [string, string]]
       : []),
     ["Bantuan jalur AI", result.hintUsed ? "Dipakai (−150)" : "Tidak dipakai"],
+    ["Jalur optimal", "Garis jingga di peta"],
   ];
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-sm text-redup">
-          {SCENARIO_LABEL[result.scenario.kind]} · {result.reached ? "Sampai di titik kumpul" : "Tidak sampai di titik kumpul aman"}
-        </p>
-        <p className="text-4xl font-extrabold text-fajar">{result.score} poin</p>
-      </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+      <p className="text-2xl font-extrabold">
+        Skor <span className="tabular-nums text-fajar">{result.score}</span> poin
+      </p>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {lines.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="text-redup">{k}</dt>
@@ -219,21 +219,20 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
           </div>
         ))}
       </dl>
-      <p className="text-xs text-redup">Garis jingga di peta adalah jalur optimal dari posisi awalmu.</p>
       <div>
-        <h3 className="text-sm font-semibold">Peringkat ruang ini</h3>
+        <h3 className="font-bold">Peringkat ruang ini</h3>
         {error ? (
-          <p role="alert" className="mt-1 text-sm text-bahaya">
+          <p role="alert" className="mt-1 text-bahaya">
             Gagal menyimpan atau memuat peringkat: {error}
           </p>
         ) : !board ? (
-          <p role="status" className="mt-1 text-sm text-redup">
+          <p role="status" className="mt-1 text-redup">
             Menyimpan skor…
           </p>
         ) : board.length === 0 ? (
-          <p className="mt-1 text-sm text-redup">Belum ada skor di ruang ini.</p>
+          <p className="mt-1 text-redup">Belum ada skor di ruang ini.</p>
         ) : (
-          <ol className="mt-1 space-y-0.5 text-sm">
+          <ol className="mt-1 space-y-0.5">
             {board.map((r, i) => {
               const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
               return (
@@ -334,11 +333,11 @@ export default function Hud({
               {status === "online" ? `${peers.length + 1} orang` : status === "offline" ? "terputus" : "menyambung…"}
             </span>
           </p>
-          {peers.length > 0 && <p className="text-xs text-redup">Bersama: {peers.map((p) => p.name).join(", ")}</p>}
+          {peers.length > 0 && <p className="text-redup">Bersama {peers.map((p) => p.name).join(", ")}</p>}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={`${ghost} min-h-9 px-3 text-xs`}
+              className={`${ghost} min-h-9 px-3`}
               onClick={() =>
                 navigator.clipboard
                   .writeText(`${location.origin}/kampus?room=${encodeURIComponent(room)}`)
@@ -367,9 +366,9 @@ export default function Hud({
               placeholder="kode-ruang, mis. kelas-7a"
               pattern="[A-Za-z0-9\-]{3,40}"
               required
-              className="min-h-9 w-full min-w-0 rounded-md border border-malam-3 bg-malam-2 px-2 text-xs placeholder:text-redup"
+              className="min-h-9 w-full min-w-0 rounded-md border border-malam-3 bg-malam-2 px-2 placeholder:text-redup"
             />
-            <button type="submit" className={`${ghost} min-h-9 px-3 text-xs`}>
+            <button type="submit" className={`${ghost} min-h-9 px-3`}>
               Pindah
             </button>
           </form>
@@ -388,7 +387,7 @@ export default function Hud({
         </div>
       </div>
 
-      <div className={`${panel} pointer-events-auto w-full max-w-sm`}>
+      <div className={`${panel} pointer-events-auto w-full max-w-sm text-sm`}>
         {phase === "idle" && <ScenarioPicker onStart={onStart} />}
         {phase === "running" && <Instruction t={t} />}
         {phase === "done" && result && <Results result={result} room={room} schoolId={school?.id ?? null} />}

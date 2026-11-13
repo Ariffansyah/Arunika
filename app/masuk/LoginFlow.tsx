@@ -65,7 +65,6 @@ export default function LoginFlow() {
   return (
     <div>
       <h1 className="text-3xl font-extrabold">Masuk ke Arunika</h1>
-      <p className="mt-2 text-redup">Pakai akun sekolahmu, atau masuk sebagai tamu untuk mencoba simulasi.</p>
 
       <form
         className="mt-8 space-y-4"
@@ -183,10 +182,9 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <h1 className="text-3xl font-extrabold">Profil kamu</h1>
-      <p className="text-redup">Nama dan warna avatar terlihat oleh teman satu ruang latihan.</p>
 
       <label className="block text-sm font-medium" htmlFor="display_name">
-        Nama tampilan
+        Nama yang dilihat teman satu ruang
         <input id="display_name" name="display_name" required minLength={2} maxLength={40} className={input} />
       </label>
 

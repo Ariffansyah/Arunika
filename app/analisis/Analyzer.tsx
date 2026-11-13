@@ -78,8 +78,7 @@ function Form({ me }: { me: Me }) {
           ) : (
             <>
               <ImageUp aria-hidden="true" className="size-8 text-redup" />
-              <span className="font-semibold">Pilih foto bangunan</span>
-              <span className="text-sm text-redup">JPG, PNG, atau WebP</span>
+              <span className="px-4 font-semibold">Pilih foto dinding, kolom, atap, atau lantai dasar (JPG, PNG, WebP)</span>
             </>
           )}
           <input
@@ -113,7 +112,7 @@ function Form({ me }: { me: Me }) {
           </select>
         </label>
 
-        <p className="text-sm text-redup">
+        <p className="text-redup">
           Hasil disimpan untuk <strong className="text-pasir">{me.school?.name ?? "tanpa sekolah"}</strong> dan tampil di
           dasbor kesiapan. Fotonya sendiri tidak disimpan.
         </p>
@@ -132,8 +131,10 @@ function Form({ me }: { me: Me }) {
           Hasil analisis
         </h2>
         {state.kind === "idle" && (
-          <p className="mt-3 text-redup">
-            Belum ada analisis. Foto yang jelas dan terang, diambil dari jarak 2 sampai 5 meter, memberi hasil terbaik.
+          <p className="mt-3 max-w-[65ch] leading-relaxed text-redup">
+            Belum ada analisis. AI akan menilai ketahanan bangunan di foto dan menyusun rekomendasi perbaikan. Foto yang
+            jelas dan terang, diambil dari jarak 2 sampai 5 meter, memberi hasil terbaik. Hasilnya bahan diskusi awal,
+            bukan pengganti pemeriksaan ahli struktur.
           </p>
         )}
         {state.kind === "loading" && (
@@ -162,13 +163,10 @@ function Result({ a, saved }: { a: Assessment; saved: boolean }) {
   const tone = a.score >= 70 ? "text-aman" : a.score >= 45 ? "text-fajar" : "text-bahaya";
   return (
     <div className="mt-4 space-y-6">
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-        <p>
-          <span className={`text-5xl font-extrabold ${tone}`}>{a.score}</span>
-          <span className="text-redup"> / 100 skor ketahanan</span>
-        </p>
-        <p className="font-semibold">{LEVEL_LABEL[a.level]}</p>
-      </div>
+      <p className="text-2xl font-bold leading-snug">
+        Skor ketahanan <span className={`tabular-nums ${tone}`}>{a.score}</span> dari 100.{" "}
+        {LEVEL_LABEL[a.level]}.
+      </p>
       <div className="h-2 overflow-hidden rounded bg-malam-3" aria-hidden="true">
         <div className="h-full bg-fajar" style={{ width: `${a.score}%` }} />
       </div>
@@ -193,10 +191,12 @@ function Result({ a, saved }: { a: Assessment; saved: boolean }) {
           <ol className="mt-2 divide-y divide-malam-3 rounded-lg border border-malam-3">
             {a.recommendations.map((r) => (
               <li key={r.action} className="space-y-1 p-3">
-                <p>{r.action}</p>
-                <p className="text-sm text-redup">
-                  <span className={r.priority === "segera" ? "font-semibold text-fajar" : ""}>{PRIORITY_LABEL[r.priority]}</span> ·{" "}
-                  {COST_LABEL[r.cost_band]}
+                <p>
+                  {r.action}{" "}
+                  <span className="text-redup">
+                    (<span className={r.priority === "segera" ? "font-semibold text-fajar" : ""}>{PRIORITY_LABEL[r.priority].toLowerCase()}</span>,{" "}
+                    {COST_LABEL[r.cost_band].toLowerCase()})
+                  </span>
                 </p>
               </li>
             ))}
@@ -204,11 +204,11 @@ function Result({ a, saved }: { a: Assessment; saved: boolean }) {
         )}
       </div>
 
-      <p className="text-sm text-redup">
-        Penilaian awal dari satu foto oleh AI, bukan pengganti pemeriksaan ahli struktur atau dinas pekerjaan umum.
-      </p>
-      <p role="status" className={`text-sm ${saved ? "text-aman" : "text-bahaya"}`}>
-        {saved ? "Tersimpan ke dasbor kesiapan." : "Hasil tidak tersimpan ke dasbor. Coba analisis ulang nanti."}
+      <p className="text-redup">
+        Penilaian awal dari satu foto oleh AI, bukan pengganti pemeriksaan ahli struktur atau dinas pekerjaan umum.{" "}
+        <span role="status" className={saved ? "text-aman" : "text-bahaya"}>
+          {saved ? "Tersimpan ke dasbor kesiapan." : "Hasil tidak tersimpan ke dasbor. Coba analisis ulang nanti."}
+        </span>
       </p>
     </div>
   );

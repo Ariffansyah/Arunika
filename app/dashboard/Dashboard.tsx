@@ -44,26 +44,25 @@ function exposure(s: School) {
 function StatusLabel({ readiness }: { readiness: number | null }) {
   const s = statusOf(readiness);
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
+    <span className="inline-flex items-center gap-1.5">
       <s.Icon aria-hidden="true" className="size-4 shrink-0" style={{ color: s.color }} />
       {s.label}
     </span>
   );
 }
 
-function Meter({ label, value, max, note }: { label: string; value: number | null; max: number; note?: string }) {
+function Meter({ label, value, max }: { label: string; value: number | null; max: number }) {
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-3 text-sm">
+      <div className="flex items-baseline justify-between gap-3">
         <span className="text-redup">{label}</span>
         <span className="font-semibold tabular-nums">{value === null ? "Belum ada" : `${value} / ${max}`}</span>
       </div>
-      <div className="mt-1 h-2 rounded bg-malam-3" aria-hidden="true">
+      <div className="mt-1.5 h-2 rounded bg-malam-3" aria-hidden="true">
         {value !== null && (
           <div className="h-full rounded bg-pasir" style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />
         )}
       </div>
-      {note && <p className="mt-1 text-xs text-redup">{note}</p>}
     </div>
   );
 }
@@ -92,50 +91,52 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
 
   return (
     <section aria-labelledby="detail-title" className="space-y-5 rounded-lg border border-malam-3 p-5">
-      <div>
-        <h2 id="detail-title" className="text-xl font-bold">
-          {row.name}
-        </h2>
-        <p className="text-sm text-redup">
-          {row.region} · Ancaman: {row.hazards.join(", ")}
-        </p>
-        <div className="mt-2">
+      <h2 id="detail-title" className="text-xl font-bold">
+        {row.name} <span className="font-normal text-redup">· {row.region}</span>
+      </h2>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+        <dt className="text-redup">Status</dt>
+        <dd>
           <StatusLabel readiness={row.readiness} />
-        </div>
-      </div>
+        </dd>
+        <dt className="text-redup">Ancaman</dt>
+        <dd>{row.hazards.join(", ")}</dd>
+        <dt className="text-redup">Latihan</dt>
+        <dd className="tabular-nums">
+          {row.drills ?? 0} kali oleh {row.participants ?? 0} peserta
+        </dd>
+      </dl>
       <div className="space-y-4">
         <Meter label="Indeks kesiapan" value={row.readiness} max={100} />
-        <Meter
-          label="Rata-rata skor latihan"
-          value={row.avg_score}
-          max={1200}
-          note={`${row.drills ?? 0} latihan oleh ${row.participants ?? 0} peserta`}
-        />
-        <Meter label="Skor ketahanan struktur terbaru" value={row.structural_score} max={100} />
-        <Meter label="Paparan risiko (model Arunika)" value={exp} max={100} note="Makin tinggi makin rentan" />
+        <Meter label="Rata-rata skor latihan" value={row.avg_score} max={1200} />
+        <Meter label="Skor ketahanan struktur" value={row.structural_score} max={100} />
+        <Meter label="Paparan risiko (tinggi = rentan)" value={exp} max={100} />
       </div>
       <div>
-        <h3 className="font-semibold">Rekomendasi dari analisis struktur terakhir</h3>
+        <h3 className="font-bold">Rekomendasi analisis struktur terakhir</h3>
         {error ? (
-          <p role="alert" className="mt-1 text-sm text-bahaya">
+          <p role="alert" className="mt-2 text-bahaya">
             {error}
           </p>
         ) : !recs ? (
-          <p role="status" className="mt-1 text-sm text-redup">
+          <p role="status" className="mt-2 text-redup">
             Memuat…
           </p>
         ) : recs.length === 0 ? (
-          <p className="mt-1 text-sm text-redup">
-            Belum ada. <Link href="/analisis" className="font-semibold text-fajar underline-offset-4 hover:underline">Unggah foto bangunan</Link> untuk
-            mendapatkannya.
+          <p className="mt-2 text-redup">
+            Belum ada.{" "}
+            <Link href="/analisis" className="font-semibold text-fajar underline decoration-fajar/40 underline-offset-4 hover:decoration-fajar">
+              Unggah foto bangunan
+            </Link>{" "}
+            untuk mendapatkannya.
           </p>
         ) : (
-          <ul className="mt-2 space-y-2 text-sm">
+          <ul className="mt-2 space-y-2">
             {recs.map((r) => (
               <li key={r.action}>
-                {r.action}
-                <span className="block text-redup">
-                  {PRIORITY_LABEL[r.priority]} · {COST_LABEL[r.cost_band]}
+                {r.action}{" "}
+                <span className="text-redup">
+                  ({PRIORITY_LABEL[r.priority].toLowerCase()}, {COST_LABEL[r.cost_band].toLowerCase()})
                 </span>
               </li>
             ))}
@@ -181,28 +182,14 @@ function Board() {
   const avgReadiness = withReadiness.length
     ? Math.round(withReadiness.reduce((s, r) => s + r.readiness!, 0) / withReadiness.length)
     : null;
+  const totalDrills = rows.reduce((s, r) => s + (r.drills ?? 0), 0);
+  const cell = "px-3 py-2.5";
 
   return (
     <div className="mt-8 space-y-8">
-      <dl className="grid gap-4 sm:grid-cols-3">
-        {[
-          ["Sekolah terdaftar", String(rows.length)],
-          ["Rata-rata indeks kesiapan", avgReadiness === null ? "Belum ada" : `${avgReadiness} / 100`],
-          ["Latihan evakuasi tercatat", String(rows.reduce((s, r) => s + (r.drills ?? 0), 0))],
-        ].map(([k, v]) => (
-          <div key={k} className="rounded-lg border border-malam-3 p-4">
-            <dt className="text-sm text-redup">{k}</dt>
-            <dd className="mt-1 text-3xl font-extrabold">{v}</dd>
-          </div>
-        ))}
-      </dl>
-      {rows.some((r) => r.is_demo) && (
-        <p className="text-sm text-redup">Sekolah bertanda (demo) dan skor awalnya adalah data contoh, bukan data lapangan.</p>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div>
-          <div className="h-80 overflow-hidden rounded-lg border border-malam-3 sm:h-[30rem]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="overflow-hidden rounded-lg border border-malam-3">
+          <div className="h-96 sm:h-[32rem]">
             <IndonesiaMap
               schools={ranked.map(({ row, exp }) => ({
                 id: row.id,
@@ -216,45 +203,78 @@ function Board() {
               onSelect={setSelected}
             />
           </div>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-redup">
+          <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-malam-3 bg-malam-2 px-3 py-2.5 text-sm">
             {[...STATUS, NO_DATA].map((s) => (
               <span key={s.label} className="inline-flex items-center gap-1.5">
                 <s.Icon aria-hidden="true" className="size-4" style={{ color: s.color }} />
                 {s.label}
               </span>
             ))}
-            <span>Tinggi kolom = paparan risiko. Seret untuk memutar peta.</span>
+            <span className="text-redup">Tinggi kolom: paparan risiko. Seret untuk memutar.</span>
           </div>
         </div>
-
-        <section aria-labelledby="prioritas">
-          <h2 id="prioritas" className="font-bold">
-            Urutan prioritas intervensi
-          </h2>
-          <ol className="mt-3 divide-y divide-malam-3 rounded-lg border border-malam-3">
-            {ranked.map(({ row, exp }) => (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  aria-pressed={row.id === current.row.id}
-                  onClick={() => setSelected(row.id)}
-                  className="block min-h-11 w-full px-3 py-2.5 text-left hover:bg-malam-2 aria-pressed:bg-malam-2"
-                >
-                  <span className="block font-semibold">{row.name}</span>
-                  <span className="flex flex-wrap items-center justify-between gap-x-3 text-sm text-redup">
-                    <StatusLabel readiness={row.readiness} />
-                    <span className="tabular-nums">
-                      Kesiapan {row.readiness ?? "–"} · Paparan {exp}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        </section>
+        <Detail key={current.row.id} row={current.row} exp={current.exp} />
       </div>
 
-      <Detail key={current.row.id} row={current.row} exp={current.exp} />
+      <section aria-labelledby="prioritas">
+        <h2 id="prioritas" className="text-xl font-bold">
+          Urutan prioritas intervensi
+        </h2>
+        <div className="mt-4 overflow-x-auto rounded-lg border border-malam-3">
+          <table className="w-full min-w-[40rem] text-left">
+            <thead className="border-b border-malam-3 text-redup">
+              <tr>
+                <th scope="col" className={`${cell} font-medium`}>Sekolah</th>
+                <th scope="col" className={`${cell} font-medium`}>Wilayah</th>
+                <th scope="col" className={`${cell} font-medium`}>Status</th>
+                <th scope="col" className={`${cell} text-right font-medium`}>Kesiapan</th>
+                <th scope="col" className={`${cell} text-right font-medium`}>Paparan</th>
+                <th scope="col" className={`${cell} text-right font-medium`}>Latihan</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-malam-3">
+              {ranked.map(({ row, exp }) => {
+                const active = row.id === current.row.id;
+                return (
+                  <tr key={row.id} className={active ? "bg-malam-2" : "hover:bg-malam-2/60"}>
+                    <th scope="row" className="p-0 font-semibold">
+                      <button
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setSelected(row.id)}
+                        className={`${cell} block min-h-11 w-full text-left hover:text-fajar`}
+                      >
+                        {row.name}
+                      </button>
+                    </th>
+                    <td className={`${cell} text-redup`}>{row.region}</td>
+                    <td className={cell}>
+                      <StatusLabel readiness={row.readiness} />
+                    </td>
+                    <td className={`${cell} text-right tabular-nums`}>{row.readiness ?? "–"}</td>
+                    <td className={`${cell} text-right tabular-nums`}>{exp}</td>
+                    <td className={`${cell} text-right tabular-nums`}>{row.drills ?? 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot className="border-t border-malam-3">
+              <tr>
+                <th scope="row" className={`${cell} font-semibold`}>
+                  {rows.length} sekolah
+                </th>
+                <td className={cell} colSpan={2} />
+                <td className={`${cell} text-right tabular-nums`}>{avgReadiness ?? "–"}</td>
+                <td className={cell} />
+                <td className={`${cell} text-right tabular-nums`}>{totalDrills}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {rows.some((r) => r.is_demo) && (
+          <p className="mt-4 text-redup">Sekolah bertanda (demo) dan skor awalnya adalah data contoh, bukan data lapangan.</p>
+        )}
+      </section>
     </div>
   );
 }
