@@ -2,8 +2,9 @@
 
 import { Line } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, type ComponentRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, type ComponentRef } from "react";
 import type { Group, Mesh } from "three";
+import Character, { preloadCharacters, type Look } from "@/components/Character";
 import { Backdrop, Buildings, Coast, Props, Terrain } from "@/components/campus/World";
 import { ASSEMBLY, GRID, H, SPAWN, W, elevationAt, tileElevation } from "@/lib/campus";
 import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
@@ -101,11 +102,12 @@ function Route({ clockRef, pts }: { clockRef: Clock; pts: Pts }) {
   return <Line ref={ref} points={points} color="#ff8a3d" lineWidth={6} dashed dashSize={0.7} gapSize={0.4} />;
 }
 
-const SKIN = ["#8d5a3b", "#a8714a", "#c68e60", "#7a4b30"];
+const STUDENTS: Look[] = ["a", "b", "c", "e", "f", "k", "m", "n"];
+preloadCharacters(STUDENTS);
 
-// Indonesian school uniform: white shirt with red (SD) or navy (SMP) bottoms.
 function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; cum: number[]; delay: number; i: number }) {
   const ref = useRef<Group>(null);
+  const walking = useRef(false);
   useFrame(() => {
     const g = ref.current;
     if (!g || pts.length < 2) return;
@@ -113,6 +115,7 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
     const stop = total - 0.4 - i * 0.55;
     const d = Math.max(0, ((clockRef.current % LOOP_S) - delay) * WALK_SPEED);
     const dist = Math.min(d, stop);
+    walking.current = d > 0 && d < stop;
     let s = 1;
     while (s < cum.length - 1 && cum[s] < dist) s++;
     const f = Math.min(1, Math.max(0, (dist - cum[s - 1]) / (cum[s] - cum[s - 1] || 1)));
@@ -122,28 +125,12 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
     const side = ((i % 3) - 1) * 0.35;
     const x = pts[s - 1][0] + dx * f - (dz / len) * side;
     const z = pts[s - 1][1] + dz * f + (dx / len) * side;
-    const bob = d < stop ? Math.abs(Math.sin(clockRef.current * 9 + i)) * 0.06 : 0;
-    g.position.set(x, elevationAt(x, z) + bob, z);
+    g.position.set(x, elevationAt(x, z), z);
     g.rotation.y = Math.atan2(dx, dz);
   });
   return (
-    <group ref={ref} scale={0.9}>
-      <mesh position={[0, 0.28, 0]} castShadow>
-        <cylinderGeometry args={[0.2, 0.26, 0.56, 10]} />
-        <meshStandardMaterial color={i % 2 ? "#24345a" : "#b3262e"} />
-      </mesh>
-      <mesh position={[0, 0.78, 0]} castShadow>
-        <capsuleGeometry args={[0.24, 0.3, 6, 12]} />
-        <meshStandardMaterial color="#f5f3ee" />
-      </mesh>
-      <mesh position={[0, 1.24, 0]} castShadow>
-        <sphereGeometry args={[0.2, 16, 12]} />
-        <meshStandardMaterial color={SKIN[i % SKIN.length]} />
-      </mesh>
-      <mesh position={[0, 1.31, -0.02]}>
-        <sphereGeometry args={[0.205, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2.2]} />
-        <meshStandardMaterial color="#1c1714" />
-      </mesh>
+    <group ref={ref}>
+      <Character look={STUDENTS[i % STUDENTS.length]} height={1.6} speed={1.4} anim={() => (walking.current ? "walk" : "idle")} />
     </group>
   );
 }
@@ -296,9 +283,11 @@ export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; st
       <Flag clockRef={clockRef} />
       <AssemblyRings />
       <Route clockRef={clockRef} pts={pts} />
-      {Array.from({ length: 8 }, (_, i) => (
-        <Student key={i} i={i} clockRef={clockRef} pts={pts} cum={cum} delay={i * 0.35} />
-      ))}
+      <Suspense fallback={null}>
+        {STUDENTS.map((look, i) => (
+          <Student key={look} i={i} clockRef={clockRef} pts={pts} cum={cum} delay={i * 0.35} />
+        ))}
+      </Suspense>
       <Water clockRef={clockRef} />
       <Camera clockRef={clockRef} />
       <Tick clockRef={clockRef} paused={paused} />
