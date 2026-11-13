@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Eye, EyeOff } from "lucide-react";
+import { Accessibility, Check, Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AVATARS, ROLE_LABEL, supabase, type Role, type School } from "@/lib/supabase";
@@ -250,17 +250,23 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
       <fieldset>
         <legend className={label}>Karakter</legend>
         <div className="mt-2 grid grid-cols-6 gap-2">
-          {AVATARS.map((look, i) => (
+          {AVATARS.map(({ look, wheelchair }, i) => (
             <label key={look} className="relative">
               <input type="radio" name="avatar" value={i} defaultChecked={i === 0} className="peer sr-only" />
               {/* eslint-disable-next-line @next/next/no-img-element -- 64px sprites, nothing to optimise */}
               <img
                 src={`/characters/previews/character-${look}.png`}
-                alt={`Karakter ${i + 1}`}
+                alt={`Karakter ${i + 1}${wheelchair ? ", pengguna kursi roda" : ""}`}
                 width={64}
                 height={64}
                 className="aspect-square w-full rounded-md border-2 border-malam-3 bg-malam-2 hover:border-redup peer-checked:border-fajar peer-checked:bg-malam-3 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fajar"
               />
+              {wheelchair && (
+                <Accessibility
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-1 left-1 size-4 rounded-full bg-pasir p-0.5 text-malam"
+                />
+              )}
               <Check
                 aria-hidden="true"
                 strokeWidth={3}

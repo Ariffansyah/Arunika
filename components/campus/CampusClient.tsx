@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import RequireAuth, { Notice, type Me } from "@/components/RequireAuth";
 import { SPAWN } from "@/lib/campus";
 import type { Scenario } from "@/lib/sim";
-import { AVATARS } from "@/lib/supabase";
+import { avatarOf } from "@/lib/supabase";
 import { player, setState, startDrill } from "./drillStore";
 import Hud, { ROOM_PATTERN } from "./Hud";
 import { useRoom } from "./useRoom";
@@ -36,7 +36,7 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
   return (
     <div className="fixed inset-0">
       <h1 className="sr-only">Kampus {me.school?.name ?? ""}</h1>
-      <World me={{ name: self.name, look: AVATARS[self.avatar] ?? AVATARS[0] }} peers={peers} school={me.school} />
+      <World me={{ name: self.name, ...avatarOf(self.avatar) }} peers={peers} school={me.school} />
       <Hud room={room} peers={peers} status={status} school={me.school} onStart={onStart} />
       <WardenChat />
     </div>

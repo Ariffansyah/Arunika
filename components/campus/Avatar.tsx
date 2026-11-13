@@ -4,22 +4,23 @@ import { Html } from "@react-three/drei";
 import { Suspense } from "react";
 import Character, { type Anim, type Look } from "@/components/Character";
 
-/** A player or NPC: animated character plus a floating name tag. */
 export default function Avatar({
   look,
   name,
   anim,
   self = false,
+  wheelchair = false,
 }: {
   look: Look;
   name: string;
   anim: () => Anim;
   self?: boolean;
+  wheelchair?: boolean;
 }) {
   return (
     <>
       <Suspense fallback={null}>
-        <Character look={look} anim={anim} />
+        <Character look={look} anim={anim} wheelchair={wheelchair} />
       </Suspense>
       <Html position={[0, 1.8, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
         <span

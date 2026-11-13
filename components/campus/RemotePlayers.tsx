@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
 import { elevationAt } from "@/lib/campus";
-import { AVATARS } from "@/lib/supabase";
+import { avatarOf } from "@/lib/supabase";
 import Avatar from "./Avatar";
 import { remotes } from "./drillStore";
 import type { Peer } from "./useRoom";
@@ -20,7 +20,7 @@ function Remote({ peer }: { peer: Peer }) {
     g.visible = Boolean(target);
     if (!target) return;
     const s = shown.current;
-    // First sighting, or a jump such as everyone returning to the start: place them instead of sliding across the map.
+    // Snap on first sight or a big jump (drill restart) instead of sliding across the map.
     if (Number.isNaN(s.x) || Math.hypot(target.x - s.x, target.z - s.z) > 4) Object.assign(s, { x: target.x, z: target.z });
     // Positions arrive at ~5 Hz; ease toward them so movement looks continuous.
     const k = Math.min(1, dt * 10);
@@ -37,9 +37,14 @@ function Remote({ peer }: { peer: Peer }) {
   return (
     <group ref={ref} visible={false}>
       <Avatar
-        look={AVATARS[peer.avatar] ?? AVATARS[0]}
+        look={avatarOf(peer.avatar).look}
+        wheelchair={avatarOf(peer.avatar).wheelchair}
         name={peer.name}
-        anim={() => (shown.current.crouch ? "sit" : shown.current.moving ? "sprint" : "idle")}
+        anim={() => {
+          const s = shown.current;
+          if (avatarOf(peer.avatar).wheelchair) return s.moving ? "wheelchair-move-forward" : "wheelchair-sit";
+          return s.crouch ? "crouch" : s.moving ? "sprint" : "idle";
+        }}
       />
     </group>
   );

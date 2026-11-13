@@ -17,7 +17,6 @@ const WALK_SPEED = 2.2;
 type Clock = { current: number };
 type Pts = readonly (readonly [number, number])[];
 
-// Story of one loop: tide rises through the first half while students walk the computed route up the hill.
 function useRoute() {
   return useMemo(() => {
     const hazards = hazardTiles(FLOOD, {});
@@ -36,7 +35,7 @@ function Tick({ clockRef, paused }: { clockRef: Clock; paused: boolean }) {
   return null;
 }
 
-/** Sways around one viewpoint instead of circling, so the sunrise and the framing stay put. */
+// Sways instead of circling so the sunrise and the framing stay put.
 function Camera({ clockRef }: { clockRef: Clock }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -97,8 +96,18 @@ function Route({ clockRef, pts }: { clockRef: Clock; pts: Pts }) {
   return <Line ref={ref} points={points} color="#ff8a3d" lineWidth={6} dashed dashSize={0.7} gapSize={0.4} />;
 }
 
-const STUDENTS: Look[] = ["a", "b", "c", "e", "f", "k", "m", "n"];
-preloadCharacters(STUDENTS);
+// One student evacuates in a wheelchair: an inclusive drill plans for every learner.
+const STUDENTS: { look: Look; wheelchair?: boolean }[] = [
+  { look: "female-c" },
+  { look: "male-a" },
+  { look: "female-b" },
+  { look: "female-e", wheelchair: true },
+  { look: "male-f" },
+  { look: "female-f" },
+  { look: "male-a" },
+  { look: "female-b" },
+];
+preloadCharacters(["female-c", "male-a", "female-b", "female-e", "male-f", "female-f"]);
 
 function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; cum: number[]; delay: number; i: number }) {
   const ref = useRef<Group>(null);
@@ -125,7 +134,21 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
   });
   return (
     <group ref={ref}>
-      <Character look={STUDENTS[i % STUDENTS.length]} height={1.6} speed={1.4} anim={() => (walking.current ? "walk" : "idle")} />
+      <Character
+        look={STUDENTS[i].look}
+        wheelchair={STUDENTS[i].wheelchair}
+        height={1.55}
+        speed={1.3}
+        anim={() =>
+          STUDENTS[i].wheelchair
+            ? walking.current
+              ? "wheelchair-move-forward"
+              : "wheelchair-sit"
+            : walking.current
+              ? "walk"
+              : "idle"
+        }
+      />
     </group>
   );
 }
@@ -139,7 +162,6 @@ function AssemblyRings() {
   ));
 }
 
-/** Non-interactive showcase of the campus: drifting camera, rising tide, students walking the AI route. */
 export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; startAt?: number }) {
   const clockRef = useRef(startAt);
   const { pts, cum } = useRoute();
@@ -154,8 +176,8 @@ export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; st
       <AssemblyRings />
       <Route clockRef={clockRef} pts={pts} />
       <Suspense fallback={null}>
-        {STUDENTS.map((look, i) => (
-          <Student key={look} i={i} clockRef={clockRef} pts={pts} cum={cum} delay={i * 0.35} />
+        {STUDENTS.map((s, i) => (
+          <Student key={i} i={i} clockRef={clockRef} pts={pts} cum={cum} delay={i * 0.35} />
         ))}
       </Suspense>
       <Water clockRef={clockRef} />

@@ -27,7 +27,7 @@ const free = (x: number, z: number) =>
 
 const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("input, textarea, select") !== null;
 
-export default function Player({ look, name }: { look: Look; name: string }) {
+export default function Player({ look, wheelchair, name }: { look: Look; wheelchair: boolean; name: string }) {
   const ref = useRef<Group>(null);
   const camera = useThree((s) => s.camera);
   const reducedMotion = useRef(false);
@@ -129,9 +129,22 @@ export default function Player({ look, name }: { look: Look; name: string }) {
     <group ref={ref}>
       <Avatar
         look={look}
+        wheelchair={wheelchair}
         name={name}
         self
-        anim={() => (player.crouch ? "sit" : player.moving ? (player.wading ? "walk" : "sprint") : "idle")}
+        anim={() =>
+          wheelchair
+            ? player.moving
+              ? "wheelchair-move-forward"
+              : "wheelchair-sit"
+            : player.crouch
+              ? "crouch"
+              : player.moving
+                ? player.wading
+                  ? "walk"
+                  : "sprint"
+                : "idle"
+        }
       />
     </group>
   );

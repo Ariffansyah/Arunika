@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Look } from "@/components/Character";
 
 export type Role = "siswa" | "guru" | "kepala_sekolah" | "pemda";
 export type Profile = { id: string; display_name: string; avatar: number; school_id: string | null; role: Role };
@@ -27,7 +28,15 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 // Profile `avatar` (0-5) picks one of these characters; see components/Character.tsx.
-export const AVATARS = ["a", "b", "c", "e", "f", "n"] as const;
+export const AVATARS: { look: Look; wheelchair: boolean }[] = [
+  { look: "female-c", wheelchair: false },
+  { look: "male-a", wheelchair: false },
+  { look: "female-b", wheelchair: false },
+  { look: "male-f", wheelchair: false },
+  { look: "female-f", wheelchair: false },
+  { look: "female-e", wheelchair: true },
+];
+export const avatarOf = (i: number) => AVATARS[i] ?? AVATARS[0];
 
 let client: SupabaseClient | null = null;
 

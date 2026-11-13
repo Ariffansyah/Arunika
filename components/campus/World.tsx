@@ -25,6 +25,7 @@ import {
   buildingRects,
   elevationAt,
   findTiles,
+  surfaceAt,
   tileAt,
   tileElevation,
   type Tile,
@@ -40,7 +41,8 @@ import Scenery from "./Scenery";
 import RemotePlayers from "./RemotePlayers";
 import type { Peer } from "./useRoom";
 
-const GROUND: Record<string, string> = { ".": "#a59f8a", h: "#4f8a4a", g: "#5f9b4c", A: "#4f8a4a", B: "#5f9b4c" };
+const GROUND: Record<string, string> = { ".": "#a3a081", h: "#4f8a4a", g: "#5f9b4c", A: "#4f8a4a", B: "#5f9b4c" };
+const SURFACE = { paving: "#cfc6b1", court: "#3f6f9e" };
 
 export function Terrain() {
   const geometry = useMemo(() => {
@@ -53,7 +55,10 @@ export function Terrain() {
       const x = pos.getX(i) + W / 2;
       const z = -pos.getY(i) + H / 2;
       pos.setXYZ(i, x, elevationAt(x, z), z);
-      c.set(GROUND[tileAt(Math.min(W - 1, Math.floor(x)), Math.min(H - 1, Math.floor(z)))] ?? GROUND["."]);
+      const tx = Math.min(W - 1, Math.floor(x));
+      const tz = Math.min(H - 1, Math.floor(z));
+      const surface = surfaceAt(tx, tz);
+      c.set(surface ? SURFACE[surface] : (GROUND[tileAt(tx, tz)] ?? GROUND["."]));
       colors.set([c.r, c.g, c.b], i * 3);
     }
     geo.setAttribute("color", new BufferAttribute(colors, 3));
@@ -107,7 +112,6 @@ function Instanced({ items, y, children }: { items: Placed[]; y: number; childre
   );
 }
 
-// A thin wall segment per fence tile, turned to follow its neighbours; corners get both directions.
 // tileAt pads the outside of the map with fence, so neighbours are read from GRID directly.
 const isFence = (x: number, z: number) => GRID[z]?.[x] === "=";
 const FENCE: Placed[] = findTiles("=").flatMap(([x, z]) => {
@@ -149,7 +153,6 @@ const RECTS = buildingRects();
 
 const FLOOR_H = 1.5;
 
-/** A school block: classrooms behind a columned front corridor (selasar) under an overhanging tiled roof. */
 function SchoolBuilding({
   id,
   risk,
@@ -169,7 +172,7 @@ function SchoolBuilding({
   const d = r.z1 - r.z0 + 1;
   const h = b.floors * FLOOR_H;
   const base = Math.min(tileElevation(r.x0, r.z0), tileElevation(r.x1, r.z1)) - 0.1;
-  // The corridor runs along the south face, the side the camera looks at.
+  // Corridor on the south face, the side the camera sees.
   const core = d - 1.1;
   const front = d / 2 - 0.55;
   const bays = Math.max(2, Math.round(w / 1.7));
@@ -177,7 +180,7 @@ function SchoolBuilding({
   useFrame((_, dt) => {
     const g = ref.current;
     if (!g || !fade) return;
-    // The camera sits south of the player and above; a block just south of the player hides them, so it fades.
+    // The camera is south of and above the player, so a block just south of them hides them.
     const behind = player.z < r.z0 + 0.5 && player.z > r.z0 - 6 && player.x > r.x0 - 1.5 && player.x < r.x1 + 2.5;
     const target = behind ? 0.28 : 1;
     if (Math.abs(opacity.current - target) < 0.01) return;
@@ -197,7 +200,6 @@ function SchoolBuilding({
 
   return (
     <group ref={ref} position={[r.x0 + w / 2, base, r.z0 + d / 2]}>
-      {/* Classrooms */}
       <mesh position={[0, h / 2, -0.55]} castShadow receiveShadow>
         <boxGeometry args={[w - 0.1, h, core]} />
         <meshStandardMaterial color={showRisk ? riskColor(risk) : "#efe3c8"} />
@@ -212,7 +214,6 @@ function SchoolBuilding({
           <meshStandardMaterial color="#d9cdb4" />
         </mesh>
       )}
-      {/* Windows and doors on each floor, facing the corridor */}
       {Array.from({ length: b.floors }, (_, f) =>
         Array.from({ length: bays }, (_, i) => {
           const x = -w / 2 + (w / bays) * (i + 0.5);
@@ -233,7 +234,6 @@ function SchoolBuilding({
           );
         }),
       )}
-      {/* Corridor floor and columns */}
       <mesh position={[0, 0.06, front]} receiveShadow>
         <boxGeometry args={[w, 0.12, 1.1]} />
         <meshStandardMaterial color="#cdbfa6" />
@@ -244,7 +244,7 @@ function SchoolBuilding({
           <meshStandardMaterial color="#f6f2ea" />
         </mesh>
       ))}
-      {/* A 4-sided cone turned 45° is a hip roof; the outer scale stretches it over walls and corridor. */}
+      {/* A 4-sided cone turned 45° is a hip roof; the outer scale stretches it to the footprint. */}
       <group position={[0, h + 0.55, 0.1]} scale={[(w + 0.7) / Math.SQRT2, 1, (d + 0.9) / Math.SQRT2]}>
         <mesh rotation-y={Math.PI / 4} castShadow>
           <coneGeometry args={[1, 1.1, 4]} />
@@ -298,7 +298,6 @@ function Warden() {
   useFrame((_, dt) => {
     const g = ref.current;
     if (!g) return;
-    // Turns to whoever walks up, then back to watching the yard.
     const target = getState().nearWarden ? Math.atan2(player.x - (x + 0.5), player.z - (z + 0.5)) : Math.PI / 4;
     const d = Math.atan2(Math.sin(target - g.rotation.y), Math.cos(target - g.rotation.y));
     g.rotation.y += d * (1 - Math.exp(-dt * 7));
@@ -306,7 +305,7 @@ function Warden() {
   return (
     <group position={[x + 0.5, tileElevation(x, z), z + 0.5]}>
       <group ref={ref} rotation-y={Math.PI / 4}>
-        <Avatar look="j" name="Petugas Keselamatan" anim={() => (getState().chatOpen ? "emote-yes" : "idle")} />
+        <Avatar look="worker" name="Petugas Keselamatan" anim={() => (getState().chatOpen ? "emote-yes" : "idle")} />
       </group>
       {near && (
         <Html position={[0, 2.4, 0]} center zIndexRange={[30, 0]}>
@@ -392,7 +391,6 @@ function Sun({ position = [W / 2 + 30, 22, H / 2 - 18] }: { position?: [number, 
   );
 }
 
-/** Dawn sky, haze and light shared by the game and the landing scene. */
 export function Backdrop({
   sky = [100, 6, -60],
   light,
@@ -417,7 +415,7 @@ export default function World({
   peers,
   school,
 }: {
-  me: { name: string; look: Look };
+  me: { name: string; look: Look; wheelchair: boolean };
   peers: Peer[];
   school: School | null;
 }) {
@@ -438,7 +436,7 @@ export default function World({
       {showRisk && <HazardOverlay hazards={hazards} />}
       <Route />
       <Water />
-      <Player look={me.look} name={me.name} />
+      <Player look={me.look} wheelchair={me.wheelchair} name={me.name} />
       <RemotePlayers peers={peers} />
     </Canvas>
   );
