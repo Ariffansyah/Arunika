@@ -111,7 +111,7 @@ export default function WardenChat() {
   return (
     <aside
       aria-labelledby="warden-title"
-      className="absolute inset-x-3 bottom-3 top-24 flex flex-col rounded-lg border border-malam-3 bg-malam/96 shadow-xl sm:inset-x-auto sm:right-3 sm:w-96"
+      className="absolute inset-x-3 bottom-3 top-24 z-40 flex flex-col rounded-lg border border-malam-3 bg-malam/96 shadow-xl sm:inset-x-auto sm:right-3 sm:w-96"
     >
       <header className="flex items-center gap-2 border-b border-malam-3 p-3">
         <h2 id="warden-title" className="mr-auto font-bold">

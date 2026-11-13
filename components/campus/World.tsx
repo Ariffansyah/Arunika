@@ -256,7 +256,7 @@ function SchoolBuilding({
     g.rotation.z = Math.sin(t * 17 + r.x0) * sway;
     g.rotation.x = Math.cos(t * 13 + r.z0) * sway * 0.6;
     if (!fade) return;
-    const target = hides(camera.position, base + h + 1.1, r.x0 - 0.1, r.z0 - 0.1, r.x1 + 1.1, r.z1 + 1.1) ? 0.28 : 1;
+    const target = hides(camera.position, base + h + 1.1, r.x0 - 0.5, r.z0 - 0.5, r.x1 + 1.5, r.z1 + 1.5) ? 0.28 : 1;
     if (Math.abs(opacity.current - target) < 0.01) return;
     opacity.current += (target - opacity.current) * (1 - Math.exp(-dt * 10));
     fadeTo(g, opacity.current);
@@ -499,7 +499,13 @@ export default function World({
   const { risks, hazards, goals } = useMemo(() => predict(scenario, school), [scenario, school]);
 
   return (
-    <Canvas shadows dpr={[1, 2]} camera={{ fov: 45, near: 0.1, far: 400 }} aria-label="Kampus sekolah">
+    <Canvas
+      shadows
+      dpr={[1, 2]}
+      camera={{ fov: 55, near: 0.1, far: 400 }}
+      style={{ touchAction: "none" }}
+      aria-label="Kampus sekolah"
+    >
       <Backdrop />
       <Scenery />
       <Terrain />

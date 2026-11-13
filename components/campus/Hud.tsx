@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Layers, Link2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Layers, Link2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -158,7 +158,8 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
         Mulai simulasi
       </button>
       <p className="leading-loose text-redup">
-        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Merunduk <kbd>C</kbd> · Tanya petugas <kbd>E</kbd>
+        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Seret layar untuk melihat · Kamera <kbd>V</kbd> · Merunduk{" "}
+        <kbd>C</kbd> · Tanya petugas <kbd>E</kbd>
       </p>
     </form>
   );
@@ -346,6 +347,7 @@ export default function Hud({
   const startAt = useDrill((s) => s.startAt);
   const result = useDrill((s) => s.result);
   const showRisk = useDrill((s) => s.showRisk);
+  const view = useDrill((s) => s.view);
   const t = useDrillClock();
   const router = useRouter();
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
@@ -359,7 +361,7 @@ export default function Hud({
   }, [phase, startAt, scenario.kind]);
 
   return (
-    <div className="pointer-events-none absolute inset-0 flex flex-col justify-between gap-3 p-3">
+    <div className="pointer-events-none absolute inset-0 z-30 flex flex-col justify-between gap-3 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className={`${panel} pointer-events-auto min-w-0 max-w-xs space-y-2 text-sm`}>
           <div className="flex items-center gap-3">
@@ -426,6 +428,15 @@ export default function Hud({
             <Layers aria-hidden="true" className="size-4" />
             <span className="sm:hidden">Risiko AI</span>
             <span className="hidden sm:inline">Lapisan risiko AI</span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === "first"}
+            onClick={() => setState({ view: view === "first" ? "third" : "first" })}
+            className={`${btn} min-h-10 border px-3 text-sm ${view === "first" ? "border-fajar bg-fajar text-malam" : "border-malam-3 bg-malam/90 text-pasir hover:border-redup"}`}
+          >
+            <Eye aria-hidden="true" className="size-4" />
+            <span className="sr-only sm:not-sr-only">Orang pertama</span>
           </button>
         </div>
       </div>

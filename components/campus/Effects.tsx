@@ -22,9 +22,9 @@ const wading = (x: number, z: number) => {
 
 const CLASSMATES: { home: Tile; look: Look }[] = [
   { home: [3, 7], look: "female-c" },
-  { home: [6, 9], look: "male-a" },
-  { home: [9, 7], look: "female-e" },
-  { home: [11, 8], look: "female-b" },
+  { home: [5, 9], look: "male-a" },
+  { home: [2, 9], look: "female-e" },
+  { home: [11, 9], look: "female-b" },
   { home: [12, 7], look: "male-f" },
   { home: [17, 8], look: "female-f" },
   { home: [21, 7], look: "male-a" },

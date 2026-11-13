@@ -26,6 +26,7 @@ type State = {
   result: DrillResult | null;
   nearWarden: boolean;
   chatOpen: boolean;
+  view: "third" | "first";
 };
 
 let state: State = {
@@ -38,6 +39,7 @@ let state: State = {
   result: null,
   nearWarden: false,
   chatOpen: false,
+  view: "third",
 };
 
 const listeners = new Set<() => void>();
@@ -57,6 +59,8 @@ export const useDrill = <T,>(select: (s: State) => T) =>
 // Per-frame values live outside React so 60 fps updates never re-render the HUD.
 export const player = { x: SPAWN[0] + 0.5, z: SPAWN[1] + 0.5, heading: 0, crouch: false, moving: false, wading: false };
 export const input = { up: false, down: false, left: false, right: false, crouch: false };
+// yaw 0 puts the camera south of the player, looking north.
+export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05 };
 export const remotes = new Map<string, { x: number; z: number; crouch: boolean; at: number }>();
 export const run = {
   hazards: new Set<number>(),

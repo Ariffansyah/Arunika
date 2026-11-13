@@ -9,24 +9,28 @@ export default function Avatar({
   name,
   anim,
   self = false,
+  label = true,
 }: {
   look: Look;
   name: string;
   anim: () => Anim;
   self?: boolean;
+  label?: boolean;
 }) {
   return (
     <>
       <Suspense fallback={null}>
         <Character look={look} anim={anim} />
       </Suspense>
-      <Html position={[0, 1.8, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
-        <span
-          className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold ${self ? "bg-fajar text-malam" : "bg-malam/85 text-pasir"}`}
-        >
-          {name}
-        </span>
-      </Html>
+      {label && (
+        <Html position={[0, 1.8, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
+          <span
+            className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold ${self ? "bg-fajar text-malam" : "bg-malam/85 text-pasir"}`}
+          >
+            {name}
+          </span>
+        </Html>
+      )}
     </>
   );
 }
