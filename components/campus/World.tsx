@@ -29,6 +29,7 @@ import {
 } from "@/lib/campus";
 import { waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
+import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
 import { getState, predict, setState, useDrill } from "./drillStore";
 import Player from "./Player";
@@ -215,7 +216,7 @@ function Warden() {
   const [x, z] = WARDEN;
   return (
     <group position={[x + 0.5, tileElevation(x, z), z + 0.5]} rotation-y={Math.PI / 4}>
-      <Avatar color="#ff8a3d" name="Petugas Keselamatan" crouching={() => false} />
+      <Avatar look="j" name="Petugas Keselamatan" anim={() => (getState().chatOpen ? "emote-yes" : "idle")} />
       {near && (
         <Html position={[0, 2.4, 0]} center zIndexRange={[30, 0]}>
           <button
@@ -325,7 +326,7 @@ export default function World({
   peers,
   school,
 }: {
-  me: { name: string; color: string };
+  me: { name: string; look: Look };
   peers: Peer[];
   school: School | null;
 }) {
@@ -345,7 +346,7 @@ export default function World({
       {showRisk && <HazardOverlay hazards={hazards} />}
       <Route />
       <Water />
-      <Player color={me.color} name={me.name} />
+      <Player look={me.look} name={me.name} />
       <RemotePlayers peers={peers} />
     </Canvas>
   );

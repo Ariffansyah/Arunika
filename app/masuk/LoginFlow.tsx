@@ -3,7 +3,7 @@
 import { Check, Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AVATAR_COLORS, ROLE_LABEL, supabase, type Role, type School } from "@/lib/supabase";
+import { AVATARS, ROLE_LABEL, supabase, type Role, type School } from "@/lib/supabase";
 
 const label = "block text-sm font-medium";
 const field =
@@ -248,21 +248,23 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
       </label>
 
       <fieldset>
-        <legend className={label}>Warna avatar</legend>
-        <div className="mt-2 flex flex-wrap gap-2.5">
-          {AVATAR_COLORS.map((c, i) => (
-            <label key={c} className="relative">
+        <legend className={label}>Karakter</legend>
+        <div className="mt-2 grid grid-cols-6 gap-2">
+          {AVATARS.map((look, i) => (
+            <label key={look} className="relative">
               <input type="radio" name="avatar" value={i} defaultChecked={i === 0} className="peer sr-only" />
-              <span className="sr-only">Warna {i + 1}</span>
-              <span
-                aria-hidden="true"
-                style={{ background: c }}
-                className="block size-11 rounded-full ring-offset-2 ring-offset-malam hover:ring-2 hover:ring-malam-3 peer-checked:ring-2 peer-checked:ring-pasir peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-fajar"
+              {/* eslint-disable-next-line @next/next/no-img-element -- 64px sprites, nothing to optimise */}
+              <img
+                src={`/characters/previews/character-${look}.png`}
+                alt={`Karakter ${i + 1}`}
+                width={64}
+                height={64}
+                className="aspect-square w-full rounded-md border-2 border-malam-3 bg-malam-2 hover:border-redup peer-checked:border-fajar peer-checked:bg-malam-3 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fajar"
               />
               <Check
                 aria-hidden="true"
                 strokeWidth={3}
-                className="pointer-events-none absolute inset-0 m-auto size-5 text-malam opacity-0 peer-checked:opacity-100"
+                className="pointer-events-none absolute top-1 right-1 size-4 rounded-full bg-fajar p-0.5 text-malam opacity-0 peer-checked:opacity-100"
               />
             </label>
           ))}

@@ -26,7 +26,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   pemda: "Pemerintah daerah",
 };
 
-export const AVATAR_COLORS = ["#ff8a3d", "#3fb6a8", "#f2c14e", "#e86a92", "#7aa7ff", "#9bd16a"];
+// Profile `avatar` (0-5) picks one of these characters; see components/Character.tsx.
+export const AVATARS = ["a", "b", "c", "e", "f", "n"] as const;
 
 let client: SupabaseClient | null = null;
 

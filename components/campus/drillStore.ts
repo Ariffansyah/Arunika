@@ -55,7 +55,7 @@ export const useDrill = <T,>(select: (s: State) => T) =>
   useSyncExternalStore(subscribe, () => select(state), () => select(state));
 
 // Per-frame values live outside React so 60 fps updates never re-render the HUD.
-export const player = { x: SPAWN[0] + 0.5, z: SPAWN[1] + 0.5, heading: 0, crouch: false };
+export const player = { x: SPAWN[0] + 0.5, z: SPAWN[1] + 0.5, heading: 0, crouch: false, moving: false, wading: false };
 export const input = { up: false, down: false, left: false, right: false, crouch: false };
 export const remotes = new Map<string, { x: number; z: number; crouch: boolean; at: number }>();
 export const run = { hazards: new Set<number>(), goals: [] as Tile[], walked: 0, hazardS: 0, coverS: 0, hintUsed: false, optimalLen: 0 };

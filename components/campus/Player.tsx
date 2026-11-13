@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import type { Group } from "three";
 import { WARDEN, elevationAt, idx, isBlocked } from "@/lib/campus";
 import { DRILL_LIMIT_S, PLAYER_SPEED, QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
+import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
 import { finishDrill, getState, input, player, run, setState } from "./drillStore";
 
@@ -26,7 +27,7 @@ const free = (x: number, z: number) =>
 
 const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("input, textarea, select") !== null;
 
-export default function Player({ color, name }: { color: string; name: string }) {
+export default function Player({ look, name }: { look: Look; name: string }) {
   const ref = useRef<Group>(null);
   const camera = useThree((s) => s.camera);
   const reducedMotion = useRef(false);
@@ -70,7 +71,9 @@ export default function Player({ color, name }: { color: string; name: string })
     const len = Math.hypot(dx, dz);
     const frozen = s.chatOpen || (running && t < 0);
     player.crouch = input.crouch && !frozen;
-    if (len && !frozen && !player.crouch) {
+    player.moving = Boolean(len) && !frozen && !player.crouch;
+    player.wading = depth > 0.3;
+    if (player.moving) {
       dx /= len;
       dz /= len;
       const speed = PLAYER_SPEED * (depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1);
@@ -116,7 +119,12 @@ export default function Player({ color, name }: { color: string; name: string })
 
   return (
     <group ref={ref}>
-      <Avatar color={color} name={name} crouching={() => player.crouch} self />
+      <Avatar
+        look={look}
+        name={name}
+        self
+        anim={() => (player.crouch ? "sit" : player.moving ? (player.wading ? "walk" : "sprint") : "idle")}
+      />
     </group>
   );
 }
