@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { Suspense, useRef } from "react";
 import type { Group } from "three";
-import Model, { M, preloadModels } from "@/components/Model";
+import Model, { Instances, M, preloadModels, type Placement } from "@/components/Model";
 import Decor from "./Decor";
 import { ASSEMBLY, SITE_D, SITE_W, TILE, elevationAt, tileCenter } from "@/lib/campus";
 
@@ -50,10 +50,7 @@ const PALMS: Spot[] = Array.from({ length: 18 }, (_, i) => ({
   size: 9 + rand(i + 30) * 4.8,
 }));
 
-const BUSHES: Spot[] = [
-  ...[2.5, 5, 7.5, 10.5, 13, 15.5, 24.5, 27.5, 30.5, 33, 36].map((x) => ({ x: x * TILE, z: 26.3 * TILE })),
-  ...[15.5, 18, 20.5, 23, 25.5].map((z) => ({ x: 1.6 * TILE, z: z * TILE })),
-].map((p, i) => ({ ...p, src: M.bushes[i % M.bushes.length], ry: rand(i + 11) * Math.PI * 2, size: 1 + rand(i + 13) * 0.6 }));
+const BUSHES: Spot[] = [...[2.5, 5, 7.5, 10.5, 13, 15.5, 24.5, 27.5, 30.5, 33, 36].map((x) => ({ x: x * TILE, z: 26.3 * TILE }))].map((p, i) => ({ ...p, src: M.bushes[i % M.bushes.length], ry: rand(i + 11) * Math.PI * 2, size: 1 + rand(i + 13) * 0.6 }));
 
 const FLOWERS: Spot[] = [
   [19.2, 23.6],
@@ -61,6 +58,20 @@ const FLOWERS: Spot[] = [
   [19.4, 25.3],
   [21.6, 25.4],
 ].map(([x, z], i) => ({ x: x * TILE, z: z * TILE, src: M.flowers[i % 2], ry: rand(i) * 6, size: 0.5 }));
+
+// A hedge just inside the fence on the west, north and lower east sides, broken where the court meets the fence.
+const HEDGE: Placement[] = [
+  ...Array.from({ length: 50 }, (_, i) => [4.2, 4.5 + i * 1.5]),
+  ...Array.from({ length: 44 }, (_, i) => [5.7 + i * 1.5, 4.2]),
+  ...Array.from({ length: 31 }, (_, i) => [SITE_W - 4.2, 33 + i * 1.5]),
+].map(([x, z], i) => {
+  const s = 1.1 + rand(i + 200) * 0.5;
+  return { x, y: elevationAt(x, z), z, ry: rand(i + 300) * Math.PI * 2, size: [s, s * 0.8, s] };
+});
+
+function Hedge() {
+  return M.bushes.map((src, k) => <Instances key={src} src={src} items={HEDGE.filter((_, i) => i % M.bushes.length === k)} />);
+}
 
 const at = (s: Spot, lift = 0) => [s.x, Math.max(0.03, elevationAt(s.x, s.z)) + lift] as const;
 
@@ -182,6 +193,7 @@ export default function Scenery() {
         <Spots spots={VILLAGE_TREES} by="height" />
         <Spots spots={PALMS} by="height" />
         <Spots spots={BUSHES} by="height" />
+        <Hedge />
         <Spots spots={FLOWERS} by="height" />
         <Responders />
         <Camp />

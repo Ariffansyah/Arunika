@@ -146,7 +146,7 @@ export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; st
   const clockRef = useRef(startAt);
   const { pts, cum } = useRoute();
   return (
-    <Canvas shadows dpr={[1, 1.75]} frameloop={paused ? "demand" : "always"} camera={{ fov: 36, near: 0.5, far: 2000 }}>
+    <Canvas shadows="percentage" dpr={[1, 1.75]} frameloop={paused ? "demand" : "always"} camera={{ fov: 36, near: 0.5, far: 2000 }}>
       <Backdrop sky={[-25, 4, -100]} light={[SITE_W / 2 + 96, 60, SITE_D / 2 - 78]} fog={[180, 780]} />
       <Scenery />
       <Terrain />

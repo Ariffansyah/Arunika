@@ -1,7 +1,7 @@
 import { ASSEMBLY, GRID, H, W, buildingRects, surfaceAt, type Tile } from "@/lib/campus";
 
 const FILL: Record<string, string> = { h: "#1f4a3a", g: "#24533f", "=": "#3a4f6e" };
-const SURFACE_FILL = { paving: "#2a3d5c", court: "#264d7a" };
+const SURFACE_FILL = { paving: "#2a3d5c", court: "#264d7a", trail: "#3d3a3a" };
 
 export default function CampusPlan({
   route,
@@ -26,7 +26,8 @@ export default function CampusPlan({
       {GRID.flatMap((row, z) =>
         [...row].map((c, x) =>
           {
-            const fill = FILL[c] ?? (surfaceAt(x, z) ? SURFACE_FILL[surfaceAt(x, z)!] : undefined);
+            const surface = surfaceAt(x, z);
+            const fill = surface ? SURFACE_FILL[surface] : FILL[c];
             return fill ? <rect key={`${x}-${z}`} x={x} y={z} width={1.02} height={1.02} fill={fill} /> : null;
           },
         ),

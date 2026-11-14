@@ -5,10 +5,11 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import {
   BackSide,
-  BufferAttribute,
+  CanvasTexture,
   Color,
   Object3D,
   PlaneGeometry,
+  SRGBColorSpace,
   type DirectionalLight,
   type Fog,
   type Group,
@@ -23,6 +24,7 @@ import {
   SITE_W,
   TILE,
   W,
+  buildingRects,
   elevationAt,
   findTiles,
   surfaceAt,
@@ -32,7 +34,7 @@ import {
   type Tile,
 } from "@/lib/campus";
 import { FENCE, FENCE_H } from "@/lib/nav";
-import { vortexAt, waterLevel } from "@/lib/sim";
+import { random, vortexAt, waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
 import Html from "@/components/Html";
@@ -48,33 +50,133 @@ import Scenery from "./Scenery";
 import RemotePlayers from "./RemotePlayers";
 import type { Peer } from "./useRoom";
 
-const GROUND: Record<string, string> = { ".": "#a3a081", h: "#4f8a4a", g: "#5f9b4c", A: "#4f8a4a", B: "#5f9b4c" };
-const SURFACE = { paving: "#cfc6b1", court: "#3f6f9e" };
+// Texture pixels per metre of ground.
+const PX = 16;
+// Hue, saturation and lightness of the grass on each kind of tile.
+const GRASS: Record<string, [number, number, number]> = { h: [96, 34, 32], A: [96, 34, 32], g: [100, 42, 40], B: [100, 42, 40] };
+const LAWN: [number, number, number] = [84, 32, 44];
+
+// The site painted once: worn lawn, a mown field, paving blocks with curbs, concrete round the buildings, a dirt track.
+function paintGround() {
+  const canvas = document.createElement("canvas");
+  canvas.width = SITE_W * PX;
+  canvas.height = SITE_D * PX;
+  const g = canvas.getContext("2d")!;
+  const rnd = random(3);
+  const px = (m: number) => m * PX;
+  const hsl = ([h, s, l]: [number, number, number], dl = 0) => `hsl(${h} ${s}% ${l + dl}%)`;
+  const grass = (x: number, z: number) => GRASS[tileAt(x, z)] ?? LAWN;
+  const surfaceOf = (x: number, z: number) => (x < 0 || z < 0 || x >= W || z >= H ? null : surfaceAt(x, z));
+
+  for (let z = 0; z < H; z++) {
+    for (let x = 0; x < W; x++) {
+      g.fillStyle = hsl(grass(x, z));
+      g.fillRect(px(x * TILE), px(z * TILE), px(TILE), px(TILE));
+    }
+  }
+  // Blades and worn patches: thousands of small dabs, lighter and darker than the base.
+  for (let i = 0; i < 90000; i++) {
+    const x = rnd() * SITE_W;
+    const z = rnd() * SITE_D;
+    g.fillStyle = hsl(grass(Math.floor(x / TILE), Math.floor(z / TILE)), (rnd() - 0.5) * 14);
+    g.fillRect(px(x), px(z), 1 + rnd() * 3, 1 + rnd() * 3);
+  }
+  for (let i = 0; i < 260; i++) {
+    const x = rnd() * SITE_W;
+    const z = rnd() * SITE_D;
+    if (tileAt(Math.floor(x / TILE), Math.floor(z / TILE)) !== ".") continue;
+    g.fillStyle = `hsl(42 ${22 + rnd() * 10}% ${48 + rnd() * 8}% / 0.35)`;
+    g.beginPath();
+    g.ellipse(px(x), px(z), px(0.6 + rnd() * 1.6), px(0.4 + rnd()), rnd() * Math.PI, 0, Math.PI * 2);
+    g.fill();
+  }
+  // Mowing stripes across the field, one per tile.
+  for (const [x, z] of findTiles("gB")) {
+    g.fillStyle = x % 2 ? "rgb(255 255 255 / 0.06)" : "rgb(0 0 0 / 0.05)";
+    g.fillRect(px(x * TILE), px(z * TILE), px(TILE), px(TILE));
+  }
+  // Concrete aprons and a drain round every building.
+  for (const r of Object.values(buildingRects())) {
+    const [x0, z0, x1, z1] = [r.x0 * TILE - 1.2, r.z0 * TILE - 1.2, (r.x1 + 1) * TILE + 1.2, (r.z1 + 1) * TILE + 1.2];
+    g.fillStyle = "#b9b2a4";
+    g.fillRect(px(x0), px(z0), px(x1 - x0), px(z1 - z0));
+    g.strokeStyle = "#7d776c";
+    g.lineWidth = px(0.12);
+    g.strokeRect(px(x0 + 0.1), px(z0 + 0.1), px(x1 - x0 - 0.2), px(z1 - z0 - 0.2));
+  }
+  for (let z = 0; z < H; z++) {
+    for (let x = 0; x < W; x++) {
+      const surface = surfaceAt(x, z);
+      const [mx, mz] = [x * TILE, z * TILE];
+      if (surface === "paving") {
+        // Running-bond paving blocks, 50 by 25 cm, each a slightly different tone.
+        g.fillStyle = "#8f887b";
+        g.fillRect(px(mx), px(mz), px(TILE), px(TILE));
+        for (let row = 0; row < TILE / 0.25; row++) {
+          for (let k = -1; k < TILE / 0.5; k++) {
+            const bx = mx + k * 0.5 + (row % 2) * 0.25;
+            const x0 = Math.max(mx, bx);
+            const x1 = Math.min(mx + TILE, bx + 0.5);
+            if (x1 <= x0) continue;
+            g.fillStyle = `hsl(36 ${8 + rnd() * 6}% ${66 + rnd() * 8}%)`;
+            g.fillRect(px(x0) + 1, px(mz + row * 0.25) + 1, px(x1 - x0) - 1, px(0.25) - 1);
+          }
+        }
+      } else if (surface === "court") {
+        g.fillStyle = "#3d6c99";
+        g.fillRect(px(mx), px(mz), px(TILE), px(TILE));
+      } else if (surface === "trail") {
+        for (let i = 0; i < 40; i++) {
+          g.fillStyle = `hsl(30 ${30 + rnd() * 10}% ${34 + rnd() * 8}%)`;
+          g.beginPath();
+          g.arc(px(mx + 0.4 + rnd() * 2.2), px(mz + 0.4 + rnd() * 2.2), px(0.35 + rnd() * 0.5), 0, Math.PI * 2);
+          g.fill();
+        }
+      }
+      if (surface !== "paving") continue;
+      // A curb wherever paving meets lawn.
+      g.fillStyle = "#ddd7cb";
+      const curb = px(0.15);
+      if (!surfaceOf(x, z - 1)) g.fillRect(px(mx), px(mz), px(TILE), curb);
+      if (!surfaceOf(x, z + 1)) g.fillRect(px(mx), px(mz + TILE) - curb, px(TILE), curb);
+      if (!surfaceOf(x - 1, z)) g.fillRect(px(mx), px(mz), curb, px(TILE));
+      if (!surfaceOf(x + 1, z)) g.fillRect(px(mx + TILE) - curb, px(mz), curb, px(TILE));
+    }
+  }
+  // Bare soil round each tree trunk.
+  for (const [x, z] of TREES) {
+    const [cx, cz] = tileCenter(x, z);
+    g.fillStyle = "#6e5038";
+    g.beginPath();
+    g.arc(px(cx), px(cz), px(1.2), 0, Math.PI * 2);
+    g.fill();
+  }
+  return canvas;
+}
 
 export function Terrain() {
+  const gl = useThree((s) => s.gl);
   const geometry = useMemo(() => {
     const geo = new PlaneGeometry(SITE_W, SITE_D, W * 2, H * 2);
     const pos = geo.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    const c = new Color();
     for (let i = 0; i < pos.count; i++) {
-      // Same as rotating the plane flat, but with the height and tile colour baked in.
+      // Same as rotating the plane flat, but with the height baked in; the UVs still span the whole site.
       const x = pos.getX(i) + SITE_W / 2;
       const z = -pos.getY(i) + SITE_D / 2;
       pos.setXYZ(i, x, elevationAt(x, z), z);
-      const tx = Math.min(W - 1, Math.floor(x / TILE));
-      const tz = Math.min(H - 1, Math.floor(z / TILE));
-      const surface = surfaceAt(tx, tz);
-      c.set(surface ? SURFACE[surface] : (GROUND[tileAt(tx, tz)] ?? GROUND["."]));
-      colors.set([c.r, c.g, c.b], i * 3);
     }
-    geo.setAttribute("color", new BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     return geo;
   }, []);
+  const map = useMemo(() => {
+    const texture = new CanvasTexture(paintGround());
+    texture.colorSpace = SRGBColorSpace;
+    texture.anisotropy = gl.capabilities.getMaxAnisotropy();
+    return texture;
+  }, [gl]);
   return (
     <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial vertexColors roughness={0.95} />
+      <meshStandardMaterial map={map} roughness={0.95} />
     </mesh>
   );
 }
@@ -406,7 +508,7 @@ export default function World({
 
   return (
     <Canvas
-      shadows
+      shadows="percentage"
       dpr={[1, 2]}
       camera={{ fov: 55, near: 0.1, far: 1500 }}
       style={{ touchAction: "none" }}

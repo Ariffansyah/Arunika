@@ -4,7 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Vector3, type Group } from "three";
 import { PLAN } from "@/lib/floorplan";
-import { buildingAt, free, groundY, layerAt, solidAt, type Solid } from "@/lib/nav";
+import { buildingAt, free, groundY, layerAt, solidAt } from "@/lib/nav";
 import { RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
 import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
@@ -41,16 +41,12 @@ const CAM_DIST = 5;
 
 const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("input, textarea, select") !== null;
 
-// Inside a building the storeys above the player are cut away, so the camera may pass where they were.
-let inside: string | null = null;
-const cutAway = (s: Solid) => s.b !== undefined && s.b === inside && (s.floor ?? 0) > player.layer;
-
 function clearReach(from: Vector3, yaw: number, pitch: number, dist: number) {
   const bx = Math.sin(yaw) * Math.cos(pitch);
   const bz = Math.cos(yaw) * Math.cos(pitch);
   const by = Math.sin(pitch);
   for (let d = 0.3; d <= dist; d += 0.15) {
-    if (solidAt(from.x + bx * d, from.y + by * d, from.z + bz * d, cutAway)) return d;
+    if (solidAt(from.x + bx * d, from.y + by * d, from.z + bz * d)) return d;
   }
   return dist;
 }
@@ -65,6 +61,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
   const camDist = useRef(CAM_DIST);
   const camLift = useRef(0);
   const eye = useRef(new Vector3());
+  const pivotAt = useRef(new Vector3());
 
   useEffect(() => {
     reducedMotion.current = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -192,7 +189,6 @@ export default function Player({ look: character, name }: { look: Look; name: st
     // Eased, so a step onto a floor or a stair reads as a step; a teleport snaps.
     const ground = groundY(player.x, player.z, player.layer);
     player.y = Math.abs(ground - player.y) > 1.5 ? ground : player.y + (ground - player.y) * (1 - Math.exp(-dt * 14));
-    inside = buildingAt(player.x, player.z);
     const g = ref.current;
     if (g) {
       g.position.set(player.x, player.y, player.z);
@@ -223,19 +219,20 @@ export default function Player({ look: character, name }: { look: Look; name: st
       );
     } else {
       // Something between camera and player: swing up a little first, then pull in; whatever still blocks the view fades.
-      // Indoors the camera may climb higher, over the walls of a room whose ceiling is cut away.
-      const maxLift = inside ? 0.8 : 0.45;
+      // Indoors the ceiling leaves no room to swing up, so the camera only pulls in.
+      const pivot = pivotAt.current.set(target.x, target.y + 0.4, target.z);
+      const maxLift = buildingAt(player.x, player.z) ? 0 : 0.45;
       let lift = 0;
-      while (lift < maxLift && clearReach(target, look.yaw, Math.min(1.45, look.camPitch + lift), CAM_DIST) < CAM_DIST) lift += 0.05;
+      while (lift < maxLift && clearReach(pivot, look.yaw, Math.min(1.45, look.camPitch + lift), CAM_DIST) < CAM_DIST) lift += 0.05;
       camLift.current += (lift - camLift.current) * (1 - Math.exp(-dt * 6));
       const pitch = Math.min(1.45, look.camPitch + camLift.current);
-      const reach = Math.max(0.4, clearReach(target, look.yaw, pitch, CAM_DIST) - 0.3);
+      const reach = Math.max(0.4, clearReach(pivot, look.yaw, pitch, CAM_DIST) - 0.3);
       camDist.current = reach < camDist.current ? reach : camDist.current + (reach - camDist.current) * (1 - Math.exp(-dt * 4));
       const d = camDist.current;
       const bx = Math.sin(look.yaw) * Math.cos(pitch);
       const bz = Math.cos(look.yaw) * Math.cos(pitch);
       const by = Math.sin(pitch);
-      camera.position.set(target.x + bx * d + jitter(), target.y + 0.4 + by * d + jitter(), target.z + bz * d + jitter());
+      camera.position.set(pivot.x + bx * d + jitter(), pivot.y + by * d + jitter(), pivot.z + bz * d + jitter());
       camera.lookAt(target.x, target.y + 0.25, target.z);
     }
 

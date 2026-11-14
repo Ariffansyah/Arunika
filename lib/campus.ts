@@ -91,13 +91,23 @@ export function elevationAt(x: number, z: number) {
 export const tileElevation = (x: number, z: number) => elevationAt(...tileCenter(x, z));
 
 // Paint only: collision and routing ignore surfaces.
-export function surfaceAt(x: number, z: number): "paving" | "court" | null {
-  if (!".S".includes(tileAt(x, z))) return null;
+export function surfaceAt(x: number, z: number): "paving" | "court" | "trail" | null {
+  const c = tileAt(x, z);
+  // A worn track climbs from the courtyard to the hilltop assembly point.
+  if ((z === 8 && x >= 28 && x <= 35) || (x === 35 && z >= 6 && z <= 7)) return ".h".includes(c) ? "trail" : null;
+  if (!".SW".includes(c)) return null;
   if (x >= 24 && x <= 28 && z >= 1 && z <= 6) return "court";
   const courtyard = z >= 7 && z <= 9 && x >= 2 && x <= 27;
   const walkway = x >= 14 && x <= 15 && z >= 7 && z <= 26;
   const ceremonyYard = z >= 23 && z <= 26 && x >= 15 && x <= 26;
-  return courtyard || walkway || ceremonyYard ? "paving" : null;
+  // Paths to the doors of the library, the canteen and the musholla.
+  const paths =
+    (z === 19 && x >= 9 && x <= 13) ||
+    (z === 23 && x >= 27 && x <= 31) ||
+    (x === 34 && z >= 19 && z <= 21) ||
+    (z === 21 && x >= 29 && x <= 33) ||
+    (x === 29 && z === 22);
+  return courtyard || walkway || ceremonyYard || paths ? "paving" : null;
 }
 
 export function findTiles(chars: string): Tile[] {

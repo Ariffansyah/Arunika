@@ -2,11 +2,21 @@
 
 import { useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useCallback, useLayoutEffect, useMemo, useRef } from "react";
-import { BoxGeometry, Color, Object3D, type Group, type InstancedMesh, type MeshStandardMaterial } from "three";
+import {
+  BoxGeometry,
+  CanvasTexture,
+  Color,
+  Object3D,
+  RepeatWrapping,
+  SRGBColorSpace,
+  type Group,
+  type InstancedMesh,
+  type MeshStandardMaterial,
+} from "three";
 import Html from "@/components/Html";
 import { Instances, preloadModels } from "@/components/Model";
 import { BUILDINGS } from "@/lib/campus";
-import { PLAN, STOREY, WALL, type Door, type Furniture, type Part, type PartKind, type Spot } from "@/lib/floorplan";
+import { CEILING, PLAN, STOREY, WALL, type Box, type Door, type Furniture, type Part, type PartKind, type Spot } from "@/lib/floorplan";
 import { buildingAt } from "@/lib/nav";
 import { aftershockAt, drillTime, fallTilt, getState, player, run, shakingAt, useDrill } from "./drillStore";
 import { fadeTo, hides } from "./fade";
@@ -26,8 +36,62 @@ const COLOR: Partial<Record<PartKind, string>> = {
   step: "#cbc2ad",
   board: "#f4f6f2",
 };
+// The painted lower band of Indonesian school walls, and the tiled wainscot inside.
+const BAND_COLOR = "#7f8f78";
+const BAND = 0.9;
 const riskColor = (r: number) => new Color(WALL_COLOR).lerp(new Color("#e0473c"), r / 100);
 const UNIT = new BoxGeometry();
+
+function Plain({ boxes, children, shadow = false }: { boxes: Box[]; children: React.ReactNode; shadow?: boolean }) {
+  const ref = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const mesh = ref.current!;
+    const o = new Object3D();
+    boxes.forEach((p, i) => {
+      o.position.set((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, (p.z0 + p.z1) / 2);
+      o.scale.set(p.x1 - p.x0, p.y1 - p.y0, p.z1 - p.z0);
+      o.updateMatrix();
+      mesh.setMatrixAt(i, o.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [boxes]);
+  return (
+    <instancedMesh ref={ref} args={[UNIT, undefined, boxes.length]} castShadow={shadow} receiveShadow={shadow}>
+      {children}
+    </instancedMesh>
+  );
+}
+
+// Rows of clay tiles (genteng), each row shading the top of the one below.
+function roofTiles() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 128;
+  const g = canvas.getContext("2d")!;
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 8; col++) {
+      const x = col * 32 + (row % 2) * 16;
+      g.fillStyle = `hsl(${14 + ((col * 7 + row * 3) % 5)} 58% ${38 + ((col * 5 + row) % 4) * 2}%)`;
+      g.fillRect(x - 32, row * 32, 32, 32);
+      g.fillRect(x + 224, row * 32, 32, 32);
+      g.fillRect(x, row * 32, 32, 32);
+      g.fillStyle = "rgb(0 0 0 / 0.18)";
+      g.fillRect(x, row * 32, 2, 32);
+    }
+    const shade = g.createLinearGradient(0, row * 32, 0, row * 32 + 32);
+    shade.addColorStop(0, "rgb(0 0 0 / 0.35)");
+    shade.addColorStop(0.25, "rgb(0 0 0 / 0)");
+    shade.addColorStop(0.85, "rgb(255 255 255 / 0.08)");
+    shade.addColorStop(1, "rgb(0 0 0 / 0.25)");
+    g.fillStyle = shade;
+    g.fillRect(0, row * 32, 256, 32);
+  }
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.wrapS = texture.wrapT = RepeatWrapping;
+  return texture;
+}
 
 function Boxes({ parts, colorOf }: { parts: Part[]; colorOf: (p: Part) => Color | string }) {
   const ref = useRef<InstancedMesh>(null);
@@ -187,7 +251,7 @@ function SpotMesh({ s }: { s: Spot }) {
 }
 
 function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: number; showRisk: boolean }) {
-  const { opaque, glass, items, doors, spots } = useMemo(() => {
+  const { opaque, bands, glass, items, doors, spots } = useMemo(() => {
     const parts = PLAN.parts.filter((p) => p.b === b && p.floor === floor && p.kind !== "under" && p.kind !== "roof");
     const items: Partial<Record<Furniture, typeof PLAN.items>> = {};
     const index: Partial<Record<Furniture, number[]>> = {};
@@ -198,6 +262,10 @@ function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: 
     });
     return {
       opaque: parts.filter((p) => p.kind !== "glass"),
+      // A skin a centimetre proud of every wall piece that stands on the floor, both faces at once.
+      bands: parts
+        .filter((p) => p.kind === "wall" && Math.abs(p.y0 - (PLAN.floorY[b] + floor * STOREY)) < 0.05)
+        .map((p) => ({ x0: p.x0 - 0.01, x1: p.x1 + 0.01, z0: p.z0 - 0.01, z1: p.z1 + 0.01, y0: p.y0, y1: Math.min(p.y1, p.y0 + BAND) })),
       glass: parts.filter((p) => p.kind === "glass"),
       items: (Object.entries(items) as [Furniture, typeof PLAN.items][]).map(([model, list]) => {
         const ids = index[model]!;
@@ -216,6 +284,11 @@ function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: 
   return (
     <>
       {opaque.length > 0 && <Boxes parts={opaque} colorOf={colorOf} />}
+      {bands.length > 0 && (
+        <Plain boxes={bands} shadow>
+          <meshStandardMaterial color={BAND_COLOR} roughness={0.7} />
+        </Plain>
+      )}
       {glass.length > 0 && <Glass parts={glass} />}
       <Suspense fallback={null}>
         {items.map(([model, list, tilt]) => (
@@ -232,12 +305,60 @@ function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: 
   );
 }
 
+// Ceilings face away from the sky light, so they are drawn evenly lit; the lamps go dark when the power is cut.
+function Ceilings({ b }: { b: string }) {
+  const power = useDrill((s) => s.power);
+  const { panels, lamps } = useMemo(() => {
+    const floors = BUILDINGS[b].floors;
+    const panels: Box[] = [];
+    const lamps: Box[] = [];
+    for (const r of PLAN.rooms) {
+      // The stairwell is open to the floor above.
+      if (r.b !== b || (r.kind === "tangga" && r.floor < floors - 1)) continue;
+      const y = PLAN.floorY[b] + r.floor * STOREY + CEILING;
+      panels.push({ x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, y0: y - 0.02, y1: y });
+      if (r.kind === "tangga") continue;
+      const [w, d] = [r.x1 - r.x0, r.z1 - r.z0];
+      const alongX = w >= d;
+      const [long, short] = alongX ? [w, d] : [d, w];
+      const n = Math.max(1, Math.round(long / 4));
+      const m = r.kind === "selasar" ? 1 : Math.max(1, Math.round(short / 3.5));
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < m; j++) {
+          const [a, c] = [((i + 0.5) / n) * long, ((j + 0.5) / m) * short];
+          const [x, z] = alongX ? [r.x0 + a, r.z0 + c] : [r.x0 + c, r.z0 + a];
+          const [hx, hz] = alongX ? [0.6, 0.08] : [0.08, 0.6];
+          lamps.push({ x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, y0: y - 0.07, y1: y - 0.02 });
+        }
+      }
+    }
+    return { panels, lamps };
+  }, [b]);
+  if (BUILDINGS[b].kind === "kantin") return null;
+  return (
+    <>
+      <Plain boxes={panels}>
+        <meshBasicMaterial color={power ? "#e6e2d9" : "#9c988f"} />
+      </Plain>
+      <Plain boxes={lamps}>
+        <meshStandardMaterial color="#f2f2ee" emissive="#fff6dc" emissiveIntensity={power ? 1.4 : 0} />
+      </Plain>
+    </>
+  );
+}
+
 function Roof({ b }: { b: string }) {
   const info = BUILDINGS[b];
   const fp = PLAN.footprint[b];
   const top = PLAN.floorY[b] + info.floors * STOREY;
   const [w, d] = [fp.x1 - fp.x0, fp.z1 - fp.z0];
   const [cx, cz] = [(fp.x0 + fp.x1) / 2, (fp.z0 + fp.z1) / 2];
+  // One texture row block is 4 rows of 0.33 m tiles; around the eaves, 8 tiles of 0.3 m.
+  const map = useMemo(() => {
+    const t = roofTiles();
+    t.repeat.set((2 * (w + d + 3.2)) / 2.4, Math.hypot(2.2, Math.min(w, d) / 2 + 0.8) / 1.32);
+    return t;
+  }, [w, d]);
   if (info.kind === "kantin") {
     // Light zinc sheets on a low gable: the roof a whirlwind strips first.
     const eave = PLAN.floorY[b] + 3.2;
@@ -273,7 +394,7 @@ function Roof({ b }: { b: string }) {
     <group position={[cx, top + 1.1, cz]} scale={[(w + 1.6) / Math.SQRT2, 1, (d + 1.6) / Math.SQRT2]}>
       <mesh rotation-y={Math.PI / 4} castShadow>
         <coneGeometry args={[1, 2.2, 4]} />
-        <meshStandardMaterial color="#b4532a" flatShading />
+        <meshStandardMaterial map={map} flatShading />
       </mesh>
     </group>
   );
@@ -281,7 +402,6 @@ function Roof({ b }: { b: string }) {
 
 function Building({ id, risk, showRisk, fade }: { id: string; risk: number; showRisk: boolean; fade: boolean }) {
   const ref = useRef<Group>(null);
-  const storeys = useRef<(Group | null)[]>([]);
   const opacity = useRef(1);
   const info = BUILDINGS[id];
   const fp = PLAN.footprint[id];
@@ -301,12 +421,8 @@ function Building({ id, risk, showRisk, fade }: { id: string; risk: number; show
     const sway = (0.002 + (risk / 100) * 0.012) * (s.scenario.intensity - 4) * strength;
     g.rotation.z = strength ? Math.sin(t * 17 + fp.x0) * sway : 0;
     g.rotation.x = strength ? Math.cos(t * 13 + fp.z0) * sway * 0.6 : 0;
-    // Walking in cuts the building away above the player, like lifting the lid of a dollhouse.
-    const inside = buildingAt(player.x, player.z) === id;
-    storeys.current.forEach((sg, f) => {
-      if (sg) sg.visible = !inside || f <= player.layer;
-    });
     if (!fade) return;
+    const inside = buildingAt(player.x, player.z) === id;
     const target = !inside && hides(camera.position, top, fp.x0 - 1.5, fp.z0 - 1.5, fp.x1 + 1.5, fp.z1 + 1.5) ? 0.28 : 1;
     if (Math.abs(opacity.current - target) < 0.01) return;
     opacity.current += (target - opacity.current) * (1 - Math.exp(-dt * 10));
@@ -317,16 +433,10 @@ function Building({ id, risk, showRisk, fade }: { id: string; risk: number; show
     <group ref={ref} position={[cx, base, cz]}>
       <group position={[-cx, -base, -cz]}>
         {Array.from({ length: info.floors + 1 }, (_, f) => (
-          <group
-            key={f}
-            ref={(g) => {
-              storeys.current[f] = g;
-            }}
-          >
-            <Storey b={id} floor={f} risk={risk} showRisk={showRisk} />
-            {f === info.floors && <Roof b={id} />}
-          </group>
+          <Storey key={f} b={id} floor={f} risk={risk} showRisk={showRisk} />
         ))}
+        <Ceilings b={id} />
+        <Roof b={id} />
       </group>
       {showRisk && (
         <Html position={[0, top - base + 1, 0]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
