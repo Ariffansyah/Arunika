@@ -5,11 +5,11 @@ import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import { Color, DoubleSide, Object3D, PlaneGeometry, type Group, type InstancedMesh, type Mesh } from "three";
 import Character, { type Anim, type Look } from "@/components/Character";
 import Model, { M } from "@/components/Model";
-import { ASSEMBLY, TILE, W, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
+import { ASSEMBLY, MAP, TILE, W, elevationAt, findTiles, surfaceAt, tileCenter, tileElevation } from "@/lib/campus";
 import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
-import { RUNOUT, WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
-import { CLASSMATE_SEATS, SIGNS, aftershockAt, drillTime, getState, roomSeats, run, shakingAt } from "./drillStore";
+import { WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
+import { CLASSMATE_SEATS, aftershockAt, drillTime, getState, landslideSigns, roomSeats, run, shakingAt } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
 
 const wading = (x: number, z: number, layer = 0) => {
@@ -211,14 +211,16 @@ export function QuakeDebris() {
   );
 }
 
-const FLOATERS: { src: string; x: number; z: number; h: number }[] = [
-  { src: M.crate, x: 28.5, z: 25.8, h: 0.6 },
-  { src: M.barrel, x: 45.6, z: 35.4, h: 0.9 },
-  { src: M.crate, x: 67.2, z: 27.9, h: 0.55 },
-  { src: M.crate, x: 40.8, z: 74.4, h: 0.65 },
-  { src: M.barrel, x: 79.5, z: 72.9, h: 0.9 },
-  { src: M.crate, x: 18.6, z: 70.2, h: 0.6 },
-];
+// Crates and barrels left about the lowest open ground, where a flood lifts them first.
+const FLOATERS = findTiles(".")
+  .filter(([x, z]) => !surfaceAt(x, z))
+  .sort((a, b) => tileElevation(...a) - tileElevation(...b))
+  .filter((_, k) => k % 17 === 5)
+  .slice(0, 6)
+  .map(([x, z], i) => {
+    const [cx, cz] = tileCenter(x, z);
+    return { src: i % 3 === 1 ? M.barrel : M.crate, x: cx, z: cz, h: i % 3 === 1 ? 0.9 : 0.55 + (i % 2) * 0.1 };
+  });
 
 function Floater({ f, i }: { f: (typeof FLOATERS)[number]; i: number }) {
   const ref = useRef<Group>(null);
@@ -485,56 +487,75 @@ export function Vortex() {
 const SLIDE_S = 6;
 const ROCKS = 36;
 
-// Warning signs on the hill, then the slope giving way over the court and the end of the office.
+// Every lane a slope could slide down, so one plane can take the shape of whichever gives way.
+const BOUNDS = MAP.runouts.reduce(
+  ([x0, x1, z0, z1], { ax, az, bx, bz, r }) => [Math.min(x0, ax - r, bx - r), Math.max(x1, ax + r, bx + r), Math.min(z0, az - r, bz - r), Math.max(z1, az + r, bz + r)],
+  [Infinity, -Infinity, Infinity, -Infinity],
+);
+
+// Warning signs on the slope, then the slope giving way down the drill's lane.
 export function Landslide() {
   const signs = useRef<(Group | null)[]>([]);
+  const lean = useRef<Group>(null);
   const mass = useRef<Mesh>(null);
   const rocks = useRef<InstancedMesh>(null);
-  const shaped = useRef(-1);
+  const shaped = useRef("");
   const o = useMemo(() => new Object3D(), []);
-  const { ax, az, bx, r } = RUNOUT;
-  const [x0, x1, z0, z1] = [bx - r, ax + 4, az - r, az + r];
   const geometry = useMemo(() => {
-    const geo = new PlaneGeometry(x1 - x0, z1 - z0, 64, 28);
+    if (!MAP.runouts.length) return null;
+    const [x0, x1, z0, z1] = BOUNDS;
+    const geo = new PlaneGeometry(x1 - x0, z1 - z0, 72, 48);
     geo.rotateX(-Math.PI / 2);
     geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
     return geo;
-  }, [x0, x1, z0, z1]);
+  }, []);
 
   useFrame(() => {
     const s = getState();
     const on = s.phase !== "idle" && s.scenario.kind === "longsor";
     const t = on ? drillTime() : -Infinity;
-    signs.current.forEach((g, i) => {
+    const lane = MAP.runouts[run.lane];
+    if (!lane) return;
+    const { ax, az, bx, bz, r } = lane;
+    const len = Math.hypot(bx - ax, bz - az);
+    const [dx, dz] = [(bx - ax) / len, (bz - az) / len];
+    landslideSigns().forEach((sign, i) => {
+      const g = signs.current[i];
       if (!g) return;
       g.visible = t >= run.timeline.signs[i];
-      // The second sign is a tree leaning further downhill as the ground creeps.
-      if (i === 1) g.rotation.z = Math.min(0.4, Math.max(0, t - run.timeline.signs[1]) * 0.012);
+      g.position.set(sign.x, elevationAt(sign.x, sign.z), sign.z);
     });
+    // The second sign is a tree leaning further downhill as the ground creeps.
+    if (lean.current) {
+      lean.current.parent!.rotation.y = Math.atan2(dx, dz);
+      lean.current.rotation.x = Math.min(0.4, Math.max(0, t - run.timeline.signs[1]) * 0.012);
+    }
     const slide = run.timeline.slide;
     const p = on && slide !== null ? Math.min(1, Math.max(0, (t - slide) / SLIDE_S)) : 0;
     const m = mass.current;
     const rk = rocks.current;
     if (!m || !rk) return;
     m.visible = rk.visible = p > 0;
-    if (p === 0 || shaped.current === p) return;
-    shaped.current = p;
-    // Earth runs from the hilltop down the runout: thickest along its middle, arriving front first.
+    const key = `${run.lane}:${p}`;
+    if (p === 0 || shaped.current === key) return;
+    shaped.current = key;
+    // Earth runs from above the slope down the lane: thickest along its middle, arriving front first.
     const pos = m.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-      const along = (ax - x) / (ax - bx);
-      const across = Math.abs(z - az) / r;
-      const depth = across < 1 && along >= -0.15 ? 1.6 * (1 - across * across) * Math.min(1, Math.max(0, (p * 1.15 - along) * 4)) : 0;
+      const along = ((x - ax) * dx + (z - az) * dz) / len;
+      const across = Math.abs((x - ax) * -dz + (z - az) * dx) / r;
+      const depth = across < 1 && along >= -0.15 && along <= 1.05 ? 1.6 * (1 - across * across) * Math.min(1, Math.max(0, (p * 1.15 - along) * 4)) : 0;
       pos.setY(i, elevationAt(x, z) + (depth > 0.05 ? depth : -1));
     }
     pos.needsUpdate = true;
     m.geometry.computeVertexNormals();
     for (let k = 0; k < ROCKS; k++) {
-      const along = ((k * 0.618) % 1) * p;
-      const x = ax - (ax - bx) * along;
-      const z = az + (((k * 0.37) % 1) - 0.5) * r * 1.4;
+      const along = ((k * 0.618) % 1) * p * len;
+      const side = (((k * 0.37) % 1) - 0.5) * r * 1.4;
+      const x = ax + dx * along - dz * side;
+      const z = az + dz * along + dx * side;
       const size = 0.4 + ((k * 0.73) % 1) * 0.8;
       o.position.set(x, elevationAt(x, z) + 1 + size / 2, z);
       o.rotation.set(p * 9 + k, p * 7 + k, k);
@@ -545,28 +566,32 @@ export function Landslide() {
     rk.instanceMatrix.needsUpdate = true;
   });
 
-  const [crack, tree, spring] = SIGNS;
+  if (!geometry) return null;
   return (
     <>
-      <group ref={(g) => void (signs.current[0] = g)} visible={false} position={[crack.x, elevationAt(crack.x, crack.z) + 0.03, crack.z]}>
+      <group ref={(g) => void (signs.current[0] = g)} visible={false}>
         {[0, 1, 2].map((k) => (
-          <mesh key={k} position={[k * 0.9 - 0.9, 0, k * 0.6 - 0.6]} rotation-y={0.5 + k * 0.35}>
+          <mesh key={k} position={[k * 0.9 - 0.9, 0.03, k * 0.6 - 0.6]} rotation-y={0.5 + k * 0.35}>
             <boxGeometry args={[0.14, 0.06, 4.5 - k]} />
             <meshStandardMaterial color="#2c1f15" />
           </mesh>
         ))}
       </group>
-      <group ref={(g) => void (signs.current[1] = g)} visible={false} position={[tree.x, elevationAt(tree.x, tree.z), tree.z]}>
-        <Suspense fallback={null}>
-          <Model src={M.trees[1]} fit={{ height: 7 }} />
-        </Suspense>
+      <group ref={(g) => void (signs.current[1] = g)} visible={false}>
+        <group>
+          <group ref={lean}>
+            <Suspense fallback={null}>
+              <Model src={M.trees[1]} fit={{ height: 7 }} />
+            </Suspense>
+          </group>
+        </group>
       </group>
-      <group ref={(g) => void (signs.current[2] = g)} visible={false} position={[spring.x, elevationAt(spring.x, spring.z) + 0.04, spring.z]}>
-        <mesh rotation-x={-Math.PI / 2}>
+      <group ref={(g) => void (signs.current[2] = g)} visible={false}>
+        <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, 0]}>
           <circleGeometry args={[1.4, 24]} />
           <meshStandardMaterial color="#7a5a3c" transparent opacity={0.85} />
         </mesh>
-        <mesh rotation-x={-Math.PI / 2} position={[-2.6, 0.01, 0]}>
+        <mesh rotation-x={-Math.PI / 2} position={[-2.6, 0.05, 0]}>
           <planeGeometry args={[4.4, 0.7]} />
           <meshStandardMaterial color="#7a5a3c" transparent opacity={0.75} />
         </mesh>

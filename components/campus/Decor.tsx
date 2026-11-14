@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { CanvasTexture, SRGBColorSpace, Shape, ShapeGeometry, Vector2 } from "three";
-import { elevationAt } from "@/lib/campus";
+import { GATE, MAP, TILE, elevationAt, findTiles } from "@/lib/campus";
+import type { Rect } from "@/lib/maps";
 import { evacuationSigns } from "@/lib/sim";
 
 const LINE = "#f3f1ea";
@@ -17,8 +18,15 @@ function Strip({ x, z, w, d, y = 0.04, color = LINE }: { x: number; z: number; w
   );
 }
 
+// Bounds in metres of a set of tiles, pulled in by `inset`.
+function bounds(tiles: [number, number][], inset: number) {
+  const xs = tiles.map((t) => t[0]);
+  const zs = tiles.map((t) => t[1]);
+  return [Math.min(...xs) * TILE + inset, (Math.max(...xs) + 1) * TILE - inset, Math.min(...zs) * TILE + inset, (Math.max(...zs) + 1) * TILE - inset];
+}
+
 function SoccerField() {
-  const [x0, x1, z0, z1] = [48.9, 83.1, 39.9, 68.1];
+  const [x0, x1, z0, z1] = bounds(findTiles("gB"), 0.9);
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
   const t = 0.12;
@@ -63,8 +71,14 @@ function SoccerField() {
   );
 }
 
-function BasketballCourt() {
-  const [x0, x1, z0, z1] = [72.45, 86.55, 3.45, 20.55];
+function BasketballCourt({ court }: { court: Rect }) {
+  const [x0, x1, z0, z1] = bounds(
+    [
+      [court[0], court[1]],
+      [court[2], court[3]],
+    ],
+    0.45,
+  );
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
   const t = 0.1;
@@ -100,7 +114,7 @@ function BasketballCourt() {
 
 function Gate() {
   return (
-    <group position={[60, 0, 82.5]}>
+    <group position={[GATE[0], 0, GATE[1]]}>
       {[-3.3, 3.3].map((dx) => (
         <mesh key={dx} position={[dx, 1.6, 0]} castShadow>
           <boxGeometry args={[0.6, 3.2, 0.6]} />
@@ -239,18 +253,19 @@ function EvacuationSigns() {
 }
 
 export default function Decor() {
+  const { benches, bins, waterTower } = MAP.decor;
   return (
     <>
       <SoccerField />
-      <BasketballCourt />
+      {MAP.court && <BasketballCourt court={MAP.court} />}
       <Gate />
-      <WaterTower x={112.8} z={76.8} />
-      <Bench x={34.8} z={45.9} />
-      <Bench x={31.5} z={69.3} />
-      <Bench x={75.9} z={30.6} />
-      <Bench x={88.8} z={64.8} ry={Math.PI / 2} />
-      <Bins x={90} z={76.8} />
-      <Bins x={7.8} z={25.2} />
+      <WaterTower x={waterTower[0]} z={waterTower[1]} />
+      {benches.map(([x, z, ry]) => (
+        <Bench key={`${x}-${z}`} x={x} z={z} ry={ry} />
+      ))}
+      {bins.map(([x, z]) => (
+        <Bins key={`${x}-${z}`} x={x} z={z} />
+      ))}
       <EvacuationSigns />
     </>
   );

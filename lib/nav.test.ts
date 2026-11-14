@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ASSEMBLY, tileCenter } from "./campus.ts";
+import { ASSEMBLY, SITE_W, TILE, buildingRects, tileCenter } from "./campus.ts";
 import { PLAN, classrooms } from "./floorplan.ts";
 import {
+  LOW_FENCE,
   N,
   buildingAt,
   cellCenter,
@@ -110,10 +111,16 @@ test("stepping onto the upper flight changes floor and height follows the steps"
 
 test("a low railing can be jumped, but not the site fence, a wall, or open ground", () => {
   const east = Math.PI / 2;
-  const over = vaultTarget(87.9, 12, east);
-  assert.ok(over && over.x > 88.6 && over.x < 90, "railing at the foot of the hill");
-  assert.ok(free(over.x, over.z, 0), "lands clear");
-  assert.equal(vaultTarget(30, 1.4, Math.PI), null, "site fence is too tall");
-  assert.equal(vaultTarget(7.5, 13.5, east), null, "building wall");
-  assert.equal(vaultTarget(60, 30, east), null, "nothing to jump");
+  // Somewhere along the railings, from just in front of one, a jump across it lands clear on the far side.
+  const jumps = LOW_FENCE.flatMap((f) =>
+    f.sx < f.sz
+      ? [vaultTarget(f.x - 0.5, f.z, east), vaultTarget(f.x + 0.5, f.z, -east)]
+      : [vaultTarget(f.x, f.z - 0.5, 0), vaultTarget(f.x, f.z + 0.5, Math.PI)],
+  ).filter((j) => j !== null);
+  assert.ok(jumps.length > LOW_FENCE.length / 2, `${jumps.length} of ${LOW_FENCE.length * 2} railing jumps`);
+  for (const j of jumps) assert.ok(free(j.x, j.z, 0), "lands clear");
+  assert.equal(vaultTarget(SITE_W / 2, 1.4, Math.PI), null, "site fence is too tall");
+  const r = buildingRects()["1"];
+  assert.equal(vaultTarget(r.x0 * TILE - 0.4, (r.z0 + 1.5) * TILE, east), null, "building wall");
+  assert.equal(vaultTarget(...tileCenter(...ASSEMBLY[1]), east), null, "nothing to jump");
 });

@@ -2,12 +2,12 @@ import { WARDEN, elevationAt, tileCenter } from "@/lib/campus";
 import { PLAN, WALL } from "@/lib/floorplan";
 import { groundY, type Extra } from "@/lib/nav";
 import {
-  SIGNS,
   drillTime,
   finishDrill,
   getState,
   inShelter,
   isUpstairs,
+  landslideSigns,
   net,
   openChat,
   player,
@@ -111,7 +111,7 @@ export function findPrompt(): Prompt | null {
   }
   PLAN.spots.forEach((sp, i) => consider(`${sp.kind}-${i}`, SPOT_LABEL[sp.kind](), sp.x, sp.z, groundY(sp.x, sp.z, sp.floor), 1.9));
   // Landslide signs are read from a few metres away, from the edge of the slope.
-  if (running) SIGNS.forEach((g, i) => t >= run.timeline.signs[i] && consider(`tanda-${i}`, g.label, g.x, g.z, elevationAt(g.x, g.z), 2, 5));
+  if (running) landslideSigns().forEach((g, i) => t >= run.timeline.signs[i] && consider(`tanda-${i}`, g.label, g.x, g.z, elevationAt(g.x, g.z), 2, 5));
   if (!best && !running) {
     const [x, z] = wardenSpot();
     if (Math.hypot(x - player.x, z - player.z) < 4) best = { id: "warden", label: "Tanya petugas", x, y: groundY(x, z, 0) + 2.3, z };

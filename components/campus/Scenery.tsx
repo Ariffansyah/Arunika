@@ -5,7 +5,7 @@ import { Suspense, useRef } from "react";
 import type { Group } from "three";
 import Model, { Instances, M, preloadModels, type Placement } from "@/components/Model";
 import Decor from "./Decor";
-import { ASSEMBLY, SITE_D, SITE_W, TILE, elevationAt, tileCenter } from "@/lib/campus";
+import { ASSEMBLY, GATE, MAP, SITE_D, SITE_W, TILE, elevationAt, findTiles, surfaceAt, tileAt, tileCenter } from "@/lib/campus";
 
 preloadModels([...M.palms, ...M.trees, ...M.bushes, ...M.flowers, ...M.houses, M.tent, M.tentFrame, M.sign, M.crate, M.barrel, M.ambulance, M.police, M.cone]);
 
@@ -50,24 +50,35 @@ const PALMS: Spot[] = Array.from({ length: 18 }, (_, i) => ({
   size: 9 + rand(i + 30) * 4.8,
 }));
 
-const BUSHES: Spot[] = [...[2.5, 5, 7.5, 10.5, 13, 15.5, 24.5, 27.5, 30.5, 33, 36].map((x) => ({ x: x * TILE, z: 26.3 * TILE }))].map((p, i) => ({ ...p, src: M.bushes[i % M.bushes.length], ry: rand(i + 11) * Math.PI * 2, size: 1 + rand(i + 13) * 0.6 }));
-
+const [FLAG_X, FLAG_Z] = MAP.decor.flag;
 const FLOWERS: Spot[] = [
-  [19.2, 23.6],
-  [21.8, 23.7],
-  [19.4, 25.3],
-  [21.6, 25.4],
-].map(([x, z], i) => ({ x: x * TILE, z: z * TILE, src: M.flowers[i % 2], ry: rand(i) * 6, size: 0.5 }));
+  [-3.9, -2.7],
+  [3.9, -2.4],
+  [-3.3, 2.4],
+  [3.3, 2.7],
+].map(([dx, dz], i) => ({ x: FLAG_X + dx, z: FLAG_Z + dz, src: M.flowers[i % 2], ry: rand(i) * 6, size: 0.5 }));
 
-// A hedge just inside the fence on the west, north and lower east sides, broken where the court meets the fence.
-const HEDGE: Placement[] = [
-  ...Array.from({ length: 50 }, (_, i) => [4.2, 4.5 + i * 1.5]),
-  ...Array.from({ length: 44 }, (_, i) => [5.7 + i * 1.5, 4.2]),
-  ...Array.from({ length: 31 }, (_, i) => [SITE_W - 4.2, 33 + i * 1.5]),
-].map(([x, z], i) => {
-  const s = 1.1 + rand(i + 200) * 0.5;
-  return { x, y: elevationAt(x, z), z, ry: rand(i + 300) * Math.PI * 2, size: [s, s * 0.8, s] };
-});
+// A hedge just inside the site fence wherever lawn meets it, two bushes to a tile.
+const HEDGE: Placement[] = findTiles(".")
+  .filter(([x, z]) => !surfaceAt(x, z))
+  .flatMap(([x, z]) =>
+    [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ]
+      .filter(([dx, dz]) => tileAt(x + dx, z + dz) === "=")
+      .flatMap(([dx, dz]) => {
+        const [cx, cz] = tileCenter(x, z);
+        const [ex, ez] = [cx + dx * (TILE / 2 - 1.2), cz + dz * (TILE / 2 - 1.2)];
+        return [-0.75, 0.75].map((k) => (dx ? [ex, ez + k] : [ex + k, ez]));
+      }),
+  )
+  .map(([x, z], i) => {
+    const s = 1.1 + rand(i + 200) * 0.5;
+    return { x, y: elevationAt(x, z), z, ry: rand(i + 300) * Math.PI * 2, size: [s, s * 0.8, s] };
+  });
 
 function Hedge() {
   return M.bushes.map((src, k) => <Instances key={src} src={src} items={HEDGE.filter((_, i) => i % M.bushes.length === k)} />);
@@ -99,30 +110,37 @@ function Road() {
   );
 }
 
+// Parked on the road either side of the gate.
 function Responders() {
+  const [gx] = GATE;
   return (
     <>
-      <Model src={M.ambulance} fit={{ width: 5.5 }} position={[46.8, 0.05, SITE_D + 4]} rotation-y={Math.PI / 2} />
-      <Model src={M.police} fit={{ width: 4.8 }} position={[75.6, 0.05, SITE_D + 4]} rotation-y={-Math.PI / 2} />
-      {[55.2, 64.8].map((x) => (
+      <Model src={M.ambulance} fit={{ width: 5.5 }} position={[gx - 13.2, 0.05, SITE_D + 4]} rotation-y={Math.PI / 2} />
+      <Model src={M.police} fit={{ width: 4.8 }} position={[gx + 15.6, 0.05, SITE_D + 4]} rotation-y={-Math.PI / 2} />
+      {[gx - 4.8, gx + 4.8].map((x) => (
         <Model key={x} src={M.cone} fit={{ height: 0.7 }} position={[x, 0.05, SITE_D + 1.65]} />
       ))}
     </>
   );
 }
 
+// Emergency tents beside the high assembly point, set back on whichever side has room inside the fence.
 function Camp() {
+  const [ax, az] = tileCenter(...findTiles("A")[0]);
+  const fx = ax + 10 > SITE_W - 3 ? -1 : 1;
+  const fz = az - 10 < 3 ? -1 : 1;
   const items: { src: string; x: number; z: number; ry: number; h: number }[] = [
-    { src: M.tent, x: 103.8, z: 7.2, ry: 0, h: 2.2 },
-    { src: M.tent, x: 112.5, z: 15.6, ry: -Math.PI / 2, h: 2.2 },
-    { src: M.tentFrame, x: 94.2, z: 7.8, ry: 0.4, h: 2.4 },
-    { src: M.crate, x: 110.7, z: 6.9, ry: 0.3, h: 0.6 },
-    { src: M.crate, x: 112.5, z: 8.7, ry: -0.2, h: 0.55 },
-    { src: M.barrel, x: 98.1, z: 6.6, ry: 0, h: 0.9 },
+    { src: M.tent, x: 0.3, z: -9.3, ry: 0, h: 2.2 },
+    { src: M.tent, x: 9, z: -0.9, ry: -Math.PI / 2, h: 2.2 },
+    { src: M.tentFrame, x: -9.3, z: -8.7, ry: 0.4, h: 2.4 },
+    { src: M.crate, x: 7.2, z: -9.6, ry: 0.3, h: 0.6 },
+    { src: M.crate, x: 9, z: -7.8, ry: -0.2, h: 0.55 },
+    { src: M.barrel, x: -5.4, z: -9.9, ry: 0, h: 0.9 },
   ];
-  return items.map((it, i) => (
-    <Model key={i} src={it.src} fit={{ height: it.h }} position={[it.x, elevationAt(it.x, it.z), it.z]} rotation-y={it.ry} />
-  ));
+  return items.map((it, i) => {
+    const [x, z] = [ax + fx * it.x, az + fz * it.z];
+    return <Model key={i} src={it.src} fit={{ height: it.h }} position={[x, elevationAt(x, z), z]} rotation-y={it.ry} />;
+  });
 }
 
 function Signs() {
@@ -137,7 +155,7 @@ function Flag() {
   useFrame(({ clock }) => {
     if (flag.current) flag.current.rotation.y = Math.sin(clock.elapsedTime * 2.1) * 0.18;
   });
-  const [x, z] = [61.5, 73.5];
+  const [x, z] = MAP.decor.flag;
   return (
     <group position={[x, elevationAt(x, z), z]}>
       <mesh position={[0, 4, 0]} castShadow>
@@ -191,8 +209,7 @@ export default function Scenery() {
       <Suspense fallback={null}>
         <Spots spots={HOUSES} by="width" />
         <Spots spots={VILLAGE_TREES} by="height" />
-        <Spots spots={PALMS} by="height" />
-        <Spots spots={BUSHES} by="height" />
+        {MAP.id === "pesisir" && <Spots spots={PALMS} by="height" />}
         <Hedge />
         <Spots spots={FLOWERS} by="height" />
         <Responders />

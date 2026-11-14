@@ -20,6 +20,7 @@ import {
   ASSEMBLY,
   ASSEMBLY_NAMES,
   H,
+  MAP,
   SITE_D,
   SITE_W,
   TILE,
@@ -564,7 +565,7 @@ export default function World({
       <Storm />
       <Scenery />
       <Terrain />
-      <Coast />
+      {MAP.id === "pesisir" && <Coast />}
       <Props fade />
       <Buildings risks={risks} showRisk={showRisk} fade />
       <Classmates />

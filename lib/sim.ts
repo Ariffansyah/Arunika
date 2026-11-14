@@ -4,6 +4,7 @@ import {
   BUILDINGS,
   GRID,
   H,
+  MAP,
   TILE,
   W,
   buildingRects,
@@ -16,13 +17,14 @@ import {
   type Soil,
   type Tile,
 } from "./campus.ts";
+import type { Runout } from "./maps.ts";
 
 export type Scenario = { kind: "gempa" | "banjir" | "angin" | "longsor"; intensity: number };
 
 export type Site = { soil: Soil; coast_km: number; rain_30d_mm: number };
 export type Structure = { floors: number; material: Material; built_year: number };
 
-export const SCENARIO_LABEL = { gempa: "Gempa Bumi", banjir: "Banjir Rob", angin: "Angin Puting Beliung", longsor: "Tanah Longsor" } as const;
+export const SCENARIO_LABEL = { gempa: "Gempa Bumi", banjir: MAP.floodLabel, angin: "Angin Puting Beliung", longsor: "Tanah Longsor" };
 
 export const INTENSITY = {
   gempa: { range: [5, 8] as [number, number], step: 0.1, label: "Magnitudo", unit: "", start: 6.5 },
@@ -31,14 +33,13 @@ export const INTENSITY = {
   longsor: { range: [50, 300] as [number, number], step: 10, label: "Curah hujan", unit: "mm/hari", start: 200 },
 };
 
-// Where the north hill's west face would slide: from beyond its top, over the court, to the end of the office.
-export const RUNOUT = { ax: 110, az: 15, bx: 74, bz: 15, r: 14 };
-
-export function inRunout(x: number, z: number) {
-  const { ax, az, bx, bz, r } = RUNOUT;
+export function inLane({ ax, az, bx, bz, r }: Runout, x: number, z: number) {
   const t = Math.min(1, Math.max(0, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2)));
   return Math.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)) < r;
 }
+
+// Nobody can tell beforehand which part of a slope gives way, so every lane it could slide down counts as danger.
+export const inRunout = (x: number, z: number) => MAP.runouts.some((lane) => inLane(lane, x, z));
 
 // Heuristic weights, not a trained model: they encode the direction of each factor
 // (soft soil amplifies shaking, unreinforced brick fails first, upper floors give flood refuge).

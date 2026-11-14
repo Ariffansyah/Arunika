@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import RequireAuth, { Notice, type Me } from "@/components/RequireAuth";
-import { SPAWN, tileCenter } from "@/lib/campus";
+import { MAP, SPAWN, mapFromUrl, tileCenter } from "@/lib/campus";
 import { classrooms } from "@/lib/floorplan";
 import { groundY } from "@/lib/nav";
 import type { Scenario } from "@/lib/sim";
@@ -23,6 +23,11 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
   const room = roomParam && ROOM_PATTERN.test(roomParam) ? roomParam : (me.profile.school_id ?? "umum");
   const self = { id: me.profile.id, name: me.profile.display_name, avatar: me.profile.avatar };
   const { peers, status, broadcastDrill } = useRoom(room, self, me.school);
+
+  // The campus modules load once per page, possibly on another page with another map: start over on this one.
+  useEffect(() => {
+    if (MAP.id !== mapFromUrl(location.search)) location.reload();
+  }, []);
 
   // The store is module state, so a revisit would otherwise resume a stale drill.
   useEffect(() => {

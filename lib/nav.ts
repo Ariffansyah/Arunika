@@ -1,4 +1,4 @@
-import { BUILDINGS, GRID, H, SITE_D, SITE_W, TILE, W, elevationAt, findTiles, tileAt, tileCenter } from "./campus.ts";
+import { BUILDINGS, GRID, H, MAP, SITE_D, SITE_W, TILE, W, elevationAt, findTiles, tileAt, tileCenter } from "./campus.ts";
 import { PLAN, STOREY, type Box, type Item, type Ramp } from "./floorplan.ts";
 
 export const RADIUS = 0.25;
@@ -54,6 +54,11 @@ const SOLIDS: Solid[] = [
   ...LOW_FENCE.map((f) => {
     const y = elevationAt(f.x, f.z);
     return { x0: f.x - f.sx / 2, x1: f.x + f.sx / 2, z0: f.z - f.sz / 2, z1: f.z + f.sz / 2, y0: y - 1, y1: y + LOW_FENCE_H };
+  }),
+  ...MAP.decor.benches.map(([x, z, ry]) => {
+    const [hx, hz] = Math.abs(Math.sin(ry)) > 0.5 ? [0.21, 0.9] : [0.9, 0.21];
+    const y = elevationAt(x, z);
+    return { x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz, y0: y - 1, y1: y + 0.48 };
   }),
   ...findTiles("T").map(([tx, tz]) => {
     const [x, z] = tileCenter(tx, tz);

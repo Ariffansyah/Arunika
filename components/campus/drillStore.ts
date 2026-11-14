@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { BUILDINGS, SPAWN, TILE, idx, tileCenter, type Tile } from "@/lib/campus";
+import { BUILDINGS, MAP, SPAWN, TILE, idx, tileCenter, type Tile } from "@/lib/campus";
 import { PLAN, classrooms, type Room } from "@/lib/floorplan";
 import { buildingAt, cellCenter, flowField, groundY, routeFrom, routeLength, upperFloorAt } from "@/lib/nav";
 import {
@@ -135,13 +135,6 @@ const blankTrack = (): Tracked => ({
   slopeS: 0,
 });
 
-// Warning signs on the hill before a landslide, in the order they appear.
-export const SIGNS = [
-  { x: 88, z: 9, label: "Periksa retakan tanah" },
-  { x: 92, z: 22, label: "Periksa pohon miring" },
-  { x: 84, z: 16, label: "Periksa air keruh" },
-];
-
 export const run = {
   hazards: new Set<number>(),
   goals: [] as Tile[],
@@ -165,7 +158,13 @@ export const run = {
   breaks: new Map<number, number>(),
   outsideS: 0,
   track: blankTrack(),
+  // Which of the map's slide lanes gives way in a landslide drill.
+  lane: 0,
 };
+
+const SIGN_LABELS = ["Periksa retakan tanah", "Periksa pohon miring", "Periksa air keruh"];
+// Warning signs on the slope before a landslide, in the order they appear.
+export const landslideSigns = () => (MAP.runouts[run.lane]?.signs ?? []).map(([x, z], i) => ({ x, z, label: SIGN_LABELS[i] }));
 
 export const drillTime = () => {
   const s = getState();

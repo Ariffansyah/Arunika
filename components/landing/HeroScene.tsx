@@ -8,7 +8,7 @@ import Character, { preloadCharacters, type Look } from "@/components/Character"
 import Scenery from "@/components/campus/Scenery";
 import { Buildings } from "@/components/campus/Building";
 import { Backdrop, Coast, Props, Terrain } from "@/components/campus/World";
-import { ASSEMBLY, GRID, SITE_D, SITE_W, SPAWN, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
+import { ASSEMBLY, GRID, MAP, SITE_D, SITE_W, SPAWN, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
 import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
 
 const FLOOD: Scenario = { kind: "banjir", intensity: 1.1 };
@@ -144,6 +144,10 @@ function AssemblyRings() {
 }
 
 export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; startAt?: number }) {
+  // The campus modules load once per page; after a drill on another map they still hold that map.
+  useEffect(() => {
+    if (MAP.id !== "pesisir") location.reload();
+  }, []);
   const clockRef = useRef(startAt);
   const { pts, cum } = useRoute();
   return (
