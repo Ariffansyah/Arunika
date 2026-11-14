@@ -3,29 +3,24 @@
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { Box3, Vector3, type Group, type Mesh } from "three";
+import { Box3, LoopOnce, Vector3, type Group, type Mesh } from "three";
 import { clone as cloneRig } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 // Quaternius "Ultimate Modular Men/Women" (CC0) in SMP uniform, see public/characters/LICENSE.txt.
 export const LOOKS = ["siswi-a", "siswa-a", "siswi-b", "siswa-b", "siswi-c", "siswi-d", "siswa-c", "petugas"] as const;
 export type Look = (typeof LOOKS)[number];
 // `cover` is drop, cover, hold on: curled up small enough for a 0.75 m desk, arms over the neck.
-export type Anim = "idle" | "walk" | "sprint" | "crouch" | "cover" | "sit" | "talk";
+// `vault` plays once: take-off, legs tucked, landing squat; the caller moves the body along the arc.
+export const ANIMS = ["idle", "walk", "sprint", "crouch", "cover", "sit", "talk", "crouchWalk", "vault"] as const;
+export type Anim = (typeof ANIMS)[number];
+// The files start every stepping loop on the same foot, so a switch between them can keep the step.
+const STRIDE = new Set<Anim>(["walk", "sprint", "crouchWalk"]);
 
 const url = (look: Look) => `/characters/${look}.glb`;
 
-// `anim` is read every frame, so callers switch clips without re-rendering.
-export default function Character({
-  look,
-  anim,
-  height = 1.6,
-  speed = 1,
-}: {
-  look: Look;
-  anim: () => Anim;
-  height?: number;
-  speed?: number;
-}) {
+// `anim` is read every frame, so callers switch clips without re-rendering. With a rate, a stepping clip
+// plays that much faster, so feet keep pace with a walker slowed by water or a slower classmate.
+export default function Character({ look, anim, height = 1.6 }: { look: Look; anim: () => Anim | [Anim, number]; height?: number }) {
   const { scene, animations } = useGLTF(url(look));
   // Skinned meshes need their skeleton cloned too, or every copy would share one pose.
   const { model, scale } = useMemo(() => {
@@ -42,13 +37,23 @@ export default function Character({
   const playing = useRef<Anim | null>(null);
 
   useFrame(() => {
-    const name = anim();
-    if (name === playing.current) return;
+    const out = anim();
+    const [name, rate] = typeof out === "string" ? [out, 1] : out;
+    const was = playing.current;
+    const last = was ? actions[was] : null;
+    if (name === was) {
+      if (STRIDE.has(name)) last?.setEffectiveTimeScale(rate);
+      return;
+    }
     const next = actions[name];
     if (!next) return;
-    const last = playing.current ? actions[playing.current] : null;
-    next.reset().setEffectiveTimeScale(speed).play();
-    if (last) next.crossFadeFrom(last, 0.25, false);
+    next.reset().setEffectiveTimeScale(STRIDE.has(name) ? rate : 1);
+    if (name === "vault") Object.assign(next.setLoop(LoopOnce, 1), { clampWhenFinished: true });
+    const inStep = !!last && STRIDE.has(name) && STRIDE.has(was!);
+    if (inStep) Object.assign(next, { time: (last.time / last.getClip().duration) * next.getClip().duration });
+    next.play();
+    // Changing pace keeps the step and blends fast; changing posture (sitting, ducking) takes longer.
+    if (last) next.crossFadeFrom(last, inStep ? 0.2 : name === "vault" ? 0.08 : 0.3, false);
     playing.current = name;
   });
 

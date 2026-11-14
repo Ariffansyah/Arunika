@@ -4,9 +4,9 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Vector3, type Group } from "three";
 import { PLAN } from "@/lib/floorplan";
-import { buildingAt, free, groundY, layerAt, solidAt } from "@/lib/nav";
-import { RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
-import type { Look } from "@/components/Character";
+import { buildingAt, free, groundY, layerAt, solidAt, vaultTarget } from "@/lib/nav";
+import { CROUCH_SPEED, RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
+import type { Anim, Look } from "@/components/Character";
 import Avatar from "./Avatar";
 import {
   aftershockAt,
@@ -38,6 +38,11 @@ const KEYS: Record<string, keyof typeof input> = {
   ShiftRight: "run",
 };
 const CAM_DIST = 5;
+// A jump: a short crouch, 0.4 s in the air, then the landing squat before walking on.
+const VAULT_S = 0.8;
+const PACE: Partial<Record<Anim, number>> = { walk: WALK_SPEED, sprint: RUN_SPEED, crouchWalk: CROUCH_SPEED };
+
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("input, textarea, select") !== null;
 
@@ -65,6 +70,10 @@ export default function Player({ look: character, name }: { look: Look; name: st
   const tuck = useRef(0);
   const eyeHeight = useRef(1.35);
   const deskAt = useRef<[number, number]>([0, 0]);
+  const shownHeading = useRef(0);
+  const last = useRef<[number, number]>([player.x, player.z]);
+  const vault = useRef<{ x0: number; z0: number; y0: number; x1: number; z1: number; y1: number; arc: number; t: number } | null>(null);
+  const pace = useRef(1);
 
   useEffect(() => {
     reducedMotion.current = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -73,6 +82,9 @@ export default function Player({ look: character, name }: { look: Look; name: st
       const k = KEYS[e.code];
       if (k) {
         input[k] = true;
+        e.preventDefault();
+      } else if (e.code === "Space" && !e.repeat) {
+        input.jump = true;
         e.preventDefault();
       } else if (e.code === "KeyE" && !e.repeat) {
         interact();
@@ -158,31 +170,59 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const len = Math.hypot(dx, dz);
     const [ox, oz] = [player.x, player.z];
     const frozen = s.chatOpen || s.mapOpen || (running && t < 0);
-    player.crouch = input.crouch && !frozen;
-    player.moving = len > 0 && !frozen && !player.crouch;
-    if (player.moving || player.crouch) player.seated = false;
-    if (player.moving) player.cover = -1;
-    player.wading = depth > 0.3;
-    player.running = player.moving && input.run && !player.wading;
-    if (player.moving) {
-      dx /= len;
-      dz /= len;
-      const speed = (player.running ? RUN_SPEED : WALK_SPEED) * (depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1);
-      // Small steps so a long frame can't carry the player through a wall corner.
-      const steps = Math.ceil(dt / 0.04);
-      const step = (speed * dt) / steps;
-      for (let i = 0; i < steps; i++) {
-        const nx = player.x + dx * step;
-        if (free(nx, player.z, layerAt(nx, player.z, player.layer), undefined, closedDoors)) player.x = nx;
-        const nz = player.z + dz * step;
-        if (free(player.x, nz, layerAt(player.x, nz, player.layer), undefined, closedDoors)) player.z = nz;
-        player.layer = layerAt(player.x, player.z, player.layer);
+    const v = vault.current;
+    const jumpPressed = input.jump;
+    input.jump = false;
+
+    if (v) {
+      v.t += dt;
+      const p = Math.min(1, Math.max(0, (v.t - 0.08) / 0.4));
+      player.x = v.x0 + (v.x1 - v.x0) * p;
+      player.z = v.z0 + (v.z1 - v.z0) * p;
+      player.y = v.y0 + (v.y1 - v.y0) * p + v.arc * Math.sin(Math.PI * p);
+      Object.assign(player, { moving: false, running: false, crouch: false });
+      if (v.t >= VAULT_S) vault.current = null;
+    } else {
+      player.crouch = input.crouch && !frozen;
+      player.moving = len > 0 && !frozen;
+      if (player.moving || player.crouch) player.seated = false;
+      if (player.moving) player.cover = -1;
+      player.wading = depth > 0.3;
+      player.running = player.moving && input.run && !player.wading && !player.crouch;
+      if (player.moving) {
+        dx /= len;
+        dz /= len;
+        const water = depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1;
+        const speed = (player.crouch ? CROUCH_SPEED : player.running ? RUN_SPEED : WALK_SPEED) * water;
+        pace.current = water;
+        // Small steps so a long frame can't carry the player through a wall corner.
+        const steps = Math.ceil(dt / 0.04);
+        const step = (speed * dt) / steps;
+        for (let i = 0; i < steps; i++) {
+          const nx = player.x + dx * step;
+          if (free(nx, player.z, layerAt(nx, player.z, player.layer), undefined, closedDoors)) player.x = nx;
+          const nz = player.z + dz * step;
+          if (free(player.x, nz, layerAt(player.x, nz, player.layer), undefined, closedDoors)) player.z = nz;
+          player.layer = layerAt(player.x, player.z, player.layer);
+        }
+        player.heading = Math.atan2(dx, dz);
+      } else if (first) {
+        player.heading = look.yaw + Math.PI;
       }
-      player.heading = Math.atan2(dx, dz);
-      if (running && t >= 0) run.walked += Math.hypot(player.x - ox, player.z - oz);
-    } else if (first) {
-      player.heading = look.yaw + Math.PI;
     }
+
+    // A jump needs a run-up on firm, still ground: not ducking, seated, in deep water or while it shakes.
+    const quake = running && s.scenario.kind === "gempa" && (shakingAt(t) || aftershockAt(t));
+    const canVault = !v && !frozen && !player.crouch && player.cover < 0 && player.layer === 0 && depth < 0.5 && !quake;
+    const landing = canVault ? vaultTarget(player.x, player.z, player.heading, closedDoors) : null;
+    if (landing && jumpPressed) {
+      const y1 = groundY(landing.x, landing.z, 0);
+      vault.current = { x0: player.x, z0: player.z, y0: player.y, x1: landing.x, z1: landing.z, y1, arc: Math.max(0.25, landing.top - Math.max(player.y, y1) - 0.35), t: 0 };
+    }
+    const label = landing ? { x: (player.x + landing.x) / 2, y: landing.top + 0.6, z: (player.z + landing.z) / 2 } : null;
+    const shown = s.vaultAt;
+    if (!label !== !shown || (label && shown && Math.hypot(label.x - shown.x, label.z - shown.z) > 0.3)) setState({ vaultAt: label });
+    if (running && t >= 0) run.walked += Math.hypot(player.x - ox, player.z - oz);
 
     if (running && t >= 0) {
       trackDrill(dt, t, Math.hypot(player.x - ox, player.z - oz), depth);
@@ -191,7 +231,26 @@ export default function Player({ look: character, name }: { look: Look; name: st
 
     // Eased, so a step onto a floor or a stair reads as a step; a teleport snaps.
     const ground = groundY(player.x, player.z, player.layer);
-    player.y = Math.abs(ground - player.y) > 1.5 ? ground : player.y + (ground - player.y) * (1 - Math.exp(-dt * 14));
+    if (!vault.current) player.y = Math.abs(ground - player.y) > 1.5 ? ground : player.y + (ground - player.y) * (1 - Math.exp(-dt * 14));
+    // The body turns toward where it heads instead of snapping round; after a teleport it faces the new way at once.
+    const jumped = Math.hypot(player.x - last.current[0], player.z - last.current[1]) > 2;
+    last.current = [player.x, player.z];
+    shownHeading.current = jumped ? player.heading : shownHeading.current + wrap(player.heading - shownHeading.current) * (1 - Math.exp(-dt * 12));
+    player.anim = vault.current
+      ? "vault"
+      : player.cover >= 0
+        ? "cover"
+        : player.crouch
+          ? player.moving
+            ? "crouchWalk"
+            : "crouch"
+          : player.running
+            ? "sprint"
+            : player.moving
+              ? "walk"
+              : player.seated
+                ? "sit"
+                : "idle";
     const g = ref.current;
     if (g) {
       g.position.set(player.x, player.y, player.z);
@@ -202,7 +261,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
       const [ux, uz] = deskAt.current;
       g.position.x += (ux - player.x) * tuck.current;
       g.position.z += (uz - player.z) * tuck.current;
-      g.rotation.y = player.heading;
+      g.rotation.y = shownHeading.current;
       g.visible = !first;
     }
 
@@ -252,9 +311,10 @@ export default function Player({ look: character, name }: { look: Look; name: st
         name={name}
         self
         label={view === "third"}
-        anim={() =>
-          player.cover >= 0 ? "cover" : player.crouch ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : player.seated ? "sit" : "idle"
-        }
+        anim={() => {
+          const p = PACE[player.anim];
+          return p ? [player.anim, pace.current] : player.anim;
+        }}
       />
     </group>
   );

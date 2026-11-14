@@ -1,19 +1,19 @@
 // North (row 0) is the hill side, south (row 27) faces the coast. Each character is a TILE-metre square.
-//   = fence   . yard   h hill   g field   T tree   1-4 classroom blocks   5 canteen   6 musholla
+//   = fence   - | low railing (along x, along z)   . yard   h hill   g field   T tree   1-4 classroom blocks   5 canteen   6 musholla
 //   A/B assembly points   S spawn   W warden NPC   G gate
 export const GRID = [
   "========================================",
-  "=............................hhhhhhhhhh=",
-  "=............................hhhhhhhhhh=",
-  "=..1111111111...33333333.....hhhhhhhhhh=",
-  "=..1111111111...33333333.....hhhhhhhhhh=",
-  "=..1111111111...33333333.....hhhhhAhhhh=",
-  "=..1111111111...33333333.....hhhhhhhhhh=",
-  "=............................hhhhhhhhhh=",
+  "=............................|hhhhhhhhh=",
+  "=............................|hhhhhhhhh=",
+  "=..1111111111...33333333.....|hhhhhhhhh=",
+  "=..1111111111...33333333.....|hhhhhhhhh=",
+  "=..1111111111...33333333.....|hhhhAhhhh=",
+  "=..1111111111...33333333.....|hhhhhhhhh=",
+  "=............................|hhhhhhhhh=",
   "=.......S.....T..............hhhhhhhhhh=",
-  "=.........................T..hhhhhhhhhh=",
-  "=..2222222222................hhhhhhhhhh=",
-  "=..2222222222.W........................=",
+  "=.........................T..|hhhhhhhhh=",
+  "=..2222222222................|hhhhhhhhh=",
+  "=..2222222222.W..............----------=",
   "=..2222222222..........................=",
   "=..2222222222...gggggggggggg...T.......=",
   "=...............gggggggggggg...........=",
@@ -71,7 +71,7 @@ export const ASSEMBLY_NAMES: Record<string, string> = {
   B: "Titik Kumpul Lapangan",
 };
 
-export const BLOCKED_CHARS = "=TW123456";
+export const BLOCKED_CHARS = "=-|TW123456";
 
 export const tileAt = (x: number, z: number) => GRID[z]?.[x] ?? "=";
 export const isBlocked = (x: number, z: number) => BLOCKED_CHARS.includes(tileAt(x, z));

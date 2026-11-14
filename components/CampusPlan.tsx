@@ -36,7 +36,13 @@ export default function CampusPlan({
         <rect key={id} x={r.x0} y={r.z0} width={r.x1 - r.x0 + 1} height={r.z1 - r.z0 + 1} fill="#c96a3c" rx={0.2} />
       ))}
       {GRID.flatMap((row, z) =>
-        [...row].map((c, x) => (c === "T" ? <circle key={`t${x}-${z}`} cx={x + 0.5} cy={z + 0.5} r={0.45} fill="#2f7d55" /> : null)),
+        [...row].map((c, x) =>
+          c === "T" ? (
+            <circle key={`t${x}-${z}`} cx={x + 0.5} cy={z + 0.5} r={0.45} fill="#2f7d55" />
+          ) : c === "-" || c === "|" ? (
+            <rect key={`r${x}-${z}`} x={c === "-" ? x : x + 0.45} y={c === "-" ? z + 0.45 : z} width={c === "-" ? 1 : 0.1} height={c === "-" ? 0.1 : 1} fill="#8fb8a0" />
+          ) : null,
+        ),
       )}
       {hazards &&
         [...hazards].map((i) => (

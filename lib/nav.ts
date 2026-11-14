@@ -21,6 +21,21 @@ export const FENCE = findTiles("=").flatMap(([tx, tz]) => {
 });
 export const FENCE_H = 1.8;
 
+// Low railings, one along each tile's own axis, reaching a perpendicular neighbour so corners close.
+const LOW = "-|";
+export const LOW_FENCE = findTiles(LOW).flatMap(([tx, tz]) => {
+  const c = tileAt(tx, tz);
+  const [x, z] = tileCenter(tx, tz);
+  const out = [c === "-" ? { x, z, sx: TILE, sz: 0.08 } : { x, z, sx: 0.08, sz: TILE }];
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const n = tileAt(tx + dx, tz + dz);
+    if (!LOW.includes(n) || n === c || (c === "-" ? dx : dz)) continue;
+    out.push(dx ? { x: x + (dx * TILE) / 4, z, sx: TILE / 2, sz: 0.08 } : { x, z: z + (dz * TILE) / 4, sx: 0.08, sz: TILE / 2 });
+  }
+  return out;
+});
+export const LOW_FENCE_H = 0.9;
+
 export function itemBox(i: Item): Solid {
   const turned = Math.abs(Math.sin(i.ry)) > 0.5;
   const [hx, hz] = turned ? [i.size[2] / 2, i.size[0] / 2] : [i.size[0] / 2, i.size[2] / 2];
@@ -35,6 +50,10 @@ const SOLIDS: Solid[] = [
   ...FENCE.map((f) => {
     const y = elevationAt(f.x, f.z);
     return { x0: f.x - f.sx / 2, x1: f.x + f.sx / 2, z0: f.z - f.sz / 2, z1: f.z + f.sz / 2, y0: y - 1, y1: y + FENCE_H };
+  }),
+  ...LOW_FENCE.map((f) => {
+    const y = elevationAt(f.x, f.z);
+    return { x0: f.x - f.sx / 2, x1: f.x + f.sx / 2, z0: f.z - f.sz / 2, z1: f.z + f.sz / 2, y0: y - 1, y1: y + LOW_FENCE_H };
   }),
   ...findTiles("T").map(([tx, tz]) => {
     const [x, z] = tileCenter(tx, tz);
@@ -111,6 +130,47 @@ export function free(x: number, z: number, layer: number, r = RADIUS, extra?: Ex
     const dz = z - Math.min(s.z1, Math.max(s.z0, z));
     return dx * dx + dz * dz < r * r;
   });
+}
+
+// Anything a jump clears: a railing, a bench, a fallen trunk. Not a wall, a fence or a desk indoors.
+const VAULT_H = 1.2;
+
+// Where a jump straight ahead from (x, z) would land, or null. Only outdoors, over something low and
+// under a metre thick, onto clear ground at about the same height.
+export function vaultTarget(x: number, z: number, heading: number, extra?: Extra): { x: number; z: number; top: number } | null {
+  if (buildingAt(x, z)) return null;
+  const dx = Math.sin(heading);
+  const dz = Math.cos(heading);
+  const g = groundY(x, z, 0);
+  let hit = -1;
+  for (let d = 0.05; d <= 0.6; d += 0.05) {
+    if (!free(x + dx * d, z + dz * d, 0, RADIUS, extra)) {
+      hit = d;
+      break;
+    }
+  }
+  if (hit < 0) return null;
+  for (let d = hit + 0.2; d <= hit + 1.3; d += 0.05) {
+    const [lx, lz] = [x + dx * d, z + dz * d];
+    const gl = groundY(lx, lz, 0);
+    if (buildingAt(lx, lz) || !free(lx, lz, 0, RADIUS, extra) || Math.abs(gl - g) > 0.6) continue;
+    // Whatever stands between take-off and landing must stay below the jump, extras included.
+    const [x0, x1] = [Math.min(x, lx), Math.max(x, lx)];
+    const [z0, z1] = [Math.min(z, lz), Math.max(z, lz)];
+    // On a slope the railing stands higher than the take-off, so measure from the higher end.
+    const lo = Math.max(g, gl) + VAULT_H;
+    const hi = Math.max(g, gl) + BODY + 0.3;
+    if (extra?.(x0 - 0.1, z0 - 0.1, x1 + 0.1, z1 + 0.1, lo, hi)) return null;
+    let top = g;
+    const tall = anySolid(x0 - 0.1, z0 - 0.1, x1 + 0.1, z1 + 0.1, (s) => {
+      if (s.walk === false || s.y1 <= g + STEP || s.y0 >= hi) return false;
+      if (s.x1 < x0 - 0.1 || s.x0 > x1 + 0.1 || s.z1 < z0 - 0.1 || s.z0 > z1 + 0.1) return false;
+      top = Math.max(top, s.y1);
+      return s.y1 > lo;
+    });
+    return tall ? null : { x: lx, z: lz, top };
+  }
+  return null;
 }
 
 // For the camera: `skip` hides solids that are not drawn, such as floors cut away above the player.

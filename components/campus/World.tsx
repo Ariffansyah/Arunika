@@ -33,7 +33,7 @@ import {
   tileElevation,
   type Tile,
 } from "@/lib/campus";
-import { FENCE, FENCE_H } from "@/lib/nav";
+import { FENCE, FENCE_H, LOW_FENCE, LOW_FENCE_H } from "@/lib/nav";
 import { random, vortexAt, waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
@@ -224,6 +224,26 @@ function Instanced({ items, y, children }: { items: Placed[]; y: number; childre
 
 const FENCE_ITEMS: Placed[] = FENCE.map((f) => ({ ...f, sy: FENCE_H }));
 
+// Railings in metre lengths, so posts and rails follow a slope instead of cutting into it.
+const RAIL_PIECES = LOW_FENCE.flatMap((f) => {
+  const long = Math.max(f.sx, f.sz);
+  const n = Math.max(1, Math.round(long));
+  const along = f.sx > f.sz;
+  return Array.from({ length: n }, (_, k) => {
+    const off = -long / 2 + (long * (k + 0.5)) / n;
+    return { x: f.x + (along ? off : 0), z: f.z + (along ? 0 : off), sx: along ? long / n : 0.05, sz: along ? 0.05 : long / n };
+  });
+});
+const RAIL_TOP: Placed[] = RAIL_PIECES.map((p) => ({ ...p, sy: 0.06 }));
+const RAIL_MID: Placed[] = RAIL_PIECES.map((p) => ({ ...p, sy: 0.05 }));
+const RAIL_POSTS: Placed[] = RAIL_PIECES.map((p) => ({
+  x: p.x - (p.sx > p.sz ? p.sx / 2 : 0),
+  z: p.z - (p.sz > p.sx ? p.sz / 2 : 0),
+  sx: 0.07,
+  sy: LOW_FENCE_H,
+  sz: 0.07,
+}));
+
 const TREES = findTiles("T");
 
 function Tree({ x, z, i, fade }: { x: number; z: number; i: number; fade: boolean }) {
@@ -293,6 +313,18 @@ export function Props({ fade = false }: { fade?: boolean }) {
         <boxGeometry />
         <meshStandardMaterial color="#efe6d4" />
       </Instanced>
+      <Instanced items={RAIL_POSTS} y={0.5}>
+        <boxGeometry />
+        <meshStandardMaterial color="#2d6a4f" />
+      </Instanced>
+      <Instanced items={RAIL_TOP} y={(LOW_FENCE_H - 0.03) / 0.06}>
+        <boxGeometry />
+        <meshStandardMaterial color="#2d6a4f" />
+      </Instanced>
+      <Instanced items={RAIL_MID} y={0.45 / 0.05}>
+        <boxGeometry />
+        <meshStandardMaterial color="#2d6a4f" />
+      </Instanced>
       <Suspense fallback={null}>
         {TREES.map(([x, z], i) => (
           <Tree key={`${x}-${z}`} x={x} z={z} i={i} fade={fade} />
@@ -361,6 +393,20 @@ function PromptLabel() {
         <kbd className="rounded border border-malam/30 px-1.5 text-xs">E</kbd>
         {prompt.label}
       </button>
+    </Html>
+  );
+}
+
+// Shown over a low obstacle while a jump over it is possible.
+function VaultLabel() {
+  const at = useDrill((s) => s.vaultAt);
+  if (!at) return null;
+  return (
+    <Html position={[at.x, at.y, at.z]} center zIndexRange={[25, 0]} style={{ pointerEvents: "none" }}>
+      <span className="flex items-center gap-1.5 whitespace-nowrap rounded-md bg-pasir/90 px-2 py-1 text-xs font-semibold text-malam">
+        <kbd className="rounded border border-malam/30 px-1 pointer-coarse:hidden">Spasi</kbd>
+        Lompati
+      </span>
     </Html>
   );
 }
@@ -533,6 +579,7 @@ export default function World({
       <AssemblyPoints safe={goals} />
       <Warden />
       <PromptLabel />
+      <VaultLabel />
       {showRisk && <HazardOverlay hazards={hazards} />}
       <Route />
       <Water />

@@ -20,6 +20,7 @@ import {
   type Tracked,
 } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
+import type { Anim } from "@/components/Character";
 
 export type DrillResult = DrillStats & { score: number };
 // What E (or the Aksi button) would do right now, shown next to the thing it acts on.
@@ -40,6 +41,8 @@ type State = {
   chatOpen: boolean;
   view: "third" | "first";
   prompt: Prompt | null;
+  // Where a jump is possible right now (Space), shown over the obstacle.
+  vaultAt: { x: number; y: number; z: number } | null;
   closedDoors: string[];
   power: boolean;
   gas: boolean;
@@ -58,6 +61,7 @@ let state: State = {
   chatOpen: false,
   view: "third",
   prompt: null,
+  vaultAt: null,
   closedDoors: [],
   power: true,
   gas: true,
@@ -94,13 +98,16 @@ export const player = {
   seated: false,
   // Taking cover under this desk, as an index into PLAN.items.
   cover: -1,
+  // What the body is doing, for the clip and for the other players.
+  anim: "idle" as Anim,
 };
-export const input = { up: false, down: false, left: false, right: false, crouch: false, run: false };
+// `jump` is a press, cleared once read; the others are held.
+export const input = { up: false, down: false, left: false, right: false, crouch: false, run: false, jump: false };
 // Set by the room connection; actions here use it to tell the other players.
 export const net = { send: null as ((event: string, payload: Record<string, unknown>) => void) | null };
 // yaw 0 puts the camera south of the player, looking north.
 export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05 };
-export const remotes = new Map<string, { x: number; z: number; layer: number; crouch: boolean; at: number }>();
+export const remotes = new Map<string, { x: number; z: number; layer: number; anim: Anim; at: number }>();
 const blankTrack = (): Tracked => ({
   reached: false,
   shakeS: 0,
@@ -190,7 +197,8 @@ export const inShelter = () =>
 export function trackDrill(dt: number, t: number, moved: number, depth: number) {
   const tr = run.track;
   const inside = buildingAt(player.x, player.z) !== null;
-  const covering = player.crouch || player.cover >= 0;
+  // Ducking counts as cover only when still; walking ducked is just walking.
+  const covering = (player.crouch && !player.moving) || player.cover >= 0;
   if (shakingAt(t)) {
     tr.shakeS += dt;
     if (covering) tr.coverS += dt;

@@ -23,10 +23,34 @@ const LOOKS: Look[] = ["siswi-a", "siswa-a", "siswi-d", "siswi-b", "siswa-b", "s
 const HOME_ROOM = classrooms()[0].id;
 const mates = LOOKS.map(() => ({ x: 0, z: 0 }));
 
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+// Once at an assembly point, each classmate walks to a place of their own in a loose ring round its centre,
+// so the class stands together instead of piling up on the edge and jostling.
+function arrivalSpot(x: number, z: number, layer: number, i: number): { at: [number, number]; centre: [number, number] | null } {
+  const centre = layer === 0 ? ASSEMBLY.map((a) => tileCenter(...a)).find(([cx, cz]) => Math.hypot(cx - x, cz - z) < 6) : undefined;
+  if (!centre) return { at: [x, z], centre: null };
+  const a = i * 2.4;
+  const r = 1.4 + (i % 3) * 0.9;
+  const at: [number, number] = [centre[0] + Math.cos(a) * r, centre[1] + Math.sin(a) * r];
+  return { at: free(...at, 0, 0.3) ? at : [x, z], centre };
+}
+
 // Drills teach walking briskly, not running: classmates model that, ducking first when the ground shakes.
 function Classmate({ i }: { i: number }) {
   const ref = useRef<Group>(null);
-  const me = useRef({ x: 0, z: 0, layer: 0, heading: 0, key: "", anim: "sit" as Anim, under: 0 });
+  const me = useRef({
+    x: 0,
+    z: 0,
+    layer: 0,
+    heading: 0,
+    face: 0,
+    key: "",
+    anim: "sit" as Anim,
+    rate: 1,
+    under: 0,
+    spot: null as { at: [number, number]; centre: [number, number] | null } | null,
+  });
   const speed = 1.3 + ((i * 37) % 10) / 25;
   const height = 1.45 + (i % 3) * 0.08;
   const delay = 0.3 + ((i * 53) % 10) / 6;
@@ -41,7 +65,7 @@ function Classmate({ i }: { i: number }) {
     if (st.key !== key) {
       const seat = roomSeats(room)[CLASSMATE_SEATS[i]];
       const layer = PLAN.rooms.find((r) => r.id === room)!.floor;
-      Object.assign(st, { x: seat.x, z: seat.z, layer, heading: seat.ry, key, anim: "sit" });
+      Object.assign(st, { x: seat.x, z: seat.z, layer, heading: seat.ry, face: seat.ry, key, anim: "sit", spot: null });
     }
     const t = drillTime();
     const quake = s.scenario.kind === "gempa";
@@ -53,42 +77,58 @@ function Classmate({ i }: { i: number }) {
     else if (quake && aftershockAt(t)) st.anim = "crouch";
     else if (t < (run.timeline.shake?.[1] ?? 0) + delay) st.anim = quake ? "idle" : "sit";
     else {
-      const next = distanceAt(field, st.x, st.z, st.layer) > 0 ? nextStep(field, st.x, st.z, st.layer) : null;
-      if (next) {
-        const tx = next.x - st.x;
-        const tz = next.z - st.z;
+      let to: { x: number; z: number } | null = null;
+      if (st.spot) {
+        if (Math.hypot(st.spot.at[0] - st.x, st.spot.at[1] - st.z) > 0.15) to = { x: st.spot.at[0], z: st.spot.at[1] };
+      } else if (distanceAt(field, st.x, st.z, st.layer) > 0) to = nextStep(field, st.x, st.z, st.layer);
+      else st.spot = arrivalSpot(st.x, st.z, st.layer, i);
+      if (to) {
+        const tx = to.x - st.x;
+        const tz = to.z - st.z;
         const len = Math.hypot(tx, tz) || 1;
-        // Keep a little apart so the class files out instead of merging into one body.
+        // On the way, keep a little apart so the class files out instead of merging into one body.
         let sx = 0;
         let sz = 0;
-        mates.forEach((o, j) => {
-          const ox = st.x - o.x;
-          const oz = st.z - o.z;
-          const d2 = ox * ox + oz * oz;
-          if (j !== i && d2 > 1e-4 && d2 < 0.36) {
-            sx += ox / d2;
-            sz += oz / d2;
-          }
-        });
+        if (!st.spot) {
+          mates.forEach((o, j) => {
+            const ox = st.x - o.x;
+            const oz = st.z - o.z;
+            const d2 = ox * ox + oz * oz;
+            if (j !== i && d2 > 1e-4 && d2 < 0.36) {
+              sx += ox / d2;
+              sz += oz / d2;
+            }
+          });
+        }
         const mx = tx / len + sx * 0.08;
         const mz = tz / len + sz * 0.08;
         const ml = Math.hypot(mx, mz) || 1;
         const depth = wading(st.x, st.z, st.layer);
-        const step = Math.min(len, speed * dt * (depth > 1 ? 0.25 : depth > 0.3 ? 0.6 : 1));
+        const water = depth > 1 ? 0.25 : depth > 0.3 ? 0.6 : 1;
+        const step = Math.min(len, speed * dt * water);
         const nx = st.x + (mx / ml) * step;
         const nz = st.z + (mz / ml) * step;
         openDoorsNear(st.x, st.z, groundY(st.x, st.z, st.layer));
         // The field only routes through open cells, so when the nudge apart hits furniture the plain step is safe.
         const ok = free(nx, nz, layerAt(nx, nz, st.layer), 0.18, closedDoors);
-        st.x = ok ? nx : st.x + (tx / len) * step;
-        st.z = ok ? nz : st.z + (tz / len) * step;
+        if (ok || !st.spot) {
+          st.x = ok ? nx : st.x + (tx / len) * step;
+          st.z = ok ? nz : st.z + (tz / len) * step;
+        } else st.spot.at = [st.x, st.z];
         st.layer = layerAt(st.x, st.z, st.layer);
-        st.heading = Math.atan2(mx, mz);
+        // Facing follows the way ahead, not the nudges, so bodies don't twitch.
+        st.face = Math.atan2(tx, tz);
         st.anim = "walk";
-      } else st.anim = within(run.timeline.wind, t) ? "crouch" : "idle";
+        st.rate = ((speed * water) / WALK_SPEED) * (1.6 / height);
+      } else {
+        st.anim = within(run.timeline.wind, t) ? "crouch" : "idle";
+        const c = st.spot?.centre;
+        if (c) st.face = Math.atan2(c[0] - st.x, c[1] - st.z);
+      }
     }
     mates[i].x = st.x;
     mates[i].z = st.z;
+    st.heading += wrap(st.face - st.heading) * (1 - Math.exp(-dt * 8));
     // Ducking at their seat slides them under the desk in front of them.
     st.under += ((st.anim === "cover" ? 0.45 : 0) - st.under) * (1 - Math.exp(-dt * 10));
     g.position.set(st.x + Math.sin(st.heading) * st.under, groundY(st.x, st.z, st.layer), st.z + Math.cos(st.heading) * st.under);
@@ -97,7 +137,7 @@ function Classmate({ i }: { i: number }) {
 
   return (
     <group ref={ref}>
-      <Character look={LOOKS[i]} height={height} speed={(speed / WALK_SPEED) * (1.6 / height)} anim={() => me.current.anim} />
+      <Character look={LOOKS[i]} height={height} anim={() => (me.current.anim === "walk" ? ["walk", me.current.rate] : me.current.anim)} />
     </group>
   );
 }

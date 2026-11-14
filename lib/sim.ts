@@ -260,6 +260,7 @@ export const pathLength = (path: Tile[]) =>
 // Metres per second: a brisk evacuation walk and a run.
 export const WALK_SPEED = 1.5;
 export const RUN_SPEED = 3.5;
+export const CROUCH_SPEED = 0.9;
 export const FLOOD_RISE_S = 90;
 
 // Seeded so every player in a room sees the same drill.

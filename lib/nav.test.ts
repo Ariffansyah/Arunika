@@ -16,6 +16,7 @@ import {
   routeFrom,
   routeLength,
   upperFloorAt,
+  vaultTarget,
 } from "./nav.ts";
 
 const assembly = flowField(
@@ -105,4 +106,14 @@ test("stepping onto the upper flight changes floor and height follows the steps"
   const bottom = groundY(x, flightB.c1, 1);
   assert.ok(top - bottom > 1.9);
   assert.ok(nextStep(assembly, x, (flightB.z0 + flightB.z1) / 2, 1));
+});
+
+test("a low railing can be jumped, but not the site fence, a wall, or open ground", () => {
+  const east = Math.PI / 2;
+  const over = vaultTarget(87.9, 12, east);
+  assert.ok(over && over.x > 88.6 && over.x < 90, "railing at the foot of the hill");
+  assert.ok(free(over.x, over.z, 0), "lands clear");
+  assert.equal(vaultTarget(30, 1.4, Math.PI), null, "site fence is too tall");
+  assert.equal(vaultTarget(7.5, 13.5, east), null, "building wall");
+  assert.equal(vaultTarget(60, 30, east), null, "nothing to jump");
 });

@@ -140,8 +140,8 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
         Mulai simulasi
       </button>
       <p className="leading-loose text-redup">
-        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Lari <kbd>Shift</kbd> · Aksi <kbd>E</kbd> · Merunduk <kbd>C</kbd> · Peta{" "}
-        <kbd>M</kbd> · Kamera <kbd>V</kbd> · Seret layar untuk melihat
+        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Lari <kbd>Shift</kbd> · Aksi <kbd>E</kbd> · Merunduk <kbd>C</kbd> · Lompat{" "}
+        <kbd>Spasi</kbd> · Peta <kbd>M</kbd> · Kamera <kbd>V</kbd> · Seret layar untuk melihat
       </p>
     </form>
   );
@@ -325,6 +325,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
 
 function TouchPad() {
   const prompt = useDrill((s) => s.prompt);
+  const canJump = useDrill((s) => s.vaultAt !== null);
   const hold = (k: keyof typeof input) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -361,7 +362,13 @@ function TouchPad() {
       <button type="button" aria-label="Kanan" className={pad} {...hold("right")}>
         <ChevronRight aria-hidden="true" />
       </button>
-      <span />
+      {canJump ? (
+        <button type="button" className={`${pad} text-xs font-bold`} onClick={() => (input.jump = true)}>
+          Lompat
+        </button>
+      ) : (
+        <span />
+      )}
       <button type="button" aria-label="Mundur" className={pad} {...hold("down")}>
         <ChevronDown aria-hidden="true" />
       </button>

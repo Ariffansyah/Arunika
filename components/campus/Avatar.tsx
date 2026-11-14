@@ -14,7 +14,7 @@ export default function Avatar({
 }: {
   look: Look;
   name: string;
-  anim: () => Anim;
+  anim: () => Anim | [Anim, number];
   self?: boolean;
   label?: boolean;
   height?: number;
