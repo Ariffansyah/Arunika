@@ -4,12 +4,10 @@ export type { Building, BuildingKind, Material } from "./maps.ts";
 
 // The map is chosen once per page load, from ?peta= in the browser or PETA in tests, so every module that
 // derives its layout from the grid when it loads sees the same campus. Switching maps reloads the page.
-export const mapFromUrl = (search: string) => {
-  const id = new URLSearchParams(search).get("peta");
-  return id && id in MAPS ? (id as Setting) : "pesisir";
-};
-const wanted = typeof location !== "undefined" ? mapFromUrl(location.search) : (globalThis.process?.env?.PETA as Setting | undefined);
-export const MAP = MAPS[wanted ?? "pesisir"] ?? MAPS.pesisir!;
+// Own keys only: "?peta=constructor" must not reach Object.prototype.
+const known = (id: string | null | undefined): Setting => (id && Object.hasOwn(MAPS, id) ? (id as Setting) : "pesisir");
+export const mapFromUrl = (search: string) => known(new URLSearchParams(search).get("peta"));
+export const MAP = MAPS[typeof location !== "undefined" ? mapFromUrl(location.search) : known(globalThis.process?.env?.PETA)]!;
 
 export const GRID = MAP.grid;
 export const W = GRID[0].length;
