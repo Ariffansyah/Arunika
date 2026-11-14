@@ -4,6 +4,7 @@ import { Check, X } from "lucide-react";
 import { useState } from "react";
 import { LESSONS } from "@/lib/lessons";
 import { useDrill } from "./drillStore";
+import { play } from "./sound";
 import { KindPicker, NpcPicker, ghost, primary } from "./ui";
 
 function Quiz({ kind }: { kind: keyof typeof LESSONS }) {
@@ -29,7 +30,10 @@ function Quiz({ kind }: { kind: keyof typeof LESSONS }) {
                     type="button"
                     disabled={shown}
                     aria-pressed={picked === k}
-                    onClick={() => setAnswers({ ...answers, [i]: k })}
+                    onClick={() => {
+                      play(k === q.answer ? "correct" : "wrong", 0.5);
+                      setAnswers({ ...answers, [i]: k });
+                    }}
                     className={`flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-left disabled:cursor-default ${tone}`}
                   >
                     {shown && k === q.answer && <Check aria-hidden="true" className="size-4 shrink-0" />}

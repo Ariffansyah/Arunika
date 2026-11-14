@@ -1,19 +1,20 @@
 "use client";
 
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Eye, Layers, Link2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Eye, Layers, Link2, Volume2, VolumeX, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import { H, MAP, TILE, W } from "@/lib/campus";
+import { PLAN } from "@/lib/floorplan";
 import { MAPS } from "@/lib/maps";
 import { INTENSITY, SCENARIO_LABEL, waterLevel, within, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
-import { aftershockAt, finishDrill, input, liveChecks, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
+import { aftershockAt, fallenAt, finishDrill, input, liveChecks, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
 import { interact } from "./interact";
 import Learn from "./Learn";
 import { KindPicker, NpcPicker, btn, ghost, panel, primary, radio } from "./ui";
-import { rumble, siren } from "./sound";
+import { falloff, isMuted, play, rumble, setMuted, siren } from "./sound";
 import type { Peer } from "./useRoom";
 
 
@@ -455,6 +456,7 @@ export default function Hud({
   const phase = useDrill((s) => s.phase);
   const guided = useDrill((s) => s.guided);
   const [tab, setTab] = useState<"belajar" | "simulasi">("belajar");
+  const [muted, setMutedState] = useState(isMuted);
   const scenario = useDrill((s) => s.scenario);
   const startAt = useDrill((s) => s.startAt);
   const result = useDrill((s) => s.result);
@@ -482,6 +484,16 @@ export default function Hud({
     // The same low roar stands in for the whirlwind passing and the slope giving way.
     if (wind) ids.push(setTimeout(() => rumble(wind[1] - wind[0]), at(wind[0])));
     if (slide !== null) ids.push(setTimeout(() => rumble(6), at(slide)));
+    // Things breaking nearby, each heard from where it happens: windows, toppling cupboards, the fallen tree, rocks.
+    const from = (x: number, z: number) => falloff(Math.hypot(x - player.x, z - player.z));
+    run.breaks.forEach((when, i) => ids.push(setTimeout(() => play("glass", 0.5 * from(PLAN.panes[i].x, PLAN.panes[i].z)), at(when))));
+    run.falls.forEach((when, i) => ids.push(setTimeout(() => play("crash", 0.7 * from(PLAN.items[i].x, PLAN.items[i].z)), at(when + 0.5))));
+    const f = run.situation?.fallen;
+    if (f && Number.isFinite(fallenAt())) ids.push(setTimeout(() => play("crash", from(f.x, f.z)), at(fallenAt() + 1.2)));
+    const lane = MAP.runouts[run.lane];
+    if (slide !== null && lane) for (let k = 0; k < 8; k++) ids.push(setTimeout(() => play("rock", from(lane.bx, lane.bz)), at(slide + 0.6 * k)));
+    // Three ticks before the start.
+    for (let k = 1; k <= 3; k++) ids.push(setTimeout(() => play("tick", 0.5), Math.max(0, startAt - k * 1000 - Date.now())));
     return () => ids.forEach(clearTimeout);
   }, [phase, startAt, scenario.kind]);
 
@@ -555,6 +567,18 @@ export default function Hud({
             <Layers aria-hidden="true" className="size-4" />
             <span className="sm:hidden">Risiko AI</span>
             <span className="hidden sm:inline">Lapisan risiko AI</span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={!muted}
+            onClick={() => {
+              setMuted(!muted);
+              setMutedState(!muted);
+            }}
+            className={`${btn} min-h-10 border border-malam-3 bg-malam/90 px-3 text-sm text-pasir hover:border-redup`}
+          >
+            {muted ? <VolumeX aria-hidden="true" className="size-4" /> : <Volume2 aria-hidden="true" className="size-4" />}
+            <span className="sr-only sm:not-sr-only">Suara</span>
           </button>
           <button
             type="button"

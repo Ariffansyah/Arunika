@@ -34,7 +34,7 @@ import {
   tileElevation,
   type Tile,
 } from "@/lib/campus";
-import { FENCE, FENCE_H, LOW_FENCE, LOW_FENCE_H } from "@/lib/nav";
+import { FENCE, FENCE_H, LOW_FENCE, LOW_FENCE_H, buildingAt } from "@/lib/nav";
 import { random, vortexAt, waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
@@ -48,6 +48,7 @@ import { drillTime, fallenAt, getState, player, predict, run, useDrill } from ".
 import { interact, wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
+import { setAmbience } from "./sound";
 import { LOOK } from "./Horizon";
 import RemotePlayers from "./RemotePlayers";
 import type { Peer } from "./useRoom";
@@ -432,6 +433,29 @@ function FallenPole() {
   );
 }
 
+// The background sound of the place and the weather, quieter indoors.
+function Ambience() {
+  useFrame(() => {
+    const s = getState();
+    const on = s.phase !== "idle";
+    const t = drillTime();
+    const kind = s.scenario.kind;
+    const storm = on && (kind === "angin" || kind === "longsor");
+    const v = on && kind === "angin" ? vortexAt(run.timeline, t) : null;
+    const muffle = buildingAt(player.x, player.z) ? 0.45 : 1;
+    const level = on && kind === "banjir" ? waterLevel(s.scenario, s.phase === "running" ? t : Infinity, run.timeline.rise) : 0;
+    setAmbience({
+      rain: storm ? (kind === "longsor" ? 1 : 0.6) * muffle : 0,
+      wind: on && kind === "angin" ? Math.min(1, 0.2 + (v ? 1.2 * Math.exp(-Math.hypot(v[0] - player.x, v[1] - player.z) / 35) : 0)) * muffle : 0,
+      waves: MAP.id === "pesisir" ? 0.6 * muffle : 0,
+      city: MAP.id === "kota" ? 0.7 * muffle : 0,
+      water: Math.min(1, level / 0.4),
+      birds: MAP.id !== "kota" && !storm ? 0.7 * muffle : 0,
+    });
+  });
+  return null;
+}
+
 function Warden() {
   const outer = useRef<Group>(null);
   const ref = useRef<Group>(null);
@@ -654,6 +678,7 @@ export default function World({
       <Vortex />
       <Rain />
       <Beacons />
+      <Ambience />
       <AssemblyPoints safe={goals} />
       <Suspense fallback={null}>
         <FallenTree />

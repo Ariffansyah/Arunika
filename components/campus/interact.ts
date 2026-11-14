@@ -18,7 +18,7 @@ import {
   shakingAt,
   type Prompt,
 } from "./drillStore";
-import { kentongan } from "./sound";
+import { falloff, kentongan, play } from "./sound";
 
 const REACH = 1.4;
 // Desks and tables are cover; a desk's id is its index in PLAN.items.
@@ -39,6 +39,8 @@ export function setDoor(id: string, open: boolean, tell = true) {
   const closed = getState().closedDoors;
   if (open !== closed.includes(id) || jammed(id)) return;
   setState({ closedDoors: open ? closed.filter((d) => d !== id) : [...closed, id] });
+  const d = DOORS.get(id)!;
+  play(open ? "door-open" : "door-close", 0.7 * falloff(Math.hypot(d.x - player.x, d.z - player.z)));
   if (tell) net.send?.("door", { id, open });
 }
 
@@ -134,7 +136,10 @@ export function findPrompt(): Prompt | null {
 export function interact() {
   const p = getState().prompt;
   if (!p) return;
-  if (p.id === "lapor") return finishDrill(true);
+  if (p.id === "lapor") {
+    play("correct", 0.7);
+    return finishDrill(true);
+  }
   if (p.id === "warden") return openChat();
   if (p.id.startsWith("tanda-")) {
     run.track.signSeen = true;
@@ -147,6 +152,7 @@ export function interact() {
   }
   if (isDoor(p.id)) return setDoor(p.id, getState().closedDoors.includes(p.id));
   const kind = p.id.split("-")[0];
+  if (kind === "mcb" || kind === "gas") play("switch", 0.6);
   if (kind === "mcb") setState({ power: !getState().power });
   else if (kind === "gas") setState({ gas: !getState().gas });
   else if (kind === "kentongan") raiseAlarm();

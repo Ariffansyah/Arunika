@@ -23,6 +23,8 @@ import {
   useDrill,
 } from "./drillStore";
 import { closedDoors, findPrompt, interact } from "./interact";
+import { play, splash } from "./sound";
+import { TILE, surfaceAt } from "@/lib/campus";
 
 const KEYS: Record<string, keyof typeof input> = {
   KeyW: "up",
@@ -74,6 +76,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
   const last = useRef<[number, number]>([player.x, player.z]);
   const vault = useRef<{ x0: number; z0: number; y0: number; x1: number; z1: number; y1: number; arc: number; t: number } | null>(null);
   const pace = useRef(1);
+  const stride = useRef(0);
 
   useEffect(() => {
     reducedMotion.current = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -175,7 +178,9 @@ export default function Player({ look: character, name }: { look: Look; name: st
     input.jump = false;
 
     if (v) {
+      const was = v.t;
       v.t += dt;
+      if (was < 0.48 && v.t >= 0.48) play("land", 0.5);
       const p = Math.min(1, Math.max(0, (v.t - 0.08) / 0.4));
       player.x = v.x0 + (v.x1 - v.x0) * p;
       player.z = v.z0 + (v.z1 - v.z0) * p;
@@ -222,7 +227,16 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const label = landing ? { x: (player.x + landing.x) / 2, y: landing.top + 0.6, z: (player.z + landing.z) / 2 } : null;
     const shown = s.vaultAt;
     if (!label !== !shown || (label && shown && Math.hypot(label.x - shown.x, label.z - shown.z) > 0.3)) setState({ vaultAt: label });
-    if (running && t >= 0) run.walked += Math.hypot(player.x - ox, player.z - oz);
+    const moved = Math.hypot(player.x - ox, player.z - oz);
+    if (running && t >= 0) run.walked += moved;
+    // A footfall every stride, sounding like what is underfoot.
+    stride.current = player.moving ? stride.current + moved : 0;
+    if (stride.current >= (player.running ? 1.15 : player.crouch ? 0.55 : 0.75)) {
+      stride.current = 0;
+      const loud = player.running ? 0.55 : player.crouch ? 0.2 : 0.35;
+      if (depth > 0.12) splash(loud);
+      else play(buildingAt(player.x, player.z) || surfaceAt(Math.floor(player.x / TILE), Math.floor(player.z / TILE)) ? "step-concrete" : "step-grass", loud);
+    }
 
     if (running && t >= 0) {
       trackDrill(dt, t, Math.hypot(player.x - ox, player.z - oz), depth);
