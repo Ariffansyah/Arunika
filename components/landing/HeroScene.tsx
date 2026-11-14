@@ -97,8 +97,8 @@ function Route({ clockRef, pts }: { clockRef: Clock; pts: Pts }) {
   return <Line ref={ref} points={points} color="#ff8a3d" lineWidth={6} dashed dashSize={2.1} gapSize={1.2} />;
 }
 
-const STUDENTS: Look[] = ["female-c", "male-a", "female-b", "female-e", "male-f", "female-f", "male-a", "female-b"];
-preloadCharacters(["female-c", "male-a", "female-b", "female-e", "male-f", "female-f"]);
+const STUDENTS: Look[] = ["siswi-a", "siswa-a", "siswi-b", "siswi-d", "siswa-b", "siswi-c", "siswa-c", "siswi-b"];
+preloadCharacters(["siswi-a", "siswa-a", "siswi-b", "siswi-d", "siswa-b", "siswi-c", "siswa-c"]);
 
 function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; cum: number[]; delay: number; i: number }) {
   const ref = useRef<Group>(null);

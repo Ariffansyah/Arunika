@@ -192,14 +192,9 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const g = ref.current;
     if (g) {
       g.position.set(player.x, player.y, player.z);
-      // Under a desk the body tucks beneath it; the player stays where they stood, which is clear of the desk.
+      // Curled up, the body fits right under the desk; the player stays where they stood, which is clear of it.
       const desk = PLAN.items[player.cover];
-      if (desk) {
-        const d = Math.hypot(desk.x - player.x, desk.z - player.z) || 1;
-        const k = Math.min(0.45, d * 0.6) / d;
-        g.position.x += (desk.x - player.x) * k;
-        g.position.z += (desk.z - player.z) * k;
-      }
+      if (desk) g.position.set(desk.x, player.y, desk.z);
       g.rotation.y = player.heading;
       g.visible = !first;
     }
@@ -207,7 +202,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const strength = running && s.scenario.kind === "gempa" ? (shakingAt(t) ? 1 : aftershockAt(t) ? 0.45 : 0) : 0;
     const shake = strength * (0.05 + (s.scenario.intensity - 5) * 0.04) * (reducedMotion.current ? 0.2 : 1);
     const jitter = () => (Math.random() - 0.5) * shake;
-    const target = eye.current.set(player.x, player.y + (player.crouch ? 0.75 : player.seated ? 1.05 : 1.35), player.z);
+    const target = eye.current.set(player.x, player.y + (player.cover >= 0 ? 0.5 : player.crouch ? 0.75 : player.seated ? 1.05 : 1.35), player.z);
 
     if (first) {
       camera.position.set(target.x + jitter(), target.y + jitter(), target.z + jitter());
@@ -248,7 +243,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
         self
         label={view === "third"}
         anim={() =>
-          player.crouch || player.cover >= 0 ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : player.seated ? "sit" : "idle"
+          player.cover >= 0 ? "cover" : player.crouch ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : player.seated ? "sit" : "idle"
         }
       />
     </group>

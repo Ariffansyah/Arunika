@@ -1,28 +1,12 @@
-	
+Characters
 
-	Mini Characters (2.0)
+Bodies, clothes, heads and the idle, walk, run and wave animations:
+"Ultimate Modular Men Pack" and "Ultimate Modular Women Pack" by Quaternius (quaternius.com),
+via poly.pizza. Parts are mixed and recoloured into an SMP school uniform.
 
-	Created/distributed by Kenney (www.kenney.nl)
-	Creation date: 07-11-2026 11:14
-	
-			------------------------------
+Crouch, sit and the drop-cover-hold-on pose are transferred from
+"Universal Animation Library" by Quaternius (quaternius.com).
 
-	License: (Creative Commons Zero, CC0)
-	http://creativecommons.org/publicdomain/zero/1.0/
-
-	You can use this content for personal, educational, and commercial purposes.
-
-	Support by crediting 'Kenney' or 'www.kenney.nl' (this is not a requirement)
-
-			------------------------------
-
-	• Website : www.kenney.nl
-	• Donate  : www.kenney.nl/donate
-
-	• Patreon : patreon.com/kenney
-	
-	Follow on social media for updates:
-
-	• Twitter:	 twitter.com/KenneyNL
-	• BlueSky:	 kenney.bsky.social
-	• Instagram: instagram.com/kenney_nl
+License: Creative Commons Zero (CC0 1.0), http://creativecommons.org/publicdomain/zero/1.0/
+You can use this content for personal, educational, and commercial purposes.
+Support Quaternius: https://www.patreon.com/quaternius (crediting is appreciated, not required)

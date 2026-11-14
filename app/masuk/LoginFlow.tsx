@@ -255,7 +255,7 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
               <input type="radio" name="avatar" value={i} defaultChecked={i === 0} className="peer sr-only" />
               {/* eslint-disable-next-line @next/next/no-img-element -- 64px sprites, nothing to optimise */}
               <img
-                src={`/characters/previews/character-${look}.png`}
+                src={`/characters/previews/${look}.png`}
                 alt={`Karakter ${i + 1}`}
                 width={64}
                 height={64}

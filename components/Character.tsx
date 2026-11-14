@@ -6,12 +6,13 @@ import { useMemo, useRef } from "react";
 import { Box3, Vector3, type Group, type Mesh } from "three";
 import { clone as cloneRig } from "three/examples/jsm/utils/SkeletonUtils.js";
 
-// Kenney "Mini Characters" (CC0), see public/characters/LICENSE.txt.
-export const LOOKS = ["female-c", "male-a", "female-b", "male-f", "female-f", "female-e", "worker"] as const;
+// Quaternius "Ultimate Modular Men/Women" (CC0) in SMP uniform, see public/characters/LICENSE.txt.
+export const LOOKS = ["siswi-a", "siswa-a", "siswi-b", "siswa-b", "siswi-c", "siswi-d", "siswa-c", "petugas"] as const;
 export type Look = (typeof LOOKS)[number];
-export type Anim = "idle" | "walk" | "sprint" | "crouch" | "sit" | "emote-yes";
+// `cover` is drop, cover, hold on: curled up small enough for a 0.75 m desk, arms over the neck.
+export type Anim = "idle" | "walk" | "sprint" | "crouch" | "cover" | "sit" | "talk";
 
-const url = (look: Look) => `/characters/character-${look}.glb`;
+const url = (look: Look) => `/characters/${look}.glb`;
 
 // `anim` is read every frame, so callers switch clips without re-rendering.
 export default function Character({
@@ -32,6 +33,8 @@ export default function Character({
     model.traverse((c) => {
       if ((c as Mesh).isMesh) c.castShadow = true;
     });
+    // Skinned bounds follow the bones, whose world matrices a fresh clone has not computed yet.
+    model.updateMatrixWorld(true);
     return { model, scale: height / new Box3().setFromObject(model).getSize(new Vector3()).y };
   }, [scene, height]);
   const ref = useRef<Group>(null);
@@ -45,7 +48,7 @@ export default function Character({
     if (!next) return;
     const last = playing.current ? actions[playing.current] : null;
     next.reset().setEffectiveTimeScale(speed).play();
-    if (last) next.crossFadeFrom(last, 0.2, false);
+    if (last) next.crossFadeFrom(last, 0.25, false);
     playing.current = name;
   });
 

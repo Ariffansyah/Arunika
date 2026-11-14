@@ -18,7 +18,7 @@ const wading = (x: number, z: number, layer = 0) => {
   return level - groundY(x, z, layer);
 };
 
-const LOOKS: Look[] = ["female-c", "male-a", "female-e", "female-b", "male-f", "female-f", "male-a", "female-c", "male-f", "female-b", "female-e", "male-a"];
+const LOOKS: Look[] = ["siswi-a", "siswa-a", "siswi-d", "siswi-b", "siswa-b", "siswi-c", "siswa-c", "siswi-a", "siswa-b", "siswi-b", "siswi-d", "siswa-a"];
 // Where the class sits between drills.
 const HOME_ROOM = classrooms()[0].id;
 const mates = LOOKS.map(() => ({ x: 0, z: 0 }));
@@ -48,7 +48,8 @@ function Classmate({ i }: { i: number }) {
     const field = s.phase !== "idle" ? run.field : null;
 
     if (!field || t < 0) st.anim = "sit";
-    else if (shaking || (quake && aftershockAt(t))) st.anim = "crouch";
+    else if (shaking) st.anim = "cover";
+    else if (quake && aftershockAt(t)) st.anim = "crouch";
     else if (t < (run.timeline.shake?.[1] ?? 0) + delay) st.anim = quake ? "idle" : "sit";
     else {
       const next = distanceAt(field, st.x, st.z, st.layer) > 0 ? nextStep(field, st.x, st.z, st.layer) : null;
@@ -88,7 +89,7 @@ function Classmate({ i }: { i: number }) {
     mates[i].x = st.x;
     mates[i].z = st.z;
     // Ducking at their seat puts them under the desk in front of them.
-    const under = shaking ? 0.35 : 0;
+    const under = st.anim === "cover" ? 0.45 : 0;
     g.position.set(st.x + Math.sin(st.heading) * under, groundY(st.x, st.z, st.layer), st.z + Math.cos(st.heading) * under);
     g.rotation.y = st.heading;
   });

@@ -341,7 +341,7 @@ function Warden() {
   return (
     <group ref={outer}>
       <group ref={ref} rotation-y={Math.PI / 4}>
-        <Avatar look="worker" name="Petugas Keselamatan" height={1.7} anim={() => (getState().chatOpen ? "emote-yes" : "idle")} />
+        <Avatar look="petugas" name="Petugas Keselamatan" height={1.7} anim={() => (getState().chatOpen ? "talk" : "idle")} />
       </group>
     </group>
   );
