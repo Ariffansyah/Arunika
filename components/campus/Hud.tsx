@@ -12,7 +12,7 @@ import { supabase, type School } from "@/lib/supabase";
 import { aftershockAt, finishDrill, input, liveChecks, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
 import { interact } from "./interact";
 import Learn from "./Learn";
-import { KindPicker, btn, ghost, panel, primary, radio } from "./ui";
+import { KindPicker, NpcPicker, btn, ghost, panel, primary, radio } from "./ui";
 import { rumble, siren } from "./sound";
 import type { Peer } from "./useRoom";
 
@@ -122,6 +122,7 @@ function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario
         </div>
       </fieldset>
       <KindPicker legend="Skenario" />
+      <NpcPicker />
       <label className="block text-sm font-semibold" htmlFor="intensity">
         {`${meta.label}: ${scenario.intensity.toFixed(meta.step < 1 ? 1 : 0)} ${meta.unit}`.trim()}
         <input

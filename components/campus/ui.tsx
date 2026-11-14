@@ -2,7 +2,7 @@
 
 import { MAP } from "@/lib/campus";
 import { INTENSITY, SCENARIO_LABEL } from "@/lib/sim";
-import { setState, useDrill } from "./drillStore";
+import { NPC_COUNTS, setNpc, setState, useDrill } from "./drillStore";
 
 export const panel = "rounded-lg border border-malam-3 bg-malam/92 p-4 shadow-lg";
 export const btn =
@@ -29,6 +29,26 @@ export function KindPicker({ legend }: { legend: string }) {
               onChange={() => setState({ scenario: { kind: k, intensity: INTENSITY[k].start } })}
             />
             {SCENARIO_LABEL[k]}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+const NPC_LABEL = ["Tidak ada", "Sedikit", "Ramai"];
+
+// Fewer classmates for a quieter campus, or a slower computer.
+export function NpcPicker() {
+  const npc = useDrill((s) => s.npc);
+  return (
+    <fieldset>
+      <legend className="text-sm font-semibold">Teman sekelas</legend>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {NPC_COUNTS.map((n, i) => (
+          <label key={n} className={radio}>
+            <input type="radio" name="npc" className="sr-only" checked={npc === n} onChange={() => setNpc(n)} />
+            {NPC_LABEL[i]}
           </label>
         ))}
       </div>

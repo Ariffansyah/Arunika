@@ -9,7 +9,7 @@ import { ASSEMBLY, MAP, TILE, W, elevationAt, findTiles, surfaceAt, tileCenter, 
 import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
 import { WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
-import { CLASSMATE_SEATS, aftershockAt, drillTime, getState, landslideSigns, roomSeats, run, shakingAt } from "./drillStore";
+import { CLASSMATE_SEATS, aftershockAt, drillTime, getState, landslideSigns, roomSeats, run, shakingAt, useDrill } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
 
 const wading = (x: number, z: number, layer = 0) => {
@@ -37,7 +37,7 @@ function arrivalSpot(x: number, z: number, layer: number, i: number): { at: [num
 }
 
 // Drills teach walking briskly, not running: classmates model that, ducking first when the ground shakes.
-function Classmate({ i }: { i: number }) {
+function Classmate({ i, count }: { i: number; count: number }) {
   const ref = useRef<Group>(null);
   const me = useRef({
     x: 0,
@@ -92,7 +92,7 @@ function Classmate({ i }: { i: number }) {
         let sx = 0;
         let sz = 0;
         if (!st.spot) {
-          mates.forEach((o, j) => {
+          mates.slice(0, count).forEach((o, j) => {
             const ox = st.x - o.x;
             const oz = st.z - o.z;
             const d2 = ox * ox + oz * oz;
@@ -145,10 +145,11 @@ function Classmate({ i }: { i: number }) {
 }
 
 export function Classmates() {
+  const count = useDrill((s) => s.npc);
   return (
     <Suspense fallback={null}>
-      {LOOKS.map((_, i) => (
-        <Classmate key={i} i={i} />
+      {LOOKS.slice(0, count).map((_, i) => (
+        <Classmate key={i} i={i} count={count} />
       ))}
     </Suspense>
   );

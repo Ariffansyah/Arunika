@@ -51,6 +51,18 @@ type State = {
   mapOpen: boolean;
   // A practice run: the route is shown, there is no time limit, and nothing is scored or shared.
   guided: boolean;
+  // How many classmates walk the campus; each player's own choice, not shared with the room.
+  npc: number;
+};
+
+export const NPC_COUNTS = [0, 4, 12];
+const savedNpc = () => {
+  try {
+    const v = localStorage.getItem("arunika:npc");
+    return v !== null && NPC_COUNTS.includes(Number(v)) ? Number(v) : 12;
+  } catch {
+    return 12;
+  }
 };
 
 let state: State = {
@@ -71,6 +83,7 @@ let state: State = {
   gas: true,
   mapOpen: false,
   guided: false,
+  npc: savedNpc(),
 };
 
 const listeners = new Set<() => void>();
@@ -86,6 +99,15 @@ export function setState(patch: Partial<State>) {
 }
 export const useDrill = <T,>(select: (s: State) => T) =>
   useSyncExternalStore(subscribe, () => select(state), () => select(state));
+
+export function setNpc(n: number) {
+  setState({ npc: n });
+  try {
+    localStorage.setItem("arunika:npc", String(n));
+  } catch {
+    // Private windows can refuse storage; the choice still holds for this visit.
+  }
+}
 
 // Per-frame values live outside React so 60 fps updates never re-render the HUD.
 const [SPAWN_X, SPAWN_Z] = tileCenter(...SPAWN);
