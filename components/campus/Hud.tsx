@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import { H, TILE, W } from "@/lib/campus";
-import { INTENSITY, SCENARIO_LABEL, waterLevel, type Scenario } from "@/lib/sim";
+import { INTENSITY, SCENARIO_LABEL, waterLevel, within, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { aftershockAt, finishDrill, input, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
 import { interact } from "./interact";
@@ -106,17 +106,17 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
       <fieldset>
         <legend className="text-sm font-semibold">Skenario</legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          {(["gempa", "banjir"] as const).map((k) => (
+          {(["gempa", "banjir", "angin", "longsor"] as const).map((k) => (
             <label
               key={k}
-              className="flex min-h-11 items-center justify-center rounded-md border border-malam-3 px-3 text-sm font-semibold has-checked:border-fajar has-checked:text-fajar has-focus-visible:outline-2 has-focus-visible:outline-fajar"
+              className="flex min-h-11 items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold has-checked:border-fajar has-checked:text-fajar has-focus-visible:outline-2 has-focus-visible:outline-fajar"
             >
               <input
                 type="radio"
                 name="kind"
                 className="sr-only"
                 checked={scenario.kind === k}
-                onChange={() => setState({ scenario: { kind: k, intensity: k === "gempa" ? 6.5 : 1 } })}
+                onChange={() => setState({ scenario: { kind: k, intensity: INTENSITY[k].start } })}
               />
               {SCENARIO_LABEL[k]}
             </label>
@@ -124,7 +124,7 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
         </div>
       </fieldset>
       <label className="block text-sm font-semibold" htmlFor="intensity">
-        {`${meta.label}: ${scenario.intensity.toFixed(1)} ${meta.unit}`.trim()}
+        {`${meta.label}: ${scenario.intensity.toFixed(meta.step < 1 ? 1 : 0)} ${meta.unit}`.trim()}
         <input
           id="intensity"
           type="range"
@@ -152,8 +152,11 @@ function Instruction({ t }: { t: number }) {
   const hint = useDrill((s) => s.showRoute);
   const report = useDrill((s) => s.prompt?.id === "lapor");
   if (t < 0) return <p className="text-2xl font-extrabold">Bersiap… {Math.ceil(-t)}</p>;
+  const { wind, slide } = run.timeline;
   const shaking = scenario.kind === "gempa" && shakingAt(t);
   const after = scenario.kind === "gempa" && aftershockAt(t);
+  const storm = within(wind, t);
+  const sliding = slide !== null && t >= slide;
   // The clock re-renders this ten times a second, often enough to follow the water at the player's feet.
   const message =
     scenario.kind === "gempa"
@@ -164,19 +167,34 @@ function Instruction({ t }: { t: number }) {
           : report
             ? "Sudah di titik kumpul. Lapor ke petugas (E)."
             : "Guncangan berhenti. Keluar dengan tertib, jangan berlari, menuju titik kumpul."
-      : report
-        ? "Sudah di tempat aman. Lapor (E)."
-        : player.wading
-          ? "Air setinggi lutut. Cari jalan yang lebih tinggi."
-          : "Air naik. Matikan listrik bila sempat, lalu naik ke bukit atau lantai 2 Gedung Kelas A.";
+      : scenario.kind === "angin"
+        ? storm
+          ? "Angin melintas! Jauhi jendela, merunduk dan lindungi kepala (C)."
+          : report
+            ? "Angin sudah reda. Lapor ke guru (E)."
+            : wind && t >= wind[1]
+              ? "Angin sudah reda. Tunggu di ruang aman, lalu lapor ke guru."
+              : "Angin puting beliung mendekat. Masuk ke ruang tanpa jendela di gedung kokoh: toilet, tangga, atau Tata Usaha."
+        : scenario.kind === "longsor"
+          ? report
+            ? "Sudah di titik kumpul. Lapor ke petugas (E)."
+            : sliding
+              ? "Longsor! Jauhi lereng, menuju titik kumpul di lapangan."
+              : "Hujan deras di lereng. Periksa tanda longsor dari jauh (E), bunyikan kentongan, lalu menjauh ke lapangan."
+          : report
+            ? "Sudah di tempat aman. Lapor (E)."
+            : player.wading
+              ? "Air setinggi lutut. Cari jalan yang lebih tinggi."
+              : "Air naik. Matikan listrik bila sempat, lalu naik ke bukit atau lantai 2 Gedung Kelas A.";
   return (
     <div className="space-y-3">
-      <p role="status" className={`font-bold leading-snug ${shaking || after ? "text-bahaya" : "text-fajar"}`}>
+      <p role="status" className={`font-bold leading-snug ${shaking || after || storm || (sliding && !report) ? "text-bahaya" : "text-fajar"}`}>
         {message}
       </p>
       <p className="tabular-nums text-redup">
         Waktu {t.toFixed(1)} dtk
         {scenario.kind === "banjir" && <> · Tinggi air {waterLevel(scenario, t).toFixed(2)} m</>}
+        {wind && t < wind[0] && <> · Angin tiba {Math.ceil(wind[0] - t)} dtk</>}
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className={ghost} onClick={showHint} disabled={hint}>
@@ -378,10 +396,13 @@ export default function Hud({
   useEffect(() => {
     if (phase !== "running") return;
     const at = (s: number) => Math.max(0, startAt + s * 1000 - Date.now());
-    const { shake, aftershock } = run.timeline;
+    const { shake, aftershock, wind, slide } = run.timeline;
     const ids = [setTimeout(() => siren(), at(shake?.[1] ?? 0))];
     if (shake) ids.push(setTimeout(() => rumble(shake[1]), at(0)));
     if (aftershock) ids.push(setTimeout(() => rumble(aftershock[1] - aftershock[0]), at(aftershock[0])));
+    // The same low roar stands in for the whirlwind passing and the slope giving way.
+    if (wind) ids.push(setTimeout(() => rumble(wind[1] - wind[0]), at(wind[0])));
+    if (slide !== null) ids.push(setTimeout(() => rumble(6), at(slide)));
     return () => ids.forEach(clearTimeout);
   }, [phase, startAt, scenario.kind]);
 

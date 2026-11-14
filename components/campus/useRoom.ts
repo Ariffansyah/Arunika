@@ -17,9 +17,10 @@ const num = (v: unknown, lo: number, hi: number) => (typeof v === "number" && v 
 // Broadcasts come from other browsers, so every field is checked before it touches game state.
 function parseScenario(p: unknown): Scenario | null {
   const s = p as { kind?: unknown; intensity?: unknown } | null;
-  if (s?.kind !== "gempa" && s?.kind !== "banjir") return null;
-  const v = num(s.intensity, ...INTENSITY[s.kind].range);
-  return v === null ? null : { kind: s.kind, intensity: v };
+  if (typeof s?.kind !== "string" || !Object.hasOwn(INTENSITY, s.kind)) return null;
+  const kind = s.kind as Scenario["kind"];
+  const v = num(s.intensity, ...INTENSITY[kind].range);
+  return v === null ? null : { kind, intensity: v };
 }
 
 export function useRoom(room: string, me: { id: string; name: string; avatar: number }, school: School | null) {

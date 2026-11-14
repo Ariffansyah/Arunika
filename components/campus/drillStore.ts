@@ -1,11 +1,13 @@
 import { useSyncExternalStore } from "react";
-import { SPAWN, TILE, idx, tileCenter, type Tile } from "@/lib/campus";
-import { PLAN, classrooms } from "@/lib/floorplan";
+import { BUILDINGS, SPAWN, TILE, idx, tileCenter, type Tile } from "@/lib/campus";
+import { PLAN, classrooms, type Room } from "@/lib/floorplan";
 import { buildingAt, cellCenter, flowField, groundY, routeFrom, routeLength, upperFloorAt } from "@/lib/nav";
 import {
+  NONE,
   campusRisks,
   grade,
   hazardTiles,
+  inRunout,
   random,
   safeAssembly,
   scoreDrill,
@@ -15,7 +17,6 @@ import {
   type Scenario,
   type Site,
   type Structure,
-  type Timeline,
   type Tracked,
 } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
@@ -116,7 +117,23 @@ const blankTrack = (): Tracked => ({
   powerOff: false,
   alarm: false,
   deepWaterS: 0,
+  sheltered: false,
+  windS: 0,
+  windCoverS: 0,
+  windWindowS: 0,
+  windExposedS: 0,
+  leftShelter: false,
+  signSeen: false,
+  caught: false,
+  slopeS: 0,
 });
+
+// Warning signs on the hill before a landslide, in the order they appear.
+export const SIGNS = [
+  { x: 88, z: 9, label: "Periksa retakan tanah" },
+  { x: 92, z: 22, label: "Periksa pohon miring" },
+  { x: 84, z: 16, label: "Periksa air keruh" },
+];
 
 export const run = {
   hazards: new Set<number>(),
@@ -128,11 +145,14 @@ export const run = {
   // Walking distance to safety from every spot on the campus, for hints and classmates.
   field: null as Float64Array | null,
   seed: 0,
-  timeline: { shake: null, aftershock: null, limit: 240 } as Timeline,
+  timeline: NONE,
   // Doorways buried by rubble: a damaged building loses an exit, so the class must use the other door.
   blocked: [] as string[],
   // In a flood the upper floor of Gedung Kelas A is a refuge (vertical evacuation).
   upstairs: false,
+  // Windowless rooms in buildings strong enough to sit out a whirlwind.
+  shelters: [] as Room[],
+  arrived: false,
   // When each tall piece of furniture topples and each window breaks, by index into PLAN.items / PLAN.panes.
   falls: new Map<number, number>(),
   breaks: new Map<number, number>(),
@@ -157,14 +177,14 @@ export function fallTilt(i: number) {
   return (Math.PI / 2) * p * p;
 }
 
+const near = (x: number, z: number, floor: number, owner: string) =>
+  owner === buildingAt(player.x, player.z) && floor === player.layer && Math.hypot(x - player.x, z - player.z) < 1.3;
+const nearPane = () => PLAN.panes.some((p) => near(p.x, p.z, p.floor, p.b));
 // Glass and tall furniture are what hurts people indoors in an earthquake.
-function nearFalling() {
-  const b = buildingAt(player.x, player.z);
-  if (!b) return false;
-  const near = (x: number, z: number, floor: number, owner: string) =>
-    owner === b && floor === player.layer && Math.hypot(x - player.x, z - player.z) < 1.3;
-  return PLAN.panes.some((p) => near(p.x, p.z, p.floor, p.b)) || TALL.some((i) => near(PLAN.items[i].x, PLAN.items[i].z, PLAN.items[i].floor, PLAN.items[i].b));
-}
+const nearFalling = () => nearPane() || TALL.some((i) => near(PLAN.items[i].x, PLAN.items[i].z, PLAN.items[i].floor, PLAN.items[i].b));
+
+export const inShelter = () =>
+  run.shelters.some((r) => r.floor === player.layer && player.x >= r.x0 && player.x <= r.x1 && player.z >= r.z0 && player.z <= r.z1);
 
 // Called every frame of a running drill with the distance just walked and the water depth at the player.
 export function trackDrill(dt: number, t: number, moved: number, depth: number) {
@@ -189,6 +209,30 @@ export function trackDrill(dt: number, t: number, moved: number, depth: number) 
     }
   }
   if (depth >= 0.5) tr.deepWaterS += dt;
+  const tl = run.timeline;
+  if (tl.wind) {
+    if (t >= tl.wind[0] && !run.arrived) {
+      run.arrived = true;
+      tr.sheltered = inShelter();
+    }
+    if (within(tl.wind, t)) {
+      const b = buildingAt(player.x, player.z);
+      tr.windS += dt;
+      if (covering) tr.windCoverS += dt;
+      if (nearPane()) tr.windWindowS += dt;
+      if (!b || BUILDINGS[b].kind === "kantin") tr.windExposedS += dt;
+      if (tr.sheltered && !inShelter()) tr.leftShelter = true;
+    }
+  }
+  if (tl.slide !== null) {
+    const danger = player.layer === 0 && inRunout(player.x, player.z);
+    // Looking at the first signs is fine; after the last one, every second on the slope counts.
+    if (danger && t >= tl.signs[tl.signs.length - 1]) tr.slopeS += dt;
+    if (danger && t >= tl.slide && t < tl.slide + 8) {
+      tr.caught = true;
+      finishDrill(false);
+    }
+  }
 }
 
 // Seats the classmates take in whichever classroom the drill starts in; players get the rest.
@@ -227,13 +271,17 @@ export const GOAL_RADIUS = 4.5;
 // The upper floor of Gedung Kelas A, not its stairs.
 export const isUpstairs = (x: number, z: number, layer: number) => layer === 1 && upperFloorAt(x, z);
 
-function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blocked: string[]) {
+function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blocked: string[], shelters: Room[]) {
   const centres = goals.map((g) => tileCenter(...g));
   const rubble = PLAN.doors.filter((d) => blocked.includes(d.id));
   return flowField(
     (layer, k) => {
       const [x, z] = cellCenter(k);
-      return (layer === 0 && centres.some(([gx, gz]) => Math.hypot(gx - x, gz - z) < GOAL_RADIUS)) || (upstairs && isUpstairs(x, z, layer));
+      return (
+        (layer === 0 && centres.some(([gx, gz]) => Math.hypot(gx - x, gz - z) < GOAL_RADIUS)) ||
+        (upstairs && isUpstairs(x, z, layer)) ||
+        shelters.some((r) => r.floor === layer && x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1)
+      );
     },
     (layer, k) => {
       const [x, z] = cellCenter(k);
@@ -285,7 +333,10 @@ export function startDrill(
   const exits = roomDoors(room);
   const blocked = quake && risks[building] >= 60 && exits.length > 1 ? [exits[Math.floor(rnd() * exits.length)].id] : [];
   const upstairs = scenario.kind === "banjir";
-  const field = safetyField(goals, hazards, upstairs, blocked);
+  // A weak building's shelter room is no shelter; if every building is weak, the best of them still beats outdoors.
+  const strong = PLAN.rooms.filter((r) => r.shelter && risks[r.b] < 40);
+  const shelters = scenario.kind !== "angin" ? [] : strong.length ? strong : PLAN.rooms.filter((r) => r.shelter);
+  const field = safetyField(goals, hazards, upstairs, blocked, shelters);
   const route = routeFrom(field, player.x, player.z, layer);
   const falls = new Map<number, number>();
   const breaks = new Map<number, number>();
@@ -306,6 +357,8 @@ export function startDrill(
     timeline: plan,
     blocked,
     upstairs,
+    shelters,
+    arrived: false,
     falls,
     breaks,
     outsideS: 0,
@@ -343,7 +396,7 @@ export function finishDrill(reached: boolean) {
     timeS: Math.max(0, (Date.now() - s.startAt) / 1000),
     walked: run.walked,
     optimalLen: run.optimalLen,
-    leadS: run.timeline.shake?.[1] ?? 0,
+    leadS: run.timeline.shake?.[1] ?? run.timeline.wind?.[1] ?? 0,
     hintUsed: run.hintUsed,
     checks: grade(s.scenario.kind, tracked),
   };

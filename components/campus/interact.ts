@@ -1,7 +1,21 @@
-import { WARDEN, tileCenter } from "@/lib/campus";
+import { WARDEN, elevationAt, tileCenter } from "@/lib/campus";
 import { PLAN, WALL } from "@/lib/floorplan";
 import { groundY, type Extra } from "@/lib/nav";
-import { drillTime, finishDrill, getState, isUpstairs, net, openChat, player, run, setState, shakingAt, type Prompt } from "./drillStore";
+import {
+  SIGNS,
+  drillTime,
+  finishDrill,
+  getState,
+  inShelter,
+  isUpstairs,
+  net,
+  openChat,
+  player,
+  run,
+  setState,
+  shakingAt,
+  type Prompt,
+} from "./drillStore";
 import { kentongan } from "./sound";
 
 const REACH = 1.4;
@@ -46,7 +60,8 @@ export function openDoorsNear(x: number, z: number, y: number) {
   }
 }
 
-const inRefuge = () => run.upstairs && isUpstairs(player.x, player.z, player.layer);
+// Refuges indoors (upper floor in a flood, shelter rooms in a whirlwind) have a teacher, not the warden.
+const inRefuge = () => (run.upstairs && isUpstairs(player.x, player.z, player.layer)) || inShelter();
 
 export const atGoal = () =>
   inRefuge() ||
@@ -68,8 +83,10 @@ export function findPrompt(): Prompt | null {
   const s = getState();
   const t = drillTime();
   const running = s.phase === "running";
-  if (running && t >= 0 && !shakingAt(t) && atGoal()) {
-    // Upstairs refuges have no warden; the report goes to the teacher there.
+  const wind = run.timeline.wind;
+  // Reporting waits until the ground is still and the wind has passed.
+  const calm = !shakingAt(t) && !(wind && t < wind[1] + 2);
+  if (running && t >= 0 && calm && atGoal()) {
     if (inRefuge()) return { id: "lapor", label: "Lapor ke guru", x: player.x, y: player.y + 2.2, z: player.z };
     const [x, z] = wardenSpot();
     return { id: "lapor", label: "Lapor ke petugas", x, y: groundY(x, z, 0) + 2.3, z };
@@ -77,10 +94,12 @@ export function findPrompt(): Prompt | null {
   if (s.chatOpen || s.mapOpen || (running && t < 0)) return null;
   let best: Prompt | null = null;
   let bestD = REACH;
-  const consider = (id: string, label: string, x: number, z: number, floorY: number, lift: number) => {
+  const consider = (id: string, label: string, x: number, z: number, floorY: number, lift: number, reach = REACH) => {
     const d = Math.hypot(x - player.x, z - player.z);
-    if (d >= bestD || Math.abs(floorY - player.y) > 1.2) return;
-    bestD = d;
+    // Long-reach things compete on their share of their own reach, so they never crowd out what is at hand.
+    const score = (d / reach) * REACH;
+    if (d >= reach || score >= bestD || Math.abs(floorY - player.y) > 1.2) return;
+    bestD = score;
     best = { id, label, x, y: floorY + lift, z };
   };
   for (const i of COVER) {
@@ -91,6 +110,8 @@ export function findPrompt(): Prompt | null {
     if (!run.blocked.includes(d.id)) consider(d.id, s.closedDoors.includes(d.id) ? "Buka pintu" : "Tutup pintu", d.x, d.z, d.y, 1.7);
   }
   PLAN.spots.forEach((sp, i) => consider(`${sp.kind}-${i}`, SPOT_LABEL[sp.kind](), sp.x, sp.z, groundY(sp.x, sp.z, sp.floor), 1.9));
+  // Landslide signs are read from a few metres away, from the edge of the slope.
+  if (running) SIGNS.forEach((g, i) => t >= run.timeline.signs[i] && consider(`tanda-${i}`, g.label, g.x, g.z, elevationAt(g.x, g.z), 2, 5));
   if (!best && !running) {
     const [x, z] = wardenSpot();
     if (Math.hypot(x - player.x, z - player.z) < 4) best = { id: "warden", label: "Tanya petugas", x, y: groundY(x, z, 0) + 2.3, z };
@@ -103,6 +124,10 @@ export function interact() {
   if (!p) return;
   if (p.id === "lapor") return finishDrill(true);
   if (p.id === "warden") return openChat();
+  if (p.id.startsWith("tanda-")) {
+    run.track.signSeen = true;
+    return;
+  }
   if (p.id.startsWith("meja-")) {
     const desk = PLAN.items[Number(p.id.slice(5))];
     Object.assign(player, { cover: Number(p.id.slice(5)), seated: false, heading: Math.atan2(desk.x - player.x, desk.z - player.z) });

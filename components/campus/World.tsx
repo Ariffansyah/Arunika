@@ -3,7 +3,18 @@
 import { Line, Sky } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
-import { BufferAttribute, Color, Object3D, PlaneGeometry, type DirectionalLight, type Group, type InstancedMesh, type Mesh } from "three";
+import {
+  BackSide,
+  BufferAttribute,
+  Color,
+  Object3D,
+  PlaneGeometry,
+  type DirectionalLight,
+  type Fog,
+  type Group,
+  type InstancedMesh,
+  type Mesh,
+} from "three";
 import {
   ASSEMBLY,
   ASSEMBLY_NAMES,
@@ -21,16 +32,16 @@ import {
   type Tile,
 } from "@/lib/campus";
 import { FENCE, FENCE_H } from "@/lib/nav";
-import { waterLevel } from "@/lib/sim";
+import { vortexAt, waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
 import Html from "@/components/Html";
 import Model, { M } from "@/components/Model";
 import Avatar from "./Avatar";
 import { Buildings } from "./Building";
-import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, QuakeDebris } from "./Effects";
+import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, Landslide, QuakeDebris, Rain, Vortex } from "./Effects";
 import { fadeTo, hides } from "./fade";
-import { getState, player, predict, useDrill } from "./drillStore";
+import { drillTime, getState, player, predict, run, useDrill } from "./drillStore";
 import { interact, wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
@@ -121,22 +132,55 @@ function Tree({ x, z, i, fade }: { x: number; z: number; i: number; fade: boolea
   const [cx, cz] = tileCenter(x, z);
   useFrame((_, dt) => {
     const g = ref.current;
-    if (!g || !fade) return;
+    if (!g) return;
+    // Trees lean in a storm and thrash as the whirlwind passes close.
+    const s = getState();
+    const storm = s.phase !== "idle" && s.scenario.kind === "angin";
+    const v = storm ? vortexAt(run.timeline, drillTime()) : null;
+    const gust = storm ? 0.05 + (v ? 0.35 * Math.exp(-Math.hypot(v[0] - cx, v[1] - cz) / 25) : 0) : 0;
+    const now = Date.now() / 1000;
+    g.rotation.z = gust * (0.6 + 0.4 * Math.sin(now * 3.1 + i));
+    g.rotation.x = gust * 0.4 * Math.sin(now * 2.3 + i * 1.7);
+    if (!fade) return;
     const target = hides(camera.position, tileElevation(x, z) + height, cx - 2.1, cz - 2.1, cx + 2.1, cz + 2.1) ? 0.3 : 1;
     if (Math.abs(opacity.current - target) < 0.01) return;
     opacity.current += (target - opacity.current) * (1 - Math.exp(-dt * 10));
     fadeTo(g, opacity.current);
   });
   return (
-    <group ref={ref}>
-      <Model
-        src={M.trees[i % M.trees.length]}
-        fit={{ height }}
-        ownMaterials={fade}
-        position={[cx, tileElevation(x, z), cz]}
-        rotation-y={(x * 13 + z * 7) % 6}
-      />
+    <group ref={ref} position={[cx, tileElevation(x, z), cz]}>
+      <Model src={M.trees[i % M.trees.length]} fit={{ height }} ownMaterials={fade} rotation-y={(x * 13 + z * 7) % 6} />
     </group>
+  );
+}
+
+const STORM_SKY = new Color("#5b6670");
+
+// Whirlwinds and landslides come with storms: a low grey sky over the sunset, closer fog, a weak sun.
+function Storm() {
+  const ref = useRef<Mesh>(null);
+  const clear = useRef<{ color: Color; near: number; far: number } | null>(null);
+  useFrame(({ scene, camera }) => {
+    const s = getState();
+    const on = s.phase !== "idle" && (s.scenario.kind === "angin" || s.scenario.kind === "longsor");
+    const fog = scene.fog as Fog | null;
+    if (fog) {
+      clear.current ??= { color: fog.color.clone(), near: fog.near, far: fog.far };
+      fog.color.copy(on ? STORM_SKY : clear.current.color);
+      fog.near = on ? 30 : clear.current.near;
+      fog.far = on ? 240 : clear.current.far;
+    }
+    const m = ref.current;
+    if (!m) return;
+    m.visible = on;
+    m.position.copy(camera.position);
+  });
+  // Drawn after the rest of the scene so it covers only the sky, which writes no depth.
+  return (
+    <mesh ref={ref} visible={false} renderOrder={1}>
+      <sphereGeometry args={[600, 24, 16]} />
+      <meshBasicMaterial color={STORM_SKY} side={BackSide} fog={false} depthWrite={false} />
+    </mesh>
   );
 }
 
@@ -299,7 +343,10 @@ function Sun({
   // Following the player keeps one shadow map sharp across the whole site; whole metres stop the edges shimmering.
   useFrame(() => {
     const light = ref.current;
-    if (!follow || !light) return;
+    if (!light) return;
+    const s = getState();
+    light.intensity = s.phase !== "idle" && (s.scenario.kind === "angin" || s.scenario.kind === "longsor") ? 0.7 : 2.2;
+    if (!follow) return;
     const x = Math.round(player.x);
     const z = Math.round(player.z);
     light.target.position.set(x, 0, z);
@@ -366,6 +413,7 @@ export default function World({
       aria-label="Kampus sekolah"
     >
       <Backdrop follow />
+      <Storm />
       <Scenery />
       <Terrain />
       <Coast />
@@ -376,6 +424,9 @@ export default function World({
       <GlassShards />
       <DoorRubble />
       <FloodDebris />
+      <Landslide />
+      <Vortex />
+      <Rain />
       <Beacons />
       <AssemblyPoints safe={goals} />
       <Warden />

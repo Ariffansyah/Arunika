@@ -1,15 +1,15 @@
 "use client";
 
-import { useFrame } from "@react-three/fiber";
-import { Suspense, useLayoutEffect, useRef } from "react";
-import { Color, Object3D, type Group, type InstancedMesh, type Mesh } from "three";
+import { useFrame, useThree } from "@react-three/fiber";
+import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
+import { Color, DoubleSide, Object3D, PlaneGeometry, type Group, type InstancedMesh, type Mesh } from "three";
 import Character, { type Anim, type Look } from "@/components/Character";
 import Model, { M } from "@/components/Model";
 import { ASSEMBLY, TILE, W, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
 import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
-import { random, waterLevel } from "@/lib/sim";
-import { CLASSMATE_SEATS, aftershockAt, drillTime, getState, roomSeats, run, shakingAt } from "./drillStore";
+import { RUNOUT, random, vortexAt, waterLevel, within } from "@/lib/sim";
+import { CLASSMATE_SEATS, SIGNS, aftershockAt, drillTime, getState, roomSeats, run, shakingAt } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
 
 const wading = (x: number, z: number, layer = 0) => {
@@ -83,7 +83,7 @@ function Classmate({ i }: { i: number }) {
         st.layer = layerAt(st.x, st.z, st.layer);
         st.heading = Math.atan2(mx, mz);
         st.anim = "walk";
-      } else st.anim = "idle";
+      } else st.anim = within(run.timeline.wind, t) ? "crouch" : "idle";
     }
     mates[i].x = st.x;
     mates[i].z = st.z;
@@ -340,5 +340,202 @@ export function DoorRubble() {
       <boxGeometry />
       <meshStandardMaterial color="#ffffff" />
     </instancedMesh>
+  );
+}
+
+const DROPS = 1400;
+
+// Rain falls in a box that travels with the camera, so a few hundred streaks read as a downpour anywhere.
+export function Rain() {
+  const ref = useRef<InstancedMesh>(null);
+  const camera = useThree((s) => s.camera);
+  const drops = useMemo(() => {
+    const rnd = random(11);
+    return Array.from({ length: DROPS }, () => [rnd() * 60 - 30, rnd() * 30, rnd() * 60 - 30, 9 + rnd() * 4]);
+  }, []);
+  const o = useMemo(() => new Object3D(), []);
+  useFrame(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    const s = getState();
+    const kind = s.scenario.kind;
+    const on = s.phase !== "idle" && (kind === "longsor" || kind === "angin");
+    mesh.visible = on;
+    if (!on) return;
+    const now = Date.now() / 1000;
+    const count = kind === "longsor" ? DROPS : DROPS / 2;
+    const lean = kind === "angin" ? 0.45 : 0.08;
+    const c = camera.position;
+    for (let i = 0; i < count; i++) {
+      const [dx, dy, dz, v] = drops[i];
+      const y = 30 - ((dy + now * v) % 30);
+      o.position.set(c.x + dx + y * lean, c.y - 12 + y, c.z + dz);
+      o.rotation.set(0, 0, lean);
+      o.updateMatrix();
+      mesh.setMatrixAt(i, o.matrix);
+    }
+    mesh.count = count;
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, DROPS]} frustumCulled={false} visible={false}>
+      <boxGeometry args={[0.02, 0.7, 0.02]} />
+      <meshBasicMaterial color="#c7d3dc" transparent opacity={0.5} />
+    </instancedMesh>
+  );
+}
+
+const FUNNEL = [
+  [3, 5],
+  [5, 8],
+  [8, 12],
+  [12, 16],
+  [16, 21],
+  [21, 26],
+];
+const SWIRL = 90;
+
+// The whirlwind: a widening funnel of dust carrying roof sheets and branches round and up as it crosses.
+export function Vortex() {
+  const ref = useRef<Group>(null);
+  const debris = useRef<InstancedMesh>(null);
+  const o = useMemo(() => new Object3D(), []);
+  useFrame(() => {
+    const g = ref.current;
+    const mesh = debris.current;
+    const s = getState();
+    if (!g || !mesh) return;
+    const v = s.phase !== "idle" && s.scenario.kind === "angin" ? vortexAt(run.timeline, drillTime()) : null;
+    g.visible = !!v;
+    if (!v) return;
+    const now = Date.now() / 1000;
+    g.position.set(v[0], elevationAt(v[0], v[1]), v[1]);
+    g.children.forEach((c, i) => {
+      if (c !== mesh) c.rotation.y = now * (1.6 + i * 0.35);
+    });
+    for (let k = 0; k < SWIRL; k++) {
+      const h = (k * 7.3) % 50;
+      const a = now * (2.2 - h * 0.025) + k * 2.4;
+      const r = 3 + h * 0.4 + (k % 4);
+      o.position.set(Math.cos(a) * r, h + Math.sin(now * 3 + k) * 0.8, Math.sin(a) * r);
+      o.rotation.set(now * 3 + k, now * 2 + k, k);
+      o.updateMatrix();
+      mesh.setMatrixAt(k, o.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <group ref={ref} visible={false}>
+      {FUNNEL.map(([bottom, top], i) => (
+        <mesh key={i} position={[0, 5 + i * 10, 0]}>
+          <cylinderGeometry args={[top, bottom, 10, 24, 1, true]} />
+          <meshStandardMaterial color={i % 2 ? "#6b7178" : "#7d838a"} transparent opacity={0.34 - i * 0.03} side={DoubleSide} depthWrite={false} />
+        </mesh>
+      ))}
+      <instancedMesh ref={debris} args={[undefined, undefined, SWIRL]} frustumCulled={false}>
+        <boxGeometry args={[0.7, 0.05, 0.45]} />
+        <meshStandardMaterial color="#59626b" />
+      </instancedMesh>
+    </group>
+  );
+}
+
+const SLIDE_S = 6;
+const ROCKS = 36;
+
+// Warning signs on the hill, then the slope giving way over the court and the end of the office.
+export function Landslide() {
+  const signs = useRef<(Group | null)[]>([]);
+  const mass = useRef<Mesh>(null);
+  const rocks = useRef<InstancedMesh>(null);
+  const shaped = useRef(-1);
+  const o = useMemo(() => new Object3D(), []);
+  const { ax, az, bx, r } = RUNOUT;
+  const [x0, x1, z0, z1] = [bx - r, ax + 4, az - r, az + r];
+  const geometry = useMemo(() => {
+    const geo = new PlaneGeometry(x1 - x0, z1 - z0, 64, 28);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+    return geo;
+  }, [x0, x1, z0, z1]);
+
+  useFrame(() => {
+    const s = getState();
+    const on = s.phase !== "idle" && s.scenario.kind === "longsor";
+    const t = on ? drillTime() : -Infinity;
+    signs.current.forEach((g, i) => {
+      if (!g) return;
+      g.visible = t >= run.timeline.signs[i];
+      // The second sign is a tree leaning further downhill as the ground creeps.
+      if (i === 1) g.rotation.z = Math.min(0.4, Math.max(0, t - run.timeline.signs[1]) * 0.012);
+    });
+    const slide = run.timeline.slide;
+    const p = on && slide !== null ? Math.min(1, Math.max(0, (t - slide) / SLIDE_S)) : 0;
+    const m = mass.current;
+    const rk = rocks.current;
+    if (!m || !rk) return;
+    m.visible = rk.visible = p > 0;
+    if (p === 0 || shaped.current === p) return;
+    shaped.current = p;
+    // Earth runs from the hilltop down the runout: thickest along its middle, arriving front first.
+    const pos = m.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const along = (ax - x) / (ax - bx);
+      const across = Math.abs(z - az) / r;
+      const depth = across < 1 && along >= -0.15 ? 1.6 * (1 - across * across) * Math.min(1, Math.max(0, (p * 1.15 - along) * 4)) : 0;
+      pos.setY(i, elevationAt(x, z) + (depth > 0.05 ? depth : -1));
+    }
+    pos.needsUpdate = true;
+    m.geometry.computeVertexNormals();
+    for (let k = 0; k < ROCKS; k++) {
+      const along = ((k * 0.618) % 1) * p;
+      const x = ax - (ax - bx) * along;
+      const z = az + (((k * 0.37) % 1) - 0.5) * r * 1.4;
+      const size = 0.4 + ((k * 0.73) % 1) * 0.8;
+      o.position.set(x, elevationAt(x, z) + 1 + size / 2, z);
+      o.rotation.set(p * 9 + k, p * 7 + k, k);
+      o.scale.setScalar(size);
+      o.updateMatrix();
+      rk.setMatrixAt(k, o.matrix);
+    }
+    rk.instanceMatrix.needsUpdate = true;
+  });
+
+  const [crack, tree, spring] = SIGNS;
+  return (
+    <>
+      <group ref={(g) => void (signs.current[0] = g)} visible={false} position={[crack.x, elevationAt(crack.x, crack.z) + 0.03, crack.z]}>
+        {[0, 1, 2].map((k) => (
+          <mesh key={k} position={[k * 0.9 - 0.9, 0, k * 0.6 - 0.6]} rotation-y={0.5 + k * 0.35}>
+            <boxGeometry args={[0.14, 0.06, 4.5 - k]} />
+            <meshStandardMaterial color="#2c1f15" />
+          </mesh>
+        ))}
+      </group>
+      <group ref={(g) => void (signs.current[1] = g)} visible={false} position={[tree.x, elevationAt(tree.x, tree.z), tree.z]}>
+        <Suspense fallback={null}>
+          <Model src={M.trees[1]} fit={{ height: 7 }} />
+        </Suspense>
+      </group>
+      <group ref={(g) => void (signs.current[2] = g)} visible={false} position={[spring.x, elevationAt(spring.x, spring.z) + 0.04, spring.z]}>
+        <mesh rotation-x={-Math.PI / 2}>
+          <circleGeometry args={[1.4, 24]} />
+          <meshStandardMaterial color="#7a5a3c" transparent opacity={0.85} />
+        </mesh>
+        <mesh rotation-x={-Math.PI / 2} position={[-2.6, 0.01, 0]}>
+          <planeGeometry args={[4.4, 0.7]} />
+          <meshStandardMaterial color="#7a5a3c" transparent opacity={0.75} />
+        </mesh>
+      </group>
+      <mesh ref={mass} geometry={geometry} visible={false} castShadow receiveShadow>
+        <meshStandardMaterial color="#6b4a2f" roughness={1} flatShading />
+      </mesh>
+      <instancedMesh ref={rocks} args={[undefined, undefined, ROCKS]} visible={false} castShadow frustumCulled={false}>
+        <dodecahedronGeometry args={[0.5, 0]} />
+        <meshStandardMaterial color="#5b5148" flatShading />
+      </instancedMesh>
+    </>
   );
 }
