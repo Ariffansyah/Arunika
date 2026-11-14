@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import Groq from "groq-sdk";
 
 // Chat needs speed and good Indonesian; the analyzer needs image input and JSON-schema output.
-export const CHAT_MODEL = "llama-3.3-70b-versatile";
+export const CHAT_MODEL = "qwen/qwen3.8-27b";
 export const VISION_MODEL = "qwen/qwen3.8-27b";
 
 let client: Groq | null = null;
