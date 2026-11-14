@@ -12,7 +12,8 @@ const never = () => () => {};
 const thisYear = () => new Date().getFullYear();
 
 export default function PlanDemo() {
-  const [scenario, setScenario] = useState<Scenario>({ kind: "banjir", intensity: 1 });
+  // The plan demo shows the two hazards that change the map: flood water and quake debris.
+  const [scenario, setScenario] = useState<Scenario & { kind: "banjir" | "gempa" }>({ kind: "banjir", intensity: 1 });
   // Prerendering may not read the clock. The year only sets building age, which the default flood view ignores,
   // so the server renders with 0 and the browser switches to the real year after hydration.
   const year = useSyncExternalStore(never, thisYear, () => 0);

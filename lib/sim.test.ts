@@ -6,11 +6,13 @@ import {
   campusRisks,
   grade,
   hazardTiles,
+  inRunout,
   pathLength,
   safeAssembly,
   scoreDrill,
   shakeSeconds,
   timeline,
+  vortexAt,
   type Scenario,
   type Tracked,
 } from "./sim.ts";
@@ -74,6 +76,15 @@ const model: Tracked = {
   powerOff: true,
   alarm: true,
   deepWaterS: 0,
+  sheltered: true,
+  windS: 15,
+  windCoverS: 15,
+  windWindowS: 0,
+  windExposedS: 0,
+  leftShelter: false,
+  signSeen: true,
+  caught: false,
+  slopeS: 0,
 };
 
 test("earthquake checklist: a model drill scores 1000+, ducking in the open scores less, not reporting scores 0", () => {
@@ -115,4 +126,28 @@ test("assessment parser rejects junk and clamps scores", () => {
   assert.equal(a?.score, 100);
   assert.equal(a?.observations.length, 1);
   assert.equal(a?.recommendations.length, 1);
+});
+
+test("whirlwind and landslide checklists total 1000 and fail the deadly mistakes", () => {
+  for (const kind of ["angin", "longsor"] as const) assert.equal(grade(kind, model).reduce((sum, c) => sum + c.max, 0), 1000);
+  assert.ok(!grade("angin", { ...model, sheltered: false }).find((c) => c.max === 300)!.ok);
+  assert.ok(!grade("longsor", { ...model, caught: true }).find((c) => c.max === 300)!.ok);
+});
+
+test("a landslide makes the hill unsafe, so the field is the only assembly point", () => {
+  const s: Scenario = { kind: "longsor", intensity: 200 };
+  const goals = safeAssembly(s, hazardTiles(s, campusRisks(main, site, s, 2026)));
+  assert.deepEqual(goals.map((g) => tileAt(...g)), ["B"]);
+  const risks = campusRisks(main, site, s, 2026);
+  assert.ok(risks["3"] > risks["1"], "the office at the foot of the slope is more at risk than the far classrooms");
+});
+
+test("a whirlwind has no open-air assembly point and crosses the campus on a seeded path", () => {
+  const s: Scenario = { kind: "angin", intensity: 110 };
+  assert.deepEqual(safeAssembly(s, hazardTiles(s, campusRisks(main, site, s, 2026))), []);
+  const tl = timeline(s, 7);
+  assert.equal(vortexAt(tl, tl.wind![0] - 1), null);
+  const mid = vortexAt(tl, (tl.wind![0] + tl.wind![1]) / 2)!;
+  assert.ok(mid[0] > 0 && mid[0] < 120, "halfway through, it is over the campus");
+  assert.ok(inRunout(103.5, 16.5) && !inRunout(64.5, 52.5));
 });

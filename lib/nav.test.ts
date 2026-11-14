@@ -56,6 +56,19 @@ test("in a flood, a ground-floor class climbs to the upper floor, not into the s
   assert.ok(end[1] > PLAN.floorY["1"] + 3.9, "route ends a storey up");
 });
 
+test("every seat can reach a whirlwind shelter room", () => {
+  const shelters = PLAN.rooms.filter((r) => r.shelter);
+  const field = flowField((layer, k) => {
+    const [x, z] = cellCenter(k);
+    return shelters.some((r) => r.floor === layer && x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+  }, () => false);
+  for (const s of PLAN.seats) {
+    const layer = seatLayer(s.room);
+    const d = Math.min(...[-0.5, 0, 0.5].flatMap((dx) => [-0.5, 0, 0.5].map((dz) => distanceAt(field, s.x + dx, s.z + dz, layer))));
+    assert.ok(Number.isFinite(d), `seat in ${s.room}`);
+  }
+});
+
 test("routes never pass through a wall", () => {
   for (const room of classrooms()) {
     const seat = PLAN.seats.find((s) => s.room === room.id)!;

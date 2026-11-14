@@ -17,7 +17,19 @@ export type Box = { x0: number; x1: number; y0: number; y1: number; z0: number; 
 export type Part = Box & { kind: PartKind; b: string; floor: number; color?: string };
 export type PartKind = "wall" | "glass" | "floor" | "column" | "rail" | "step" | "board" | "trim" | "under" | "roof";
 export type RoomKind = "kelas" | "selasar" | "tangga" | "wc" | "guru" | "tu" | "kepsek" | "perpustakaan" | "kantin" | "dapur" | "musholla";
-export type Room = { id: string; b: string; floor: number; kind: RoomKind; name: string; x0: number; z0: number; x1: number; z1: number };
+// `shelter` rooms have no windows or only small high ones: where to sit out a whirlwind.
+export type Room = {
+  id: string;
+  b: string;
+  floor: number;
+  kind: RoomKind;
+  name: string;
+  x0: number;
+  z0: number;
+  x1: number;
+  z1: number;
+  shelter: boolean;
+};
 // `out` points from the room side through the doorway.
 export type Door = { id: string; b: string; floor: number; x: number; z: number; along: "x" | "z"; w: number; y: number; out: [number, number] };
 export type Pane = { b: string; floor: number; x: number; z: number; along: "x" | "z"; w: number; y0: number; y1: number };
@@ -153,9 +165,9 @@ class Storey {
     if (cur < a1) put("wall", cur, a1, this.y0, top);
   }
 
-  room(kind: RoomKind, name: string, u0: number, u1: number, v0: number, v1: number) {
+  room(kind: RoomKind, name: string, u0: number, u1: number, v0: number, v1: number, shelter = false) {
     const id = `${this.b}-${this.floor}-${this.plan.rooms.length}`;
-    this.plan.rooms.push({ id, b: this.b, floor: this.floor, kind, name, ...area(this.F, u0, u1, v0, v1) });
+    this.plan.rooms.push({ id, b: this.b, floor: this.floor, kind, name, ...area(this.F, u0, u1, v0, v1), shelter });
     return id;
   }
 
@@ -244,9 +256,9 @@ function kelas(plan: Plan, F: Frame, b: string, y00: number, base: number) {
     s.wall("u", 0, L, CORRIDOR, vIn, front, s.y1, [1, 6]);
     for (const u of [9, 18, end]) s.wall("v", vIn, D - WALL, u - WALL / 2, u + WALL / 2);
     CLASS_NAMES[b][f].forEach((name, i) => classroom(s, i * 9, name));
-    if (stairs) s.room("tangga", "Tangga", end, L, vIn, D);
+    if (stairs) s.room("tangga", "Tangga", end, L, vIn, D, true);
     else {
-      s.room("wc", "Toilet", end, L, vIn, D);
+      s.room("wc", "Toilet", end, L, vIn, D, true);
       for (const u of [27.8, 29.1]) s.item("toilet", u, 11.25, 0, -1, [0.5, 0.8, 0.7]);
       s.item("bathroomSink", 29.45, 4, -1, 0, [0.55, 0.9, 0.45]);
     }
@@ -298,7 +310,7 @@ function kantor(plan: Plan, F: Frame, b: string, y00: number) {
   for (const u of [1.3, 2.6, 3.9]) s.item("bookcaseClosedDoors", u, D - WALL - 0.25, 0, -1, [1.1, 1.9, 0.45]);
   s.item("pottedPlant", 11.3, 11.2, 0, -1, [0.5, 1.1, 0.5], false);
 
-  s.room("tu", "Tata Usaha", 12, 18, vIn, D - WALL);
+  s.room("tu", "Tata Usaha", 12, 18, vIn, D - WALL, true);
   for (const u of [14, 16.5]) {
     s.item("desk", u, 5.6, 0, -1, [1.2, 0.75, 0.6]);
     s.item("chairDesk", u, 6.25, 0, -1, [0.6, 0.95, 0.6], false);
@@ -315,7 +327,8 @@ function kantor(plan: Plan, F: Frame, b: string, y00: number) {
   s.item("bookcaseClosedDoors", 22.6, D - WALL - 0.25, 0, -1, [1.1, 1.9, 0.45]);
   s.item("pottedPlant", 23.3, 3.2, 0, 1, [0.5, 1.1, 0.5], false);
 
-  s.spot("kentongan", 15, 1.1, 0, 1, 1.2);
+  // At the end of the corridor away from the hill, out of a landslide's reach.
+  s.spot("kentongan", 6, 1.1, 0, 1, 1.2);
 }
 
 function perpustakaan(plan: Plan, F: Frame, b: string, y00: number) {

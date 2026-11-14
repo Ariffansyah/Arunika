@@ -3,7 +3,9 @@ import {
   BLOCKED_CHARS,
   BUILDINGS,
   H,
+  TILE,
   W,
+  buildingRects,
   idx,
   isBlocked,
   tileAt,
@@ -13,17 +15,28 @@ import {
   type Tile,
 } from "./campus.ts";
 
-export type Scenario = { kind: "banjir" | "gempa"; intensity: number };
+export type Scenario = { kind: "gempa" | "banjir" | "angin" | "longsor"; intensity: number };
 
 export type Site = { soil: Soil; coast_km: number; rain_30d_mm: number };
 export type Structure = { floors: number; material: Material; built_year: number };
 
-export const SCENARIO_LABEL = { banjir: "Banjir Rob", gempa: "Gempa Bumi" } as const;
+export const SCENARIO_LABEL = { gempa: "Gempa Bumi", banjir: "Banjir Rob", angin: "Angin Puting Beliung", longsor: "Tanah Longsor" } as const;
 
 export const INTENSITY = {
-  gempa: { range: [5, 8] as [number, number], step: 0.1, label: "Magnitudo", unit: "" },
-  banjir: { range: [0.5, 2] as [number, number], step: 0.1, label: "Tinggi air", unit: "m" },
+  gempa: { range: [5, 8] as [number, number], step: 0.1, label: "Magnitudo", unit: "", start: 6.5 },
+  banjir: { range: [0.5, 2] as [number, number], step: 0.1, label: "Tinggi air", unit: "m", start: 1 },
+  angin: { range: [60, 150] as [number, number], step: 5, label: "Kecepatan angin", unit: "km/jam", start: 110 },
+  longsor: { range: [50, 300] as [number, number], step: 10, label: "Curah hujan", unit: "mm/hari", start: 200 },
 };
+
+// Where the north hill's west face would slide: from beyond its top, over the court, to the end of the office.
+export const RUNOUT = { ax: 110, az: 15, bx: 74, bz: 15, r: 14 };
+
+export function inRunout(x: number, z: number) {
+  const { ax, az, bx, bz, r } = RUNOUT;
+  const t = Math.min(1, Math.max(0, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2)));
+  return Math.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)) < r;
+}
 
 // Heuristic weights, not a trained model: they encode the direction of each factor
 // (soft soil amplifies shaking, unreinforced brick fails first, upper floors give flood refuge).
@@ -39,33 +52,61 @@ const MATERIAL_FLOOD: Record<Material, number> = {
   kayu: 1.2,
   bata_tanpa_tulangan: 0.8,
 };
+// Light steel and timber roofs are stripped first by strong wind.
+const MATERIAL_WIND: Record<Material, number> = {
+  beton_bertulang: 0,
+  bata_tanpa_tulangan: 0.8,
+  kayu: 1.4,
+  baja_ringan: 2.2,
+};
 const SOIL: Record<Soil, number> = { keras: 0, sedang: 0.6, lunak: 1.4 };
 
 const logistic = (z: number) => 100 / (1 + Math.exp(-z));
 
-export function structureRisk(b: Structure, site: Site, s: Scenario, year = new Date().getFullYear()) {
+// `slope` is how exposed a building is to the landslide runout, from 0 (far) to 1 (inside it).
+export function structureRisk(b: Structure, site: Site, s: Scenario, year = new Date().getFullYear(), slope = 0) {
   const age = Math.max(0, year - b.built_year);
   const z =
     s.kind === "gempa"
       ? -4.5 + 1.5 * (s.intensity - 5) + MATERIAL_QUAKE[b.material] + SOIL[site.soil] + 0.03 * age + 0.3 * (b.floors - 1)
-      : -4 +
-        2.2 * s.intensity +
-        MATERIAL_FLOOD[b.material] +
-        1.5 / (1 + site.coast_km) +
-        (0.8 * site.rain_30d_mm) / 300 +
-        0.02 * age -
-        0.6 * (b.floors - 1);
+      : s.kind === "banjir"
+        ? -4 +
+          2.2 * s.intensity +
+          MATERIAL_FLOOD[b.material] +
+          1.5 / (1 + site.coast_km) +
+          (0.8 * site.rain_30d_mm) / 300 +
+          0.02 * age -
+          0.6 * (b.floors - 1)
+        : s.kind === "angin"
+          ? -5 + 0.04 * (s.intensity - 60) + MATERIAL_WIND[b.material] + 0.02 * age + 0.2 * (b.floors - 1)
+          : -6 + 0.012 * (s.intensity - 50) + SOIL[site.soil] + 0.01 * age + 7 * slope;
   return Math.round(logistic(z));
+}
+
+// Share of a footprint (in tiles) that lies in the landslide runout.
+function slopeExposure(x0: number, z0: number, x1: number, z1: number) {
+  let inside = 0;
+  let all = 0;
+  for (let z = z0; z <= z1; z++) {
+    for (let x = x0; x <= x1; x++) {
+      all++;
+      if (inRunout((x + 0.5) * TILE, (z + 0.5) * TILE)) inside++;
+    }
+  }
+  return inside / all;
 }
 
 export function campusRisks(main: Structure, site: Site, s: Scenario, year?: number) {
   const out: Record<string, number> = {};
+  const rects = buildingRects();
   for (const [id, b] of Object.entries(BUILDINGS)) {
+    const r = rects[id];
     out[id] = structureRisk(
       { floors: b.floors, material: b.material ?? main.material, built_year: main.built_year + b.yearOffset },
       site,
       s,
       year,
+      s.kind === "longsor" ? slopeExposure(r.x0, r.z0, r.x1, r.z1) : 0,
     );
   }
   return out;
@@ -78,6 +119,15 @@ export function hazardTiles(s: Scenario, risks: Record<string, number>, waterLev
       if (isBlocked(x, z)) continue;
       if (s.kind === "banjir") {
         if (tileElevation(x, z) < waterLevel) out.add(idx(x, z));
+        continue;
+      }
+      if (s.kind === "longsor") {
+        if (inRunout((x + 0.5) * TILE, (z + 0.5) * TILE)) out.add(idx(x, z));
+        continue;
+      }
+      if (s.kind === "angin") {
+        // Falling branches and whole trees: stay clear of them in a whirlwind.
+        if (nearChar(x, z, "T", 1)) out.add(idx(x, z));
         continue;
       }
       for (const [id, risk] of Object.entries(risks)) {
@@ -94,7 +144,9 @@ function nearChar(x: number, z: number, c: string, r: number) {
   return false;
 }
 
+// A whirlwind is sat out indoors, so it has no safe open-air assembly point.
 export function safeAssembly(s: Scenario, hazards: Set<number>): Tile[] {
+  if (s.kind === "angin") return [];
   return ASSEMBLY.filter(([x, z]) =>
     s.kind === "banjir" ? tileElevation(x, z) > s.intensity + 0.2 : !hazards.has(idx(x, z)),
   );
@@ -186,18 +238,59 @@ export function random(seed: number) {
 }
 
 export type Window = [from: number, to: number];
-export type Timeline = { shake: Window | null; aftershock: Window | null; limit: number };
+export type Timeline = {
+  shake: Window | null;
+  aftershock: Window | null;
+  // When the whirlwind is over the campus, and the line it travels along.
+  wind: Window | null;
+  path: [[number, number], [number, number]] | null;
+  // When warning signs show on the hill, and when the slope gives way.
+  signs: number[];
+  slide: number | null;
+  limit: number;
+};
+
+export const NONE: Timeline = { shake: null, aftershock: null, wind: null, path: null, signs: [], slide: null, limit: 240 };
+// A whirlwind crosses at about 8 m/s; the campus is 120 m wide.
+export const VORTEX_SPEED = 8;
 
 // Compressed real behaviour: a bigger quake shakes longer, and a strong one is followed by an aftershock.
 export const shakeSeconds = (magnitude: number) => 6 + (magnitude - 5) * 5;
 
 export function timeline(s: Scenario, seed: number): Timeline {
   const rnd = random(seed);
-  if (s.kind !== "gempa") return { shake: null, aftershock: null, limit: 240 };
-  const shake = shakeSeconds(s.intensity);
-  const at = shake + 20 + rnd() * 15;
-  return { shake: [0, shake], aftershock: s.intensity >= 6 ? [at, at + 3 + (s.intensity - 5)] : null, limit: 240 };
+  if (s.kind === "gempa") {
+    const shake = shakeSeconds(s.intensity);
+    const at = shake + 20 + rnd() * 15;
+    return { ...NONE, shake: [0, shake], aftershock: s.intensity >= 6 ? [at, at + 3 + (s.intensity - 5)] : null };
+  }
+  if (s.kind === "angin") {
+    // Stronger wind comes on faster: 35 to 55 s of warning.
+    const arrive = 55 - ((s.intensity - 60) / 90) * 20;
+    const path: Timeline["path"] = [
+      [-40, 10 + rnd() * 64],
+      [160, 10 + rnd() * 64],
+    ];
+    const cross = Math.hypot(path[1][0] - path[0][0], path[1][1] - path[0][1]) / VORTEX_SPEED;
+    return { ...NONE, wind: [arrive, arrive + cross], path };
+  }
+  if (s.kind === "longsor") {
+    // More rain, sooner failure: 60 to 90 s after the drill starts.
+    const slide = 90 - ((s.intensity - 50) / 250) * 30;
+    return { ...NONE, signs: [0.15, 0.35, 0.55].map((f) => f * slide), slide };
+  }
+  return NONE;
 }
+
+// Where the whirlwind is at time t (it starts 40 m outside the campus), or null before it forms and after it leaves.
+export function vortexAt(tl: Timeline, t: number): [number, number] | null {
+  if (!tl.wind || !tl.path || t < tl.wind[0] || t > tl.wind[1]) return null;
+  const f = (t - tl.wind[0]) / (tl.wind[1] - tl.wind[0]);
+  const [[ax, az], [bx, bz]] = tl.path;
+  return [ax + (bx - ax) * f, az + (bz - az) * f];
+}
+
+export const vortexRadius = (s: Scenario) => 10 + ((s.intensity - 60) / 90) * 8;
 
 export const within = (w: Window | null, t: number) => !!w && t >= w[0] && t < w[1];
 
@@ -218,6 +311,15 @@ export type Tracked = {
   powerOff: boolean;
   alarm: boolean;
   deepWaterS: number;
+  sheltered: boolean;
+  windS: number;
+  windCoverS: number;
+  windWindowS: number;
+  windExposedS: number;
+  leftShelter: boolean;
+  signSeen: boolean;
+  caught: boolean;
+  slopeS: number;
 };
 
 export type Check = { label: string; ok: boolean; got: number; max: number };
@@ -243,6 +345,25 @@ export function grade(kind: Scenario["kind"], t: Tracked): Check[] {
       check("Tidak kembali masuk gedung", 100, t.reentered ? 0 : 1),
       check("Menghindari reruntuhan di luar gedung", 100, 1 - t.debrisS / 10, t.debrisS < 2),
       check("Merunduk di luar gedung saat gempa susulan", 100, t.aftershockIndoorS < 1 ? after : 0),
+      check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0),
+    ];
+  }
+  if (kind === "angin") {
+    return [
+      check("Masuk ke ruang aman sebelum angin tiba", 300, t.sheltered ? 1 : 0),
+      check("Menjauhi jendela saat angin melintas", 150, t.windWindowS < 1 ? 1 : 0),
+      check("Merunduk dan melindungi kepala", 150, t.windS ? t.windCoverS / t.windS / 0.5 : 0),
+      check("Tidak di luar atau di kantin saat angin", 150, t.windExposedS < 1 ? 1 : 0),
+      check("Tetap di ruang aman sampai angin reda", 100, t.leftShelter ? 0 : 1),
+      check("Lapor ke guru setelah angin reda", 150, t.reached ? 1 : 0),
+    ];
+  }
+  if (kind === "longsor") {
+    return [
+      check("Memeriksa tanda longsor di lereng", 150, t.signSeen ? 1 : 0),
+      check("Membunyikan kentongan", 150, t.alarm ? 1 : 0),
+      check("Menjauh dari lereng sebelum longsor", 300, t.caught ? 0 : 1),
+      check("Tidak naik ke bukit atau mendekati lereng", 200, t.slopeS < 2 ? 1 : 0),
       check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0),
     ];
   }

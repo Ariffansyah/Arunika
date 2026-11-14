@@ -30,7 +30,7 @@ create table if not exists public.drill_results (
   user_id uuid references public.profiles (id) on delete cascade,
   school_id uuid references public.schools (id),
   room text not null,
-  scenario text not null check (scenario in ('banjir', 'gempa')),
+  scenario text not null check (scenario in ('gempa', 'banjir', 'angin', 'longsor')),
   intensity double precision not null,
   score int not null check (score between 0 and 1200),
   time_s double precision not null,
@@ -48,6 +48,10 @@ create table if not exists public.assessments (
   result jsonb not null,
   created_at timestamptz not null default now()
 );
+
+-- Databases created before the whirlwind and landslide drills still carry the old two-scenario check.
+alter table public.drill_results drop constraint if exists drill_results_scenario_check;
+alter table public.drill_results add constraint drill_results_scenario_check check (scenario in ('gempa', 'banjir', 'angin', 'longsor'));
 
 create index if not exists drill_results_room_idx on public.drill_results (room, scenario, score desc);
 create index if not exists assessments_school_idx on public.assessments (school_id, created_at desc);
