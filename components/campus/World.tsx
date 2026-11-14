@@ -48,6 +48,7 @@ import { drillTime, getState, player, predict, run, useDrill } from "./drillStor
 import { interact, wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
+import { LOOK } from "./Horizon";
 import RemotePlayers from "./RemotePlayers";
 import type { Peer } from "./useRoom";
 
@@ -247,11 +248,19 @@ const RAIL_POSTS: Placed[] = RAIL_PIECES.map((p) => ({
 
 const TREES = findTiles("T");
 
+// Shade trees on the coast with the odd palm, pines among them in the mountains, shade trees in the city.
+const treeKind = (x: number, z: number, i: number) => {
+  const onHill = [-1, 0, 1].some((d) => tileAt(x + d, z) === "h" || tileAt(x, z + d) === "h");
+  if (MAP.id === "pegunungan" && (onHill || i % 3 === 0)) return { src: M.pines[i % M.pines.length], height: 10 + (i % 4) };
+  if (MAP.id === "pesisir" && i % 4 === 3 && !onHill) return { src: M.palms[i % M.palms.length], height: 9 + (i % 3) };
+  return { src: M.trees[i % M.trees.length], height: 7 + ((x * 37 + z * 17) % 10) / 4.5 };
+};
+
 function Tree({ x, z, i, fade }: { x: number; z: number; i: number; fade: boolean }) {
   const ref = useRef<Group>(null);
   const opacity = useRef(1);
   const camera = useThree((s) => s.camera);
-  const height = 7 + ((x * 37 + z * 17) % 10) / 4.5;
+  const { src, height } = treeKind(x, z, i);
   const [cx, cz] = tileCenter(x, z);
   useFrame((_, dt) => {
     const g = ref.current;
@@ -260,7 +269,8 @@ function Tree({ x, z, i, fade }: { x: number; z: number; i: number; fade: boolea
     const s = getState();
     const storm = s.phase !== "idle" && s.scenario.kind === "angin";
     const v = storm ? vortexAt(run.timeline, drillTime()) : null;
-    const gust = storm ? 0.05 + (v ? 0.35 * Math.exp(-Math.hypot(v[0] - cx, v[1] - cz) / 25) : 0) : 0;
+    // A breath of wind on a calm day, so the trees are never frozen.
+    const gust = storm ? 0.05 + (v ? 0.35 * Math.exp(-Math.hypot(v[0] - cx, v[1] - cz) / 25) : 0) : 0.012;
     const now = Date.now() / 1000;
     g.rotation.z = gust * (0.6 + 0.4 * Math.sin(now * 3.1 + i));
     g.rotation.x = gust * 0.4 * Math.sin(now * 2.3 + i * 1.7);
@@ -272,7 +282,7 @@ function Tree({ x, z, i, fade }: { x: number; z: number; i: number; fade: boolea
   });
   return (
     <group ref={ref} position={[cx, tileElevation(x, z), cz]}>
-      <Model src={M.trees[i % M.trees.length]} fit={{ height }} ownMaterials={fade} rotation-y={(x * 13 + z * 7) % 6} />
+      <Model src={src} fit={{ height }} ownMaterials={fade} rotation-y={(x * 13 + z * 7) % 6} />
     </group>
   );
 }
@@ -523,17 +533,19 @@ export function Backdrop({
   sky = [100, 6, -60],
   light,
   fog = [120, 420],
+  fogColor = "#d9b08c",
   follow = false,
 }: {
   sky?: [number, number, number];
   light?: [number, number, number];
   fog?: [number, number];
+  fogColor?: string;
   follow?: boolean;
 }) {
   return (
     <>
       <Sky sunPosition={sky} turbidity={7} rayleigh={2.2} mieCoefficient={0.008} />
-      <fog attach="fog" args={["#d9b08c", ...fog]} />
+      <fog attach="fog" args={[fogColor, ...fog]} />
       <hemisphereLight args={["#ffe2c2", "#22324f", 0.9]} />
       <Sun position={light} follow={follow} />
     </>
@@ -561,7 +573,7 @@ export default function World({
       style={{ touchAction: "none" }}
       aria-label="Kampus sekolah"
     >
-      <Backdrop follow />
+      <Backdrop {...LOOK[MAP.id]} follow />
       <Storm />
       <Scenery />
       <Terrain />

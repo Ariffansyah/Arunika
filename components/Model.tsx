@@ -5,12 +5,15 @@ import { useFrame, type ThreeElements } from "@react-three/fiber";
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { Box3, Matrix4, Vector3, type BufferGeometry, type InstancedMesh, type Material, type Mesh } from "three";
 
-// Kenney kits (CC0), see the LICENSE.txt next to each kit in public/models.
+// Kenney kits and Quaternius's Ultimate Stylized Nature (CC0), see the LICENSE.txt next to each kit in public/models.
+const nature = (names: string[]) => names.map((f) => `/models/nature-q/${f}.glb`);
 export const M = {
-  palms: ["tree_palm", "tree_palmBend", "tree_palmTall", "tree_palmDetailedTall", "tree_palmShort"].map((f) => `/models/nature/${f}.glb`),
-  trees: ["tree_fat", "tree_oak", "tree_default", "tree_detailed"].map((f) => `/models/nature/${f}.glb`),
-  bushes: ["plant_bush", "plant_bushLarge", "plant_bushDetailed"].map((f) => `/models/nature/${f}.glb`),
-  flowers: ["flower_redA", "flower_yellowB"].map((f) => `/models/nature/${f}.glb`),
+  palms: nature(["palm-1", "palm-2", "palm-3", "palm-4", "palm-5"]),
+  trees: nature(["tree-1", "tree-2", "tree-3", "tree-4", "tree-5"]),
+  pines: nature(["pine-1", "pine-2", "pine-3", "pine-4", "pine-5"]),
+  bushes: nature(["bush", "bush-flowers", "plant"]),
+  grass: nature(["grass-small", "grass-large"]),
+  flowers: nature(["flowers-1", "flowers-3", "flowers-4"]),
   rocks: ["rock_largeA", "rock_smallA"].map((f) => `/models/nature/${f}.glb`),
   houses: ["a", "c", "e", "g", "k", "n"].map((f) => `/models/suburban/building-type-${f}.glb`),
   tent: "/models/survival/tent-canvas.glb",
@@ -62,7 +65,7 @@ type Part = { geometry: BufferGeometry; material: Material; local: Matrix4 };
 
 type Tilt = (k: number) => number;
 
-function InstancedPart({ part, items, size, turn, tilt }: { part: Part; items: Placement[]; size: Vector3; turn: number; tilt?: Tilt }) {
+function InstancedPart({ part, items, size, turn, tilt, shadows }: { part: Part; items: Placement[]; size: Vector3; turn: number; tilt?: Tilt; shadows: boolean }) {
   const ref = useRef<InstancedMesh>(null);
   const angles = useRef<number[]>([]);
   const write = useCallback(() => {
@@ -74,7 +77,8 @@ function InstancedPart({ part, items, size, turn, tilt }: { part: Part; items: P
     const x = new Matrix4();
     const s = new Matrix4();
     items.forEach((it, k) => {
-      const [w, h, d] = it.size;
+      const [w0, h, d0] = it.size;
+      const [w, d] = [w0 || (h * size.x) / size.y, d0 || (h * size.z) / size.y];
       const a = angles.current[k] ?? 0;
       s.makeScale((quarter ? d : w) / size.x, h / size.y, (quarter ? w : d) / size.z);
       r.makeRotationY(it.ry);
@@ -101,12 +105,13 @@ function InstancedPart({ part, items, size, turn, tilt }: { part: Part; items: P
     });
     if (moved) write();
   });
-  return <instancedMesh ref={ref} args={[part.geometry, part.material, items.length]} castShadow receiveShadow />;
+  return <instancedMesh ref={ref} args={[part.geometry, part.material, items.length]} castShadow={shadows} receiveShadow={shadows} />;
 }
 
 // Every copy of a model as one InstancedMesh per mesh in it: a few hundred desks stay a handful of draw calls.
-// Each placement stretches the model to its size; `turn` points the model's front along +z; `tilt` topples copies.
-export function Instances({ src, items, turn = 0, tilt }: { src: string; items: Placement[]; turn?: number; tilt?: Tilt }) {
+// Each placement stretches the model to its size, where a width or depth of 0 keeps the model's proportions
+// to the height; `turn` points the model's front along +z; `tilt` topples copies.
+export function Instances({ src, items, turn = 0, tilt, shadows = true }: { src: string; items: Placement[]; turn?: number; tilt?: Tilt; shadows?: boolean }) {
   const { scene } = useGLTF(src);
   const { parts, size } = useMemo(() => {
     scene.updateMatrixWorld(true);
@@ -122,5 +127,5 @@ export function Instances({ src, items, turn = 0, tilt }: { src: string; items: 
     return { parts, size: box.getSize(new Vector3()) };
   }, [scene]);
   if (!items.length) return null;
-  return parts.map((p, i) => <InstancedPart key={i} part={p} items={items} size={size} turn={turn} tilt={tilt} />);
+  return parts.map((p, i) => <InstancedPart key={i} part={p} items={items} size={size} turn={turn} tilt={tilt} shadows={shadows} />);
 }

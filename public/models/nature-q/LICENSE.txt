@@ -1,0 +1,8 @@
+Trees, palms, pines, bushes, grass and flowers
+
+"Ultimate Stylized Nature Pack" by Quaternius (quaternius.com), via poly.pizza.
+Each plant is split into its own file, with smaller textures, no normal maps, and leaves as cut-outs.
+
+License: Creative Commons Zero (CC0 1.0), http://creativecommons.org/publicdomain/zero/1.0/
+You can use this content for personal, educational, and commercial purposes.
+Support Quaternius: https://www.patreon.com/quaternius (crediting is appreciated, not required)

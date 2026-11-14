@@ -5,9 +5,10 @@ import { Suspense, useRef } from "react";
 import type { Group } from "three";
 import Model, { Instances, M, preloadModels, type Placement } from "@/components/Model";
 import Decor from "./Decor";
+import Horizon from "./Horizon";
 import { ASSEMBLY, GATE, MAP, SITE_D, SITE_W, TILE, elevationAt, findTiles, surfaceAt, tileAt, tileCenter } from "@/lib/campus";
 
-preloadModels([...M.palms, ...M.trees, ...M.bushes, ...M.flowers, ...M.houses, M.tent, M.tentFrame, M.sign, M.crate, M.barrel, M.ambulance, M.police, M.cone]);
+preloadModels([...M.palms, ...M.trees, ...M.pines, ...M.bushes, ...M.grass, ...M.flowers, ...M.houses, M.tent, M.tentFrame, M.sign, M.crate, M.barrel, M.ambulance, M.police, M.cone]);
 
 // Deterministic scatter so the surroundings are identical on every load and for every player.
 const rand = (i: number) => {
@@ -176,29 +177,6 @@ function Flag() {
   );
 }
 
-function Horizon() {
-  return (
-    <>
-      <mesh rotation-x={-Math.PI / 2} position={[SITE_W / 2, 0.03, (SITE_D - 480) / 2]} receiveShadow>
-        <planeGeometry args={[960, 480 + SITE_D]} />
-        <meshStandardMaterial color="#6f8f4c" />
-      </mesh>
-      <mesh position={[SITE_W / 2 - 120, 72, -570]}>
-        <cylinderGeometry args={[15, 210, 144, 14]} />
-        <meshStandardMaterial color="#7d8794" flatShading />
-      </mesh>
-      <mesh position={[SITE_W / 2 + 180, 36, -510]}>
-        <coneGeometry args={[180, 72, 12]} />
-        <meshStandardMaterial color="#7a8a86" flatShading />
-      </mesh>
-      <mesh position={[SITE_W / 2 - 360, 30, -450]}>
-        <coneGeometry args={[165, 60, 12]} />
-        <meshStandardMaterial color="#7a8a86" flatShading />
-      </mesh>
-    </>
-  );
-}
-
 export default function Scenery() {
   return (
     <>
@@ -207,8 +185,8 @@ export default function Scenery() {
       <Flag />
       <Decor />
       <Suspense fallback={null}>
-        <Spots spots={HOUSES} by="width" />
-        <Spots spots={VILLAGE_TREES} by="height" />
+        {MAP.id !== "kota" && <Spots spots={HOUSES} by="width" />}
+        {MAP.id !== "kota" && <Spots spots={VILLAGE_TREES} by="height" />}
         {MAP.id === "pesisir" && <Spots spots={PALMS} by="height" />}
         <Hedge />
         <Spots spots={FLOWERS} by="height" />
