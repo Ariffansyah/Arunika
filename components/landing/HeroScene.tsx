@@ -6,7 +6,8 @@ import { Suspense, useEffect, useMemo, useRef, type ComponentRef } from "react";
 import type { Group, Mesh } from "three";
 import Character, { preloadCharacters, type Look } from "@/components/Character";
 import Scenery from "@/components/campus/Scenery";
-import { Backdrop, Buildings, Coast, Props, Terrain } from "@/components/campus/World";
+import { Buildings } from "@/components/campus/Building";
+import { Backdrop, Coast, Props, Terrain } from "@/components/campus/World";
 import { ASSEMBLY, GRID, SITE_D, SITE_W, SPAWN, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
 import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
 

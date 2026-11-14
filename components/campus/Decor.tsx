@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { GRID, SPAWN, TILE, buildingRects, elevationAt, isBlocked, tileCenter, tileElevation } from "@/lib/campus";
+import { GRID, SPAWN, TILE, elevationAt, isBlocked, tileCenter } from "@/lib/campus";
 import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
 
 const LINE = "#f3f1ea";
@@ -171,25 +171,6 @@ function WaterTower({ x, z }: { x: number; z: number }) {
   );
 }
 
-function MushollaDome() {
-  const r = buildingRects()["6"];
-  const x = ((r.x0 + r.x1 + 1) / 2) * TILE;
-  const z = ((r.z0 + r.z1 + 1) / 2) * TILE;
-  const y = Math.min(tileElevation(r.x0, r.z0), tileElevation(r.x1, r.z1)) - 0.1 + 4 + 1.6;
-  return (
-    <group position={[x, y, z]}>
-      <mesh castShadow>
-        <sphereGeometry args={[2.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#2c8a5a" />
-      </mesh>
-      <mesh position={[0, 2.6, 0]}>
-        <cylinderGeometry args={[0.06, 0.06, 1, 6]} />
-        <meshStandardMaterial color="#e2c56a" />
-      </mesh>
-    </group>
-  );
-}
-
 const FLOOD: Scenario = { kind: "banjir", intensity: 1 };
 
 // Signs follow the route the planner computes, so they always point the right way.
@@ -248,7 +229,6 @@ export default function Decor() {
       <SoccerField />
       <BasketballCourt />
       <Gate />
-      <MushollaDome />
       <WaterTower x={112.8} z={76.8} />
       <Bench x={34.8} z={45.9} />
       <Bench x={31.5} z={69.3} />

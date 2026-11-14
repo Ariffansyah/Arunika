@@ -3,14 +3,13 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Vector3, type Group } from "three";
-import { BUILDINGS, TILE, WARDEN, elevationAt, idx, isBlocked, tileAt, tileCenter, tileElevation } from "@/lib/campus";
+import { TILE, WARDEN, idx, tileCenter } from "@/lib/campus";
+import { buildingAt, free, groundY, layerAt, solidAt, type Solid } from "@/lib/nav";
 import { DRILL_LIMIT_S, QUAKE_SHAKE_S, RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
 import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
 import { finishDrill, getState, input, look, openChat, player, resetInput, run, setState, useDrill } from "./drillStore";
 
-const RADIUS = 0.3;
-const STOREY = 4;
 const KEYS: Record<string, keyof typeof input> = {
   KeyW: "up",
   ArrowUp: "up",
@@ -26,39 +25,18 @@ const KEYS: Record<string, keyof typeof input> = {
 };
 const CAM_DIST = 5;
 
-const free = (x: number, z: number) =>
-  [-RADIUS, RADIUS].every((ox) => [-RADIUS, RADIUS].every((oz) => !isBlocked(Math.floor((x + ox) / TILE), Math.floor((z + oz) / TILE))));
-
 const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("input, textarea, select") !== null;
 
-function solid(x: number, y: number, z: number) {
-  const tx = Math.floor(x / TILE);
-  const tz = Math.floor(z / TILE);
-  const c = tileAt(tx, tz);
-  const ground = tileElevation(tx, tz);
-  if (BUILDINGS[c]) return y < ground + BUILDINGS[c].floors * STOREY + 2.2;
-  if (c === "T") return y < ground + 7.5;
-  if (c === "=") return y < ground + 1.9;
-  // Roofs overhang the walls: the space under the eaves is open, only the roof slab is solid.
-  for (const [ox, oz] of [
-    [-1.2, 0],
-    [1.2, 0],
-    [0, -1.2],
-    [0, 1.2],
-  ]) {
-    const b = BUILDINGS[tileAt(Math.floor((x + ox) / TILE), Math.floor((z + oz) / TILE))];
-    const eave = ground + (b?.floors ?? 0) * STOREY;
-    if (b && y > eave && y < eave + 1.2) return true;
-  }
-  return false;
-}
+// Inside a building the storeys above the player are cut away, so the camera may pass where they were.
+let inside: string | null = null;
+const cutAway = (s: Solid) => s.b !== undefined && s.b === inside && (s.floor ?? 0) > player.layer;
 
 function clearReach(from: Vector3, yaw: number, pitch: number, dist: number) {
   const bx = Math.sin(yaw) * Math.cos(pitch);
   const bz = Math.cos(yaw) * Math.cos(pitch);
   const by = Math.sin(pitch);
-  for (let d = 0.6; d <= dist; d += 0.15) {
-    if (solid(from.x + bx * d, from.y + by * d, from.z + bz * d)) return d;
+  for (let d = 0.3; d <= dist; d += 0.15) {
+    if (solidAt(from.x + bx * d, from.y + by * d, from.z + bz * d, cutAway)) return d;
   }
   return dist;
 }
@@ -150,7 +128,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const running = s.phase === "running";
     const t = running ? (Date.now() - s.startAt) / 1000 : 0;
     const water = s.phase === "idle" ? 0 : waterLevel(s.scenario, running ? t : Infinity);
-    const depth = water - elevationAt(player.x, player.z);
+    const depth = water - groundY(player.x, player.z, player.layer);
     const first = s.view === "first";
 
     const ahead = Number(input.up) - Number(input.down);
@@ -162,6 +140,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const frozen = s.chatOpen || (running && t < 0);
     player.crouch = input.crouch && !frozen;
     player.moving = len > 0 && !frozen && !player.crouch;
+    if (player.moving || player.crouch) player.seated = false;
     player.wading = depth > 0.3;
     player.running = player.moving && input.run && !player.wading;
     if (player.moving) {
@@ -174,8 +153,11 @@ export default function Player({ look: character, name }: { look: Look; name: st
       const steps = Math.ceil(dt / 0.04);
       const step = (speed * dt) / steps;
       for (let i = 0; i < steps; i++) {
-        if (free(player.x + dx * step, player.z)) player.x += dx * step;
-        if (free(player.x, player.z + dz * step)) player.z += dz * step;
+        const nx = player.x + dx * step;
+        if (free(nx, player.z, layerAt(nx, player.z, player.layer))) player.x = nx;
+        const nz = player.z + dz * step;
+        if (free(player.x, nz, layerAt(player.x, nz, player.layer))) player.z = nz;
+        player.layer = layerAt(player.x, player.z, player.layer);
       }
       player.heading = Math.atan2(dx, dz);
       if (running && t >= 0) run.walked += Math.hypot(player.x - ox, player.z - oz);
@@ -189,18 +171,23 @@ export default function Player({ look: character, name }: { look: Look; name: st
       const inDebris =
         s.scenario.kind === "gempa" && !shaking && run.hazards.has(idx(Math.floor(player.x / TILE), Math.floor(player.z / TILE)));
       if (depth > 0.15 || inDebris) run.hazardS += dt;
-      const atGoal = run.goals.some((g) => {
-        const [gx, gz] = tileCenter(...g);
-        return Math.hypot(gx - player.x, gz - player.z) < 4.8;
-      });
+      const atGoal =
+        player.layer === 0 &&
+        run.goals.some((g) => {
+          const [gx, gz] = tileCenter(...g);
+          return Math.hypot(gx - player.x, gz - player.z) < 4.8;
+        });
       if (atGoal && !shaking) finishDrill(true);
       else if (t > DRILL_LIMIT_S) finishDrill(false);
     }
 
-    const ground = elevationAt(player.x, player.z);
+    // Eased, so a step onto a floor or a stair reads as a step; a teleport snaps.
+    const ground = groundY(player.x, player.z, player.layer);
+    player.y = Math.abs(ground - player.y) > 1.5 ? ground : player.y + (ground - player.y) * (1 - Math.exp(-dt * 14));
+    inside = buildingAt(player.x, player.z);
     const g = ref.current;
     if (g) {
-      g.position.set(player.x, ground, player.z);
+      g.position.set(player.x, player.y, player.z);
       g.rotation.y = player.heading;
       g.visible = !first;
     }
@@ -210,7 +197,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
         ? (0.05 + (s.scenario.intensity - 5) * 0.04) * (reducedMotion.current ? 0.2 : 1)
         : 0;
     const jitter = () => (Math.random() - 0.5) * shake;
-    const target = eye.current.set(player.x, ground + (player.crouch ? 0.75 : 1.35), player.z);
+    const target = eye.current.set(player.x, player.y + (player.crouch ? 0.75 : player.seated ? 1.05 : 1.35), player.z);
 
     if (first) {
       camera.position.set(target.x + jitter(), target.y + jitter(), target.z + jitter());
@@ -222,11 +209,13 @@ export default function Player({ look: character, name }: { look: Look; name: st
       );
     } else {
       // Something between camera and player: swing up a little first, then pull in; whatever still blocks the view fades.
+      // Indoors the camera may climb higher, over the walls of a room whose ceiling is cut away.
+      const maxLift = inside ? 0.8 : 0.45;
       let lift = 0;
-      while (lift < 0.45 && clearReach(target, look.yaw, look.camPitch + lift, CAM_DIST) < CAM_DIST) lift += 0.05;
+      while (lift < maxLift && clearReach(target, look.yaw, Math.min(1.45, look.camPitch + lift), CAM_DIST) < CAM_DIST) lift += 0.05;
       camLift.current += (lift - camLift.current) * (1 - Math.exp(-dt * 6));
-      const pitch = look.camPitch + camLift.current;
-      const reach = Math.max(1.2, clearReach(target, look.yaw, pitch, CAM_DIST) - 0.3);
+      const pitch = Math.min(1.45, look.camPitch + camLift.current);
+      const reach = Math.max(0.4, clearReach(target, look.yaw, pitch, CAM_DIST) - 0.3);
       camDist.current = reach < camDist.current ? reach : camDist.current + (reach - camDist.current) * (1 - Math.exp(-dt * 4));
       const d = camDist.current;
       const bx = Math.sin(look.yaw) * Math.cos(pitch);
@@ -248,7 +237,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
         name={name}
         self
         label={view === "third"}
-        anim={() => (player.crouch ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : "idle")}
+        anim={() => (player.crouch ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : player.seated ? "sit" : "idle")}
       />
     </group>
   );

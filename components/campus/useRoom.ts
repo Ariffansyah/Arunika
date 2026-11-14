@@ -3,6 +3,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
 import { SITE_D, SITE_W } from "@/lib/campus";
+import { classrooms } from "@/lib/floorplan";
 import { INTENSITY, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { player, remotes, startDrill } from "./drillStore";
@@ -53,13 +54,15 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
       .on("broadcast", { event: "pos" }, ({ payload }) => {
         const x = num(payload?.x, 0, SITE_W);
         const z = num(payload?.z, 0, SITE_D);
+        const layer = payload?.f === 1 ? 1 : 0;
         if (typeof payload?.id === "string" && x !== null && z !== null) {
-          remotes.set(payload.id, { x, z, crouch: payload.c === true, at: Date.now() });
+          remotes.set(payload.id, { x, z, layer, crouch: payload.c === true, at: Date.now() });
         }
       })
       .on("broadcast", { event: "drill" }, ({ payload }) => {
         const s = parseScenario(payload?.scenario);
-        if (s) startDrill(s, school);
+        const room = classrooms().find((r) => r.id === payload?.room)?.id;
+        if (s && room) startDrill(s, school, 1500, room);
       })
       .subscribe(async (st) => {
         if (st === "SUBSCRIBED") {
@@ -76,12 +79,12 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
     // Sending before the channel joins would fall back to one HTTP request per message.
     const timer = setInterval(() => {
       if (!joined) return;
-      const msg = `${player.x.toFixed(2)},${player.z.toFixed(2)},${player.crouch}`;
+      const msg = `${player.x.toFixed(2)},${player.z.toFixed(2)},${player.layer},${player.crouch}`;
       const now = Date.now();
       if (msg === last && now - lastAt < 3000) return;
       last = msg;
       lastAt = now;
-      ch.send({ type: "broadcast", event: "pos", payload: { id: me.id, x: player.x, z: player.z, c: player.crouch } });
+      ch.send({ type: "broadcast", event: "pos", payload: { id: me.id, x: player.x, z: player.z, f: player.layer, c: player.crouch } });
     }, 200);
 
     return () => {
@@ -92,8 +95,8 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
     };
   }, [room, me.id, me.name, me.avatar, school]);
 
-  const broadcastDrill = (scenario: Scenario) =>
-    channel.current?.send({ type: "broadcast", event: "drill", payload: { scenario } });
+  const broadcastDrill = (scenario: Scenario, room: string) =>
+    channel.current?.send({ type: "broadcast", event: "drill", payload: { scenario, room } });
 
   return { peers, status, broadcastDrill };
 }

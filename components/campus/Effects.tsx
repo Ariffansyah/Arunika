@@ -5,97 +5,98 @@ import { Suspense, useLayoutEffect, useRef } from "react";
 import { Color, Object3D, type Group, type InstancedMesh, type Mesh } from "three";
 import Character, { type Anim, type Look } from "@/components/Character";
 import Model, { M } from "@/components/Model";
-import { ASSEMBLY, GRID, TILE, W, elevationAt, tileCenter, tileElevation, type Tile } from "@/lib/campus";
-import { QUAKE_SHAKE_S, bestRoute, waterLevel } from "@/lib/sim";
-import { getState, run } from "./drillStore";
+import { ASSEMBLY, TILE, W, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
+import { PLAN, classrooms } from "@/lib/floorplan";
+import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
+import { QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
+import { CLASSMATE_SEATS, getState, roomSeats, run } from "./drillStore";
 
 const drillTime = () => {
   const s = getState();
   return s.phase === "idle" ? -Infinity : (Date.now() - s.startAt) / 1000;
 };
 
-const wading = (x: number, z: number) => {
+const wading = (x: number, z: number, layer = 0) => {
   const s = getState();
   const level = s.phase === "idle" ? 0 : waterLevel(s.scenario, s.phase === "running" ? drillTime() : Infinity);
-  return level - elevationAt(x, z);
+  return level - groundY(x, z, layer);
 };
 
-const CLASSMATES: { home: Tile; look: Look }[] = [
-  { home: [3, 7], look: "female-c" },
-  { home: [5, 9], look: "male-a" },
-  { home: [2, 9], look: "female-e" },
-  { home: [11, 9], look: "female-b" },
-  { home: [12, 7], look: "male-f" },
-  { home: [17, 8], look: "female-f" },
-  { home: [21, 7], look: "male-a" },
-  { home: [24, 8], look: "female-c" },
-  { home: [5, 14], look: "male-f" },
-  { home: [10, 15], look: "female-b" },
-];
-
-type Plan = { pts: [number, number][]; cum: number[]; d: number };
-
-function plan(home: Tile): Plan {
-  const tiles = bestRoute(GRID, home, run.goals, run.hazards) ?? [home];
-  const pts = tiles.map(([x, z]) => tileCenter(x, z));
-  const cum = [0];
-  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
-  return { pts, cum, d: 0 };
-}
+const LOOKS: Look[] = ["female-c", "male-a", "female-e", "female-b", "male-f", "female-f", "male-a", "female-c", "male-f", "female-b", "female-e", "male-a"];
+// Where the class sits between drills.
+const HOME_ROOM = classrooms()[0].id;
+const mates = LOOKS.map(() => ({ x: 0, z: 0 }));
 
 // Drills teach walking briskly, not running: classmates model that, ducking first when the ground shakes.
 function Classmate({ i }: { i: number }) {
-  const c = CLASSMATES[i];
   const ref = useRef<Group>(null);
-  const [hx, hz] = tileCenter(...c.home);
-  const me = useRef({ x: hx, z: hz, heading: Math.PI, drill: -1, plan: null as Plan | null, anim: "idle" as Anim });
-  const speed = 1.4 + ((i * 37) % 10) / 20;
-  const delay = 0.3 + ((i * 53) % 10) / 9;
+  const me = useRef({ x: 0, z: 0, layer: 0, heading: 0, key: "", anim: "sit" as Anim });
+  const speed = 1.3 + ((i * 37) % 10) / 25;
+  const delay = 0.3 + ((i * 53) % 10) / 6;
 
   useFrame((_, dt) => {
     const g = ref.current;
     const s = getState();
     const st = me.current;
     if (!g) return;
-    if (s.phase === "idle" || st.drill !== s.startAt) {
-      Object.assign(st, { x: hx, z: hz, heading: Math.PI, plan: null, anim: "idle" });
-      st.drill = s.phase === "idle" ? -1 : s.startAt;
-      if (s.phase !== "idle") st.plan = plan(c.home);
+    const room = s.phase === "idle" ? HOME_ROOM : s.room;
+    const key = `${room}:${s.phase === "idle" ? "idle" : s.startAt}`;
+    if (st.key !== key) {
+      const seat = roomSeats(room)[CLASSMATE_SEATS[i]];
+      const layer = PLAN.rooms.find((r) => r.id === room)!.floor;
+      Object.assign(st, { x: seat.x, z: seat.z, layer, heading: seat.ry, key, anim: "sit" });
     }
     const t = drillTime();
     const quake = s.scenario.kind === "gempa";
     const shaking = quake && t >= 0 && t < QUAKE_SHAKE_S;
-    const go = st.plan && t >= (quake ? QUAKE_SHAKE_S : 0) + delay;
+    const field = s.phase !== "idle" ? run.field : null;
 
-    if (shaking) st.anim = "crouch";
-    else if (go && st.plan) {
-      const p = st.plan;
-      const total = p.cum[p.cum.length - 1];
-      const stop = Math.max(0, total - 1.5 - (i % 4) * 1.2);
-      const depth = wading(st.x, st.z);
-      if (p.d < stop) {
-        p.d = Math.min(stop, p.d + speed * dt * (depth > 1 ? 0.25 : depth > 0.3 ? 0.6 : 1));
-        let k = 1;
-        while (k < p.cum.length - 1 && p.cum[k] < p.d) k++;
-        const f = Math.min(1, Math.max(0, (p.d - p.cum[k - 1]) / (p.cum[k] - p.cum[k - 1] || 1)));
-        const [ax, az] = p.pts[k - 1];
-        const [bx, bz] = p.pts[k] ?? p.pts[k - 1];
-        const side = ((i % 3) - 1) * 0.9;
-        const len = Math.hypot(bx - ax, bz - az) || 1;
-        st.x = ax + (bx - ax) * f - ((bz - az) / len) * side;
-        st.z = az + (bz - az) * f + ((bx - ax) / len) * side;
-        st.heading = Math.atan2(bx - ax, bz - az);
+    if (!field || t < 0) st.anim = "sit";
+    else if (shaking) st.anim = "crouch";
+    else if (t < (quake ? QUAKE_SHAKE_S : 0) + delay) st.anim = quake ? "idle" : "sit";
+    else {
+      const next = distanceAt(field, st.x, st.z, st.layer) > 0 ? nextStep(field, st.x, st.z, st.layer) : null;
+      if (next) {
+        const tx = next.x - st.x;
+        const tz = next.z - st.z;
+        const len = Math.hypot(tx, tz) || 1;
+        // Keep a little apart so the class files out instead of merging into one body.
+        let sx = 0;
+        let sz = 0;
+        mates.forEach((o, j) => {
+          const ox = st.x - o.x;
+          const oz = st.z - o.z;
+          const d2 = ox * ox + oz * oz;
+          if (j !== i && d2 > 1e-4 && d2 < 0.36) {
+            sx += ox / d2;
+            sz += oz / d2;
+          }
+        });
+        const mx = tx / len + sx * 0.08;
+        const mz = tz / len + sz * 0.08;
+        const ml = Math.hypot(mx, mz) || 1;
+        const depth = wading(st.x, st.z, st.layer);
+        const step = Math.min(len, speed * dt * (depth > 1 ? 0.25 : depth > 0.3 ? 0.6 : 1));
+        const nx = st.x + (mx / ml) * step;
+        const nz = st.z + (mz / ml) * step;
+        // The field only routes through open cells, so when the nudge apart hits furniture the plain step is safe.
+        const ok = free(nx, nz, layerAt(nx, nz, st.layer), 0.18);
+        st.x = ok ? nx : st.x + (tx / len) * step;
+        st.z = ok ? nz : st.z + (tz / len) * step;
+        st.layer = layerAt(st.x, st.z, st.layer);
+        st.heading = Math.atan2(mx, mz);
         st.anim = "walk";
       } else st.anim = "idle";
-    } else st.anim = "idle";
-
-    g.position.set(st.x, elevationAt(st.x, st.z), st.z);
+    }
+    mates[i].x = st.x;
+    mates[i].z = st.z;
+    g.position.set(st.x, groundY(st.x, st.z, st.layer), st.z);
     g.rotation.y = st.heading;
   });
 
   return (
     <group ref={ref}>
-      <Character look={c.look} height={1.45 + (i % 3) * 0.08} speed={1.1} anim={() => me.current.anim} />
+      <Character look={LOOKS[i]} height={1.45 + (i % 3) * 0.08} speed={1.1} anim={() => me.current.anim} />
     </group>
   );
 }
@@ -103,7 +104,7 @@ function Classmate({ i }: { i: number }) {
 export function Classmates() {
   return (
     <Suspense fallback={null}>
-      {CLASSMATES.map((_, i) => (
+      {LOOKS.map((_, i) => (
         <Classmate key={i} i={i} />
       ))}
     </Suspense>

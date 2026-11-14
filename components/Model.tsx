@@ -2,8 +2,8 @@
 
 import { useGLTF } from "@react-three/drei";
 import type { ThreeElements } from "@react-three/fiber";
-import { useMemo } from "react";
-import { Box3, Vector3, type Material, type Mesh } from "three";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { Box3, Matrix4, Vector3, type BufferGeometry, type InstancedMesh, type Material, type Mesh } from "three";
 
 // Kenney kits (CC0), see the LICENSE.txt next to each kit in public/models.
 export const M = {
@@ -56,3 +56,47 @@ export default function Model({
 }
 
 export const preloadModels = (srcs: string[]) => srcs.forEach((s) => useGLTF.preload(s));
+
+export type Placement = { x: number; y: number; z: number; ry: number; size: [number, number, number] };
+type Part = { geometry: BufferGeometry; material: Material; local: Matrix4 };
+
+function InstancedPart({ part, items, size, turn }: { part: Part; items: Placement[]; size: Vector3; turn: number }) {
+  const ref = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const mesh = ref.current!;
+    const quarter = Math.abs(Math.sin(turn)) > 0.5;
+    const m = new Matrix4();
+    const r = new Matrix4();
+    const s = new Matrix4();
+    items.forEach((it, k) => {
+      const [w, h, d] = it.size;
+      s.makeScale((quarter ? d : w) / size.x, h / size.y, (quarter ? w : d) / size.z);
+      r.makeRotationY(it.ry + turn);
+      mesh.setMatrixAt(k, m.makeTranslation(it.x, it.y, it.z).multiply(r).multiply(s).multiply(part.local));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [items, part, size, turn]);
+  return <instancedMesh ref={ref} args={[part.geometry, part.material, items.length]} castShadow receiveShadow />;
+}
+
+// Every copy of a model as one InstancedMesh per mesh in it: a few hundred desks stay a handful of draw calls.
+// Each placement stretches the model to its size; `turn` points the model's front along +z.
+export function Instances({ src, items, turn = 0 }: { src: string; items: Placement[]; turn?: number }) {
+  const { scene } = useGLTF(src);
+  const { parts, size } = useMemo(() => {
+    scene.updateMatrixWorld(true);
+    const box = new Box3().setFromObject(scene);
+    const center = box.getCenter(new Vector3());
+    const toBase = new Matrix4().makeTranslation(-center.x, -box.min.y, -center.z);
+    const parts: Part[] = [];
+    scene.traverse((o) => {
+      const mesh = o as Mesh;
+      // Materials are copied so fading one building leaves the others alone.
+      if (mesh.isMesh) parts.push({ geometry: mesh.geometry, material: (mesh.material as Material).clone(), local: toBase.clone().multiply(mesh.matrixWorld) });
+    });
+    return { parts, size: box.getSize(new Vector3()) };
+  }, [scene]);
+  if (!items.length) return null;
+  return parts.map((p, i) => <InstancedPart key={i} part={p} items={items} size={size} turn={turn} />);
+}

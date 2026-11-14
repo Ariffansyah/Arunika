@@ -3,30 +3,16 @@
 import { Line, Sky } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
-import {
-  BufferAttribute,
-  Color,
-  Object3D,
-  PlaneGeometry,
-  type DirectionalLight,
-  type Group,
-  type InstancedMesh,
-  type Mesh,
-  type MeshStandardMaterial,
-  type Vector3,
-} from "three";
+import { BufferAttribute, Color, Object3D, PlaneGeometry, type DirectionalLight, type Group, type InstancedMesh, type Mesh } from "three";
 import {
   ASSEMBLY,
   ASSEMBLY_NAMES,
-  BUILDINGS,
-  GRID,
   H,
   SITE_D,
   SITE_W,
   TILE,
   W,
   WARDEN,
-  buildingRects,
   elevationAt,
   findTiles,
   surfaceAt,
@@ -35,13 +21,16 @@ import {
   tileElevation,
   type Tile,
 } from "@/lib/campus";
-import { QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
+import { FENCE, FENCE_H } from "@/lib/nav";
+import { waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
 import Html from "@/components/Html";
 import Model, { M } from "@/components/Model";
 import Avatar from "./Avatar";
+import { Buildings } from "./Building";
 import { Beacons, Classmates, FloodDebris, QuakeDebris } from "./Effects";
+import { fadeTo, hides } from "./fade";
 import { getState, openChat, player, predict, useDrill } from "./drillStore";
 import Player from "./Player";
 import Scenery from "./Scenery";
@@ -120,18 +109,7 @@ function Instanced({ items, y, children }: { items: Placed[]; y: number; childre
   );
 }
 
-// tileAt pads the outside of the map with fence, so neighbours are read from GRID directly.
-const isFence = (x: number, z: number) => GRID[z]?.[x] === "=";
-const FENCE_H = 1.8;
-const FENCE: Placed[] = findTiles("=").flatMap(([tx, tz]) => {
-  const along = isFence(tx - 1, tz) || isFence(tx + 1, tz);
-  const across = isFence(tx, tz - 1) || isFence(tx, tz + 1);
-  const [x, z] = tileCenter(tx, tz);
-  return [
-    ...(along ? [{ x, z, sx: TILE, sy: FENCE_H, sz: 0.25 }] : []),
-    ...(across || !along ? [{ x, z, sx: 0.25, sy: FENCE_H, sz: TILE }] : []),
-  ];
-});
+const FENCE_ITEMS: Placed[] = FENCE.map((f) => ({ ...f, sy: FENCE_H }));
 
 const TREES = findTiles("T");
 
@@ -165,7 +143,7 @@ function Tree({ x, z, i, fade }: { x: number; z: number; i: number; fade: boolea
 export function Props({ fade = false }: { fade?: boolean }) {
   return (
     <>
-      <Instanced items={FENCE} y={0.5}>
+      <Instanced items={FENCE_ITEMS} y={0.5}>
         <boxGeometry />
         <meshStandardMaterial color="#efe6d4" />
       </Instanced>
@@ -176,173 +154,6 @@ export function Props({ fade = false }: { fade?: boolean }) {
       </Suspense>
     </>
   );
-}
-
-const riskColor = (r: number) => new Color("#efe3c8").lerp(new Color("#e0473c"), r / 100);
-
-// Liang-Barsky clip of the camera-to-player sight line against a footprint; returns where it enters, or null.
-function sightEnters(cam: Vector3, x0: number, z0: number, x1: number, z1: number) {
-  const dx = player.x - cam.x;
-  const dz = player.z - cam.z;
-  let t0 = 0;
-  let t1 = 1;
-  for (const [p, q] of [
-    [-dx, cam.x - x0],
-    [dx, x1 - cam.x],
-    [-dz, cam.z - z0],
-    [dz, z1 - cam.z],
-  ]) {
-    if (p === 0) {
-      if (q < 0) return null;
-      continue;
-    }
-    const r = q / p;
-    if (p < 0) t0 = Math.max(t0, r);
-    else t1 = Math.min(t1, r);
-    if (t0 > t1) return null;
-  }
-  return t0 < 0.95 ? t0 : null;
-}
-
-function hides(cam: Vector3, top: number, x0: number, z0: number, x1: number, z1: number) {
-  const t = sightEnters(cam, x0, z0, x1, z1);
-  if (t === null) return false;
-  const eye = elevationAt(player.x, player.z) + 1.4;
-  return cam.y + (eye - cam.y) * t < top;
-}
-
-function fadeTo(g: Group, opacity: number) {
-  const see = opacity < 0.99;
-  g.traverse((o) => {
-    const m = (o as Mesh).material as MeshStandardMaterial | undefined;
-    if (!m || Array.isArray(m)) return;
-    // Opaque shaders are compiled to ignore alpha, so switching modes needs a recompile.
-    if (m.transparent !== see) {
-      m.transparent = see;
-      m.needsUpdate = true;
-    }
-    m.opacity = opacity;
-  });
-}
-
-const RECTS = buildingRects();
-
-const STOREY = 4;
-const CORRIDOR = 2.5;
-
-function SchoolBuilding({
-  id,
-  risk,
-  showRisk,
-  fade,
-}: {
-  id: string;
-  risk: number;
-  showRisk: boolean;
-  fade: boolean;
-}) {
-  const ref = useRef<Group>(null);
-  const opacity = useRef(1);
-  const r = RECTS[id];
-  const b = BUILDINGS[id];
-  const w = (r.x1 - r.x0 + 1) * TILE;
-  const d = (r.z1 - r.z0 + 1) * TILE;
-  const x0 = r.x0 * TILE;
-  const z0 = r.z0 * TILE;
-  const h = b.floors * STOREY;
-  const base = Math.min(tileElevation(r.x0, r.z0), tileElevation(r.x1, r.z1)) - 0.1;
-  // Corridor on the south face, the side the camera sees.
-  const core = d - CORRIDOR;
-  const front = d / 2 - CORRIDOR / 2;
-  const bays = Math.max(2, Math.round(w / 4.5));
-
-  const camera = useThree((s) => s.camera);
-  useFrame((_, dt) => {
-    const g = ref.current;
-    if (!g) return;
-    const s = getState();
-    const t = (Date.now() - s.startAt) / 1000;
-    const shaking = s.phase === "running" && s.scenario.kind === "gempa" && t >= 0 && t < QUAKE_SHAKE_S;
-    // Weaker blocks visibly sway more: the risk model, shown rather than told.
-    const sway = shaking ? (0.004 + (risk / 100) * 0.03) * (s.scenario.intensity - 4) * 0.5 : 0;
-    g.rotation.z = Math.sin(t * 17 + r.x0) * sway;
-    g.rotation.x = Math.cos(t * 13 + r.z0) * sway * 0.6;
-    if (!fade) return;
-    const target = hides(camera.position, base + h + 2.4, x0 - 1.5, z0 - 1.5, x0 + w + 1.5, z0 + d + 1.5) ? 0.28 : 1;
-    if (Math.abs(opacity.current - target) < 0.01) return;
-    opacity.current += (target - opacity.current) * (1 - Math.exp(-dt * 10));
-    fadeTo(g, opacity.current);
-  });
-
-  return (
-    <group ref={ref} position={[x0 + w / 2, base, z0 + d / 2]}>
-      <mesh position={[0, h / 2, -CORRIDOR / 2]} castShadow receiveShadow>
-        <boxGeometry args={[w - 0.1, h, core]} />
-        <meshStandardMaterial color={showRisk ? riskColor(risk) : "#efe3c8"} />
-      </mesh>
-      <mesh position={[0, 0.25, -CORRIDOR / 2]}>
-        <boxGeometry args={[w - 0.05, 0.5, core + 0.05]} />
-        <meshStandardMaterial color="#9a8467" />
-      </mesh>
-      {b.floors > 1 && (
-        <mesh position={[0, STOREY, front]} castShadow receiveShadow>
-          <boxGeometry args={[w - 0.1, 0.2, CORRIDOR]} />
-          <meshStandardMaterial color="#d9cdb4" />
-        </mesh>
-      )}
-      {Array.from({ length: b.floors }, (_, f) =>
-        Array.from({ length: bays }, (_, i) => {
-          const x = -w / 2 + (w / bays) * (i + 0.5);
-          const door = f === 0 && i % 3 === 1;
-          return (
-            <group key={`${f}-${i}`} position={[x, f * STOREY, core / 2 - CORRIDOR / 2 + 0.03]}>
-              <mesh position={[0, door ? 1.05 : 1.5, 0]}>
-                <boxGeometry args={[door ? 1 : 1.5, door ? 2.1 : 1.2, 0.05]} />
-                <meshStandardMaterial color={door ? "#7a4a2b" : "#2b4a6b"} />
-              </mesh>
-              {!door && (
-                <mesh position={[0, 1.5, 0.01]}>
-                  <boxGeometry args={[0.06, 1.2, 0.06]} />
-                  <meshStandardMaterial color="#e9f1f5" />
-                </mesh>
-              )}
-            </group>
-          );
-        }),
-      )}
-      <mesh position={[0, 0.1, front]} receiveShadow>
-        <boxGeometry args={[w, 0.2, CORRIDOR]} />
-        <meshStandardMaterial color="#cdbfa6" />
-      </mesh>
-      {Array.from({ length: bays + 1 }, (_, i) => (
-        <mesh key={i} position={[-w / 2 + 0.15 + ((w - 0.3) / bays) * i, h / 2, d / 2 - 0.15]} castShadow>
-          <boxGeometry args={[0.25, h, 0.25]} />
-          <meshStandardMaterial color="#f6f2ea" />
-        </mesh>
-      ))}
-      {/* A 4-sided cone turned 45° is a hip roof; the outer scale stretches it to the footprint. */}
-      <group position={[0, h + 1.1, 0.2]} scale={[(w + 1.6) / Math.SQRT2, 1, (d + 2) / Math.SQRT2]}>
-        <mesh rotation-y={Math.PI / 4} castShadow>
-          <coneGeometry args={[1, 2.2, 4]} />
-          <meshStandardMaterial color="#b4532a" flatShading />
-        </mesh>
-      </group>
-      {showRisk && (
-        <Html position={[0, h + 3.4, 0]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap rounded bg-malam/90 px-2 py-1 text-center text-xs text-pasir">
-            <div className="font-semibold">{b.name}</div>
-            <div>
-              Risiko rusak <strong className={risk >= 60 ? "text-bahaya" : "text-fajar"}>{risk}%</strong>
-            </div>
-          </div>
-        </Html>
-      )}
-    </group>
-  );
-}
-
-export function Buildings({ risks, showRisk, fade = false }: { risks: Record<string, number>; showRisk: boolean; fade?: boolean }) {
-  return Object.keys(RECTS).map((id) => <SchoolBuilding key={id} id={id} risk={risks[id] ?? 0} showRisk={showRisk} fade={fade} />);
 }
 
 function AssemblyPoints({ safe }: { safe: Tile[] }) {
@@ -450,10 +261,7 @@ function Route() {
   if (!route || route.length < 2) return null;
   return (
     <Line
-      points={route.map(([x, z]) => {
-        const [cx, cz] = tileCenter(x, z);
-        return [cx, tileElevation(x, z) + 0.3, cz] as [number, number, number];
-      })}
+      points={route.map(([x, y, z]) => [x, y + 0.25, z] as [number, number, number])}
       color="#ff8a3d"
       lineWidth={5}
       dashed

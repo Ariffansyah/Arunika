@@ -103,7 +103,7 @@ function Minimap() {
   const route = useDrill((s) => (s.showRoute ? s.route : null));
   return (
     <div className="w-28 overflow-hidden rounded-md border border-malam-3 sm:w-52">
-      <CampusPlan route={route ?? undefined} label="Peta mini kampus dengan posisi kamu">
+      <CampusPlan path={route?.map(([x, , z]) => [x / TILE, z / TILE])} label="Peta mini kampus dengan posisi kamu">
         <circle ref={dot} r={0.8} fill="#f4ecdc" stroke="#0d1828" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
       </CampusPlan>
     </div>

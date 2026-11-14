@@ -3,7 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
-import { elevationAt } from "@/lib/campus";
+import { groundY } from "@/lib/nav";
 import { avatarOf } from "@/lib/supabase";
 import Avatar from "./Avatar";
 import { remotes } from "./drillStore";
@@ -31,7 +31,7 @@ function Remote({ peer }: { peer: Peer }) {
     s.x = nx;
     s.z = nz;
     s.crouch = target.crouch;
-    g.position.set(s.x, elevationAt(s.x, s.z), s.z);
+    g.position.set(s.x, groundY(s.x, s.z, target.layer), s.z);
   });
 
   return (

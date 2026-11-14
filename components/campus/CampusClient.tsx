@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import RequireAuth, { Notice, type Me } from "@/components/RequireAuth";
 import { SPAWN, tileCenter } from "@/lib/campus";
+import { classrooms } from "@/lib/floorplan";
+import { groundY } from "@/lib/nav";
 import type { Scenario } from "@/lib/sim";
 import { avatarOf } from "@/lib/supabase";
 import { player, setState, startDrill } from "./drillStore";
@@ -25,13 +27,15 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
   // The store is module state, so a revisit would otherwise resume a stale drill.
   useEffect(() => {
     const [x, z] = tileCenter(...SPAWN);
-    Object.assign(player, { x, z, heading: 0, crouch: false, moving: false, running: false, wading: false });
+    Object.assign(player, { x, z, layer: 0, y: groundY(x, z, 0), heading: 0, crouch: false, moving: false, running: false, wading: false, seated: false });
     setState({ phase: "idle", result: null, showRoute: false, chatOpen: false });
   }, [room]);
 
   const onStart = (s: Scenario) => {
-    startDrill(s, me.school);
-    broadcastDrill(s);
+    const rooms = classrooms();
+    const room = rooms[Math.floor(Math.random() * rooms.length)].id;
+    startDrill(s, me.school, 1500, room);
+    broadcastDrill(s, room);
   };
 
   return (

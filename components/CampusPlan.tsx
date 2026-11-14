@@ -5,12 +5,15 @@ const SURFACE_FILL = { paving: "#2a3d5c", court: "#264d7a" };
 
 export default function CampusPlan({
   route,
+  path,
   hazards,
   hazardColor = "#3b82c4",
   label,
   children,
 }: {
   route?: Tile[];
+  // Like route, but free points in plan units (tile widths) rather than tile corners.
+  path?: [number, number][];
   hazards?: Set<number>;
   hazardColor?: string;
   label: string;
@@ -41,9 +44,9 @@ export default function CampusPlan({
       {ASSEMBLY.map(([x, z]) => (
         <circle key={`a${x}`} cx={x + 0.5} cy={z + 0.5} r={0.8} fill="none" stroke="#34c47c" strokeWidth={0.25} />
       ))}
-      {route && (
+      {(route || path) && (
         <polyline
-          points={route.map(([x, z]) => `${x + 0.5},${z + 0.5}`).join(" ")}
+          points={(path ?? route!.map(([x, z]) => [x + 0.5, z + 0.5])).map(([x, z]) => `${x},${z}`).join(" ")}
           fill="none"
           stroke="#ff8a3d"
           strokeWidth={0.35}
