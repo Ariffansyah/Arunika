@@ -313,7 +313,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
   const lines: [string, string][] = [
     ["Skenario", SCENARIO_LABEL[result.scenario.kind]],
     ["Waktu", `${result.timeS.toFixed(1)} dtk`],
-    ["Jarak", `${result.walked.toFixed(0)} m, jalur optimal ${result.optimalLen.toFixed(0)} m (garis jingga)`],
+    ["Jarak", `${result.walked.toFixed(0)} m, jalur terbaik ${result.optimalLen.toFixed(0)} m`],
     ["Jalur AI", result.hintUsed ? "Dipakai (−150)" : "Tidak dipakai"],
   ];
 
@@ -342,6 +342,21 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
           </li>
         ))}
       </ul>
+      <figure className="space-y-1">
+        <div className="overflow-hidden rounded-md border border-malam-3">
+          <CampusPlan path={result.route} label="Jejakmu dan jalur terbaik di peta kampus">
+            <polyline
+              points={result.trail.map(([x, z]) => `${x},${z}`).join(" ")}
+              fill="none"
+              stroke="#f4ecdc"
+              strokeWidth={0.3}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </CampusPlan>
+        </div>
+        <figcaption className="text-redup">Putih jejakmu, jingga jalur terbaik.</figcaption>
+      </figure>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {lines.map(([k, v]) => (
           <div key={k} className="contents">

@@ -10,7 +10,7 @@ let muted = (() => {
   }
 })();
 
-const SAMPLES: Record<string, number> = {
+const SAMPLES = {
   "step-concrete": 5,
   "step-grass": 5,
   "door-open": 2,
@@ -19,12 +19,11 @@ const SAMPLES: Record<string, number> = {
   crash: 5,
   rock: 5,
   land: 3,
-  click: 1,
   correct: 1,
   wrong: 1,
   tick: 1,
   switch: 1,
-};
+} as const;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
 
 function start() {
@@ -35,7 +34,7 @@ function start() {
     master.gain.value = muted ? 0 : 1;
     master.connect(ctx.destination);
     // Decoded up front, so the first footstep is not late.
-    for (const [name, n] of Object.entries(SAMPLES)) for (let i = 0; i < n; i++) load(n > 1 ? `${name}-${i}` : name);
+    for (const [name, n] of Object.entries(SAMPLES) as [string, number][]) for (let i = 0; i < n; i++) load(n > 1 ? `${name}-${i}` : name);
   } catch {
     // No Web Audio: the campus runs silent, every cue is also on screen.
   }
@@ -79,7 +78,7 @@ export function setMuted(on: boolean) {
 // A recorded sound, one of its takes at random, a touch higher or lower each time so repeats don't drone.
 export function play(name: keyof typeof SAMPLES, gain = 1) {
   if (!ctx || !master || muted || gain <= 0.01) return;
-  const n = SAMPLES[name];
+  const n: number = SAMPLES[name];
   const c = ctx;
   const out = master;
   void load(n > 1 ? `${name}-${Math.floor(Math.random() * n)}` : name).then((buf) => {
@@ -178,7 +177,6 @@ export function kentongan(knocks = 10) {
 export type Ambience = { rain: number; wind: number; waves: number; city: number; water: number; birds: number };
 type Layer = { gain: GainNode; level: number };
 let layers: Record<Exclude<keyof Ambience, "birds">, Layer> | null = null;
-let birds = 0;
 let nextChirp = 0;
 
 function buildLayers(c: AudioContext, out: GainNode) {
@@ -249,9 +247,8 @@ export function setAmbience(a: Ambience) {
     l.level = a[k];
     l.gain.gain.setTargetAtTime(a[k] * peak[k], ctx.currentTime, 0.6);
   }
-  birds = a.birds;
-  if (birds > 0.05 && !muted && ctx.currentTime > nextChirp) {
-    chirp(ctx, master, birds);
+  if (a.birds > 0.05 && !muted && ctx.currentTime > nextChirp) {
+    chirp(ctx, master, a.birds);
     nextChirp = ctx.currentTime + 1.5 + Math.random() * 5;
   }
 }

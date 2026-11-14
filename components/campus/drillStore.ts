@@ -24,7 +24,8 @@ import { fallenBox, outdoors, situation, type Situation } from "@/lib/situation"
 import type { School } from "@/lib/supabase";
 import type { Anim } from "@/components/Character";
 
-export type DrillResult = DrillStats & { score: number; guided: boolean };
+// The trail and the best route are in plan units (tiles), ready to draw on the campus plan.
+export type DrillResult = DrillStats & { score: number; guided: boolean; trail: [number, number][]; route: [number, number][] };
 // What E (or the Aksi button) would do right now, shown next to the thing it acts on.
 export type Prompt = { id: string; label: string; x: number; y: number; z: number };
 // Metres, with height so the route can be drawn up and down stairs.
@@ -193,6 +194,9 @@ export const run = {
   // Doors jammed shut for the whole drill, and the assembly point a fallen pole made unsafe.
   locked: [] as string[],
   closedGoal: null as Tile | null,
+  // Where the player went, every half second, to compare with the best route afterwards.
+  trail: [] as [number, number][],
+  trailAt: 0,
 };
 
 // When the tree in the situation comes down: late in the shaking, or as the whirlwind leaves.
@@ -248,6 +252,10 @@ export const inShelter = () =>
 // Called every frame of a running drill with the distance just walked and the water depth at the player.
 export function trackDrill(dt: number, t: number, moved: number, depth: number) {
   const tr = run.track;
+  if (t >= run.trailAt) {
+    run.trail.push([player.x, player.z]);
+    run.trailAt = t + 0.5;
+  }
   const inside = buildingAt(player.x, player.z) !== null;
   // Ducking counts as cover only when still; walking ducked is just walking.
   const covering = (player.crouch && !player.moving) || player.cover >= 0;
@@ -438,6 +446,8 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     mates,
     locked,
     closedGoal,
+    trail: [],
+    trailAt: 0,
   });
   setState({
     phase: "running",
@@ -483,5 +493,12 @@ export function finishDrill(reached: boolean) {
     checks: grade(s.scenario.kind, tracked, !!run.situation && outdoors(run.situation)),
   };
   // The results show the optimal route from the start, not whatever hint was last drawn.
-  setState({ phase: "done", route: run.optimalRoute, showRoute: true, result: { ...stats, score: scoreDrill(stats), guided: s.guided } });
+  const result = {
+    ...stats,
+    score: scoreDrill(stats),
+    guided: s.guided,
+    trail: [...run.trail, [player.x, player.z]].map(([x, z]) => [x / TILE, z / TILE] as [number, number]),
+    route: (run.optimalRoute ?? []).map(([x, , z]) => [x / TILE, z / TILE] as [number, number]),
+  };
+  setState({ phase: "done", route: run.optimalRoute, showRoute: true, result });
 }

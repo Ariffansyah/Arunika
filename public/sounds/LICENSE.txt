@@ -1,7 +1,7 @@
 Sounds
 
 Footsteps, glass, wood, rock and landing impacts: "Impact Sounds" by Kenney (kenney.nl).
-Doors: "RPG Audio" by Kenney. Click, tick, switch, correct and wrong: "Interface Sounds" by Kenney.
+Doors: "RPG Audio" by Kenney. Tick, switch, correct and wrong: "Interface Sounds" by Kenney.
 Converted to mono MP3 so every browser can play them.
 
 The siren, rumble, kentongan, splashes, rain, wind, waves, city hum, flood water and birdsong are
