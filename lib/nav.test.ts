@@ -2,7 +2,21 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ASSEMBLY, tileCenter } from "./campus.ts";
 import { PLAN, classrooms } from "./floorplan.ts";
-import { N, buildingAt, cellCenter, cellOf, distanceAt, flowField, free, groundY, layerAt, nextStep, routeFrom, routeLength } from "./nav.ts";
+import {
+  N,
+  buildingAt,
+  cellCenter,
+  cellOf,
+  distanceAt,
+  flowField,
+  free,
+  groundY,
+  layerAt,
+  nextStep,
+  routeFrom,
+  routeLength,
+  upperFloorAt,
+} from "./nav.ts";
 
 const assembly = flowField(
   (layer, k) => layer === 0 && ASSEMBLY.some((a) => Math.hypot(...tileCenter(...a).map((v, i) => v - cellCenter(k)[i])) < 4.5),
@@ -33,6 +47,29 @@ test("the upper floor reaches the ground only by the stairs", () => {
   assert.ok(routeLength(route) > 40);
   assert.ok(end[1] < PLAN.floorY["1"] + 1, "route ends on the ground");
   assert.ok(route.some(([x, , z]) => PLAN.ramps.some((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1)), "route uses the stairs");
+});
+
+test("in a flood, a ground-floor class climbs to the upper floor, not into the stairwell's void", () => {
+  const refuge = flowField((layer, k) => layer === 1 && upperFloorAt(...cellCenter(k)), () => false);
+  const seat = PLAN.seats.find((s) => s.room === classrooms()[0].id)!;
+  const end = routeFrom(refuge, seat.x, seat.z, 0).at(-1)!;
+  assert.ok(end[1] > PLAN.floorY["1"] + 3.9, "route ends a storey up");
+});
+
+test("routes never pass through a wall", () => {
+  for (const room of classrooms()) {
+    const seat = PLAN.seats.find((s) => s.room === room.id)!;
+    const route = routeFrom(assembly, seat.x, seat.z, room.floor);
+    assert.ok(routeLength(route) > 10, room.name);
+    for (let i = 1; i < route.length; i++) {
+      const [ax, ay, az] = route[i - 1];
+      const [bx, by, bz] = route[i];
+      const [mx, mz] = [(ax + bx) / 2, (az + bz) / 2];
+      // Any wall between two route points covers the midpoint; the route is clear on one floor or the other.
+      const layer = Math.min(ay, by) > PLAN.floorY["1"] + 2 ? 1 : 0;
+      assert.ok(free(mx, mz, layer, 0.05) || free(mx, mz, 1 - layer, 0.05), `${room.name} at ${mx.toFixed(2)},${mz.toFixed(2)}`);
+    }
+  }
 });
 
 test("every room can be left on foot", () => {
