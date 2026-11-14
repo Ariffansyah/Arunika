@@ -4,7 +4,7 @@ Bodies, clothes, heads and the idle, walk, run and wave animations:
 "Ultimate Modular Men Pack" and "Ultimate Modular Women Pack" by Quaternius (quaternius.com),
 via poly.pizza. Parts are mixed and recoloured into an SMP school uniform.
 
-Crouch, sit and the drop-cover-hold-on pose are transferred from
+Crouch, sit, the drop-cover-hold-on pose, the ducked walk and the jump are transferred from
 "Universal Animation Library" by Quaternius (quaternius.com).
 
 License: Creative Commons Zero (CC0 1.0), http://creativecommons.org/publicdomain/zero/1.0/
