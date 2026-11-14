@@ -286,26 +286,31 @@ export type Timeline = {
   // When warning signs show on the hill, and when the slope gives way.
   signs: number[];
   slide: number | null;
+  // Seconds for a flood to reach its full height.
+  rise: number;
   limit: number;
 };
 
-export const NONE: Timeline = { shake: null, aftershock: null, wind: null, path: null, signs: [], slide: null, limit: 240 };
+export const NONE: Timeline = { shake: null, aftershock: null, wind: null, path: null, signs: [], slide: null, rise: FLOOD_RISE_S, limit: 240 };
 // A whirlwind crosses at about 8 m/s; the campus is 120 m wide.
 export const VORTEX_SPEED = 8;
 
 // Compressed real behaviour: a bigger quake shakes longer, and a strong one is followed by an aftershock.
 export const shakeSeconds = (magnitude: number) => 6 + (magnitude - 5) * 5;
 
+// Every drill of the same disaster runs a little differently: how long it shakes and when the aftershock
+// comes, when the wind arrives, when the slope gives way, how fast the water rises.
 export function timeline(s: Scenario, seed: number): Timeline {
   const rnd = random(seed);
   if (s.kind === "gempa") {
-    const shake = shakeSeconds(s.intensity);
-    const at = shake + 20 + rnd() * 15;
+    const shake = shakeSeconds(s.intensity) * (0.85 + rnd() * 0.3);
+    const at = shake + 15 + rnd() * 25;
     return { ...NONE, shake: [0, shake], aftershock: s.intensity >= 6 ? [at, at + 3 + (s.intensity - 5)] : null };
   }
+  if (s.kind === "banjir") return { ...NONE, rise: 60 + rnd() * 60 };
   if (s.kind === "angin") {
-    // Stronger wind comes on faster: 35 to 55 s of warning.
-    const arrive = 55 - ((s.intensity - 60) / 90) * 20;
+    // Stronger wind comes on faster: 35 to 55 s of warning, give or take 8 s.
+    const arrive = 55 - ((s.intensity - 60) / 90) * 20 + (rnd() - 0.5) * 16;
     const path: Timeline["path"] = [
       [-40, 10 + rnd() * 64],
       [160, 10 + rnd() * 64],
@@ -314,9 +319,9 @@ export function timeline(s: Scenario, seed: number): Timeline {
     return { ...NONE, wind: [arrive, arrive + cross], path };
   }
   if (s.kind === "longsor") {
-    // More rain, sooner failure: 60 to 90 s after the drill starts.
-    const slide = 90 - ((s.intensity - 50) / 250) * 30;
-    return { ...NONE, signs: [0.15, 0.35, 0.55].map((f) => f * slide), slide };
+    // More rain, sooner failure: 60 to 90 s after the drill starts, give or take 8 s.
+    const slide = 90 - ((s.intensity - 50) / 250) * 30 + (rnd() - 0.5) * 16;
+    return { ...NONE, signs: [0.15, 0.35, 0.55].map((f) => (f + rnd() * 0.08) * slide), slide };
   }
   return NONE;
 }
@@ -370,16 +375,17 @@ const check = (label: string, max: number, part: number, ok = part >= 1): Check 
   max,
 });
 
-// The procedure for each disaster as a checklist; points add up to 1000.
-export function grade(kind: Scenario["kind"], t: Tracked): Check[] {
+// The procedure for each disaster as a checklist; points add up to 1000. `outside` is a quake that
+// catches the class out in the open, where cover means ducking clear of anything that can fall.
+export function grade(kind: Scenario["kind"], t: Tracked, outside = false): Check[] {
   if (kind === "gempa") {
     // Under a desk counts fully, crouching in the open half; 80% of the shaking is enough for full marks.
     const cover = t.shakeS ? (t.deskS + 0.5 * (t.coverS - t.deskS)) / t.shakeS / 0.8 : 1;
     const after = t.aftershockS ? t.aftershockCoverS / t.aftershockS / 0.5 : 1;
     return [
-      check("Berlindung di bawah meja saat guncangan", 200, cover),
+      check(outside ? "Merunduk di tempat terbuka saat guncangan" : "Berlindung di bawah meja saat guncangan", 200, cover),
       check("Tetap di tempat selama guncangan", 100, t.shakeMoved < 2 ? 1 : 0),
-      check("Menjauhi jendela dan lemari", 100, t.nearFallS < 1 ? 1 : 0),
+      check(outside ? "Menjauhi gedung dan pohon" : "Menjauhi jendela dan lemari", 100, t.nearFallS < 1 ? 1 : 0),
       check("Berjalan, tidak berlari di dalam gedung", 100, t.runIndoorS < 1 ? 1 : 0),
       check("Tidak kembali masuk gedung", 100, t.reentered ? 0 : 1),
       check("Menghindari reruntuhan di luar gedung", 100, 1 - t.debrisS / 10, t.debrisS < 2),
@@ -434,5 +440,5 @@ export function scoreDrill(d: DrillStats) {
   return Math.round(Math.min(1200, Math.max(0, score)));
 }
 
-export const waterLevel = (s: Scenario, t: number) =>
-  s.kind === "banjir" ? s.intensity * Math.min(1, Math.max(0, t / FLOOD_RISE_S)) : 0;
+export const waterLevel = (s: Scenario, t: number, rise = FLOOD_RISE_S) =>
+  s.kind === "banjir" ? s.intensity * Math.min(1, Math.max(0, t / rise)) : 0;

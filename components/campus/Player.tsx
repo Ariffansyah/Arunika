@@ -158,7 +158,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const s = getState();
     const running = s.phase === "running";
     const t = running ? (Date.now() - s.startAt) / 1000 : 0;
-    const water = s.phase === "idle" ? 0 : waterLevel(s.scenario, running ? t : Infinity);
+    const water = s.phase === "idle" ? 0 : waterLevel(s.scenario, running ? t : Infinity, run.timeline.rise);
     const depth = water - groundY(player.x, player.z, player.layer);
     const first = s.view === "first";
 

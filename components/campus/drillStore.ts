@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { BUILDINGS, MAP, SPAWN, TILE, idx, tileCenter, type Tile } from "@/lib/campus";
+import { BUILDINGS, MAP, SPAWN, TILE, idx, tileAt, tileCenter, type Tile } from "@/lib/campus";
 import { PLAN, classrooms, type Room } from "@/lib/floorplan";
 import { buildingAt, cellCenter, flowField, groundY, routeFrom, routeLength, upperFloorAt } from "@/lib/nav";
 import {
@@ -7,6 +7,7 @@ import {
   campusRisks,
   grade,
   hazardTiles,
+  inLane,
   inRunout,
   random,
   safeAssembly,
@@ -19,6 +20,7 @@ import {
   type Structure,
   type Tracked,
 } from "@/lib/sim";
+import { fallenBox, outdoors, situation, type Situation } from "@/lib/situation";
 import type { School } from "@/lib/supabase";
 import type { Anim } from "@/components/Character";
 
@@ -160,6 +162,19 @@ export const run = {
   track: blankTrack(),
   // Which of the map's slide lanes gives way in a landslide drill.
   lane: 0,
+  situation: null as Situation | null,
+  // Where each classmate starts, as x, z, facing and floor.
+  mates: [] as [number, number, number, number][],
+  // Doors jammed shut for the whole drill, and the assembly point a fallen pole made unsafe.
+  locked: [] as string[],
+  closedGoal: null as Tile | null,
+};
+
+// When the tree in the situation comes down: late in the shaking, or as the whirlwind leaves.
+export const fallenAt = () => {
+  const f = run.situation?.fallen;
+  if (!f) return Infinity;
+  return f.at === "shake" ? (run.timeline.shake?.[1] ?? 0) * 0.6 : (run.timeline.wind?.[1] ?? Infinity);
 };
 
 const SIGN_LABELS = ["Periksa retakan tanah", "Periksa pohon miring", "Periksa air keruh"];
@@ -188,6 +203,19 @@ const near = (x: number, z: number, floor: number, owner: string) =>
 const nearPane = () => PLAN.panes.some((p) => near(p.x, p.z, p.floor, p.b));
 // Glass and tall furniture are what hurts people indoors in an earthquake.
 const nearFalling = () => nearPane() || TALL.some((i) => near(PLAN.items[i].x, PLAN.items[i].z, PLAN.items[i].floor, PLAN.items[i].b));
+// Outdoors it is walls, trees and poles that come down: within 3 m of a building or a tree.
+const nearStructure = () => {
+  const [tx, tz] = [Math.floor(player.x / TILE), Math.floor(player.z / TILE)];
+  for (let dz = -2; dz <= 2; dz++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const c = tileAt(tx + dx, tz + dz);
+      if (!"T123456".includes(c)) continue;
+      const [cx, cz] = [Math.min(Math.max(player.x, (tx + dx) * TILE), (tx + dx + 1) * TILE), Math.min(Math.max(player.z, (tz + dz) * TILE), (tz + dz + 1) * TILE)];
+      if (Math.hypot(cx - player.x, cz - player.z) < (c === "T" ? 4.5 : 3)) return true;
+    }
+  }
+  return false;
+};
 
 export const inShelter = () =>
   run.shelters.some((r) => r.floor === player.layer && player.x >= r.x0 && player.x <= r.x1 && player.z >= r.z0 && player.z <= r.z1);
@@ -201,9 +229,10 @@ export function trackDrill(dt: number, t: number, moved: number, depth: number) 
   if (shakingAt(t)) {
     tr.shakeS += dt;
     if (covering) tr.coverS += dt;
-    if (player.cover >= 0) tr.deskS += dt;
+    // Full marks for cover: under a desk indoors, or ducked in the open clear of anything that can fall.
+    if (player.cover >= 0 || (!inside && covering && !nearStructure())) tr.deskS += dt;
     tr.shakeMoved += moved;
-    if (nearFalling()) tr.nearFallS += dt;
+    if (inside ? nearFalling() : nearStructure()) tr.nearFallS += dt;
   } else if (getState().scenario.kind === "gempa") {
     if (inside && player.running) tr.runIndoorS += dt;
     if (!inside) run.outsideS += dt;
@@ -235,7 +264,8 @@ export function trackDrill(dt: number, t: number, moved: number, depth: number) 
     const danger = player.layer === 0 && inRunout(player.x, player.z);
     // Looking at the first signs is fine; after the last one, every second on the slope counts.
     if (danger && t >= tl.signs[tl.signs.length - 1]) tr.slopeS += dt;
-    if (danger && t >= tl.slide && t < tl.slide + 8) {
+    const lane = MAP.runouts[run.lane];
+    if (lane && player.layer === 0 && inLane(lane, player.x, player.z) && t >= tl.slide && t < tl.slide + 8) {
       tr.caught = true;
       finishDrill(false);
     }
@@ -278,7 +308,7 @@ export const GOAL_RADIUS = 4.5;
 // The upper floor of Gedung Kelas A, not its stairs.
 export const isUpstairs = (x: number, z: number, layer: number) => layer === 1 && upperFloorAt(x, z);
 
-function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blocked: string[], shelters: Room[]) {
+function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blocked: string[], shelters: Room[], trunk: ReturnType<typeof fallenBox> | null) {
   const centres = goals.map((g) => tileCenter(...g));
   const rubble = PLAN.doors.filter((d) => blocked.includes(d.id));
   return flowField(
@@ -296,7 +326,8 @@ function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blo
     },
     (layer, k) => {
       const [x, z] = cellCenter(k);
-      return rubble.some((d) => d.floor === layer && Math.hypot(d.x - x, d.z - z) < 0.8);
+      const underTrunk = !!trunk && layer === 0 && x > trunk.x0 - 0.3 && x < trunk.x1 + 0.3 && z > trunk.z0 - 0.3 && z < trunk.z1 + 0.3;
+      return underTrunk || rubble.some((d) => d.floor === layer && Math.hypot(d.x - x, d.z - z) < 0.8);
     },
   );
 }
@@ -307,43 +338,50 @@ const roomDoors = (room: string) => {
   return PLAN.doors.filter((d) => d.b === r.b && d.floor === r.floor && d.x > r.x0 - 0.3 && d.x < r.x1 + 0.3 && d.z > r.z0 - 0.3 && d.z < r.z1 + 0.3);
 };
 
-export function startDrill(
-  scenario: Scenario,
-  school: School | null,
-  delayMs = 1500,
-  room = classrooms()[0].id,
-  seed = Math.floor(Math.random() * 2 ** 31),
-) {
-  // A drill begins mid-lesson: everyone at a desk in the same classroom, never already somewhere safe.
-  const free = roomSeats(room).filter((_, i) => !CLASSMATE_SEATS.includes(i));
-  const seat = free[Math.floor(Math.random() * free.length)];
-  const layer = PLAN.rooms.find((r) => r.id === room)!.floor;
+export function startDrill(scenario: Scenario, school: School | null, delayMs = 1500, seed = Math.floor(Math.random() * 2 ** 31)) {
+  const sit = situation(scenario, seed);
+  const rnd = random(seed);
+  const room = sit.room?.id ?? "";
+  const layer = sit.room?.floor ?? 0;
+  // A drill begins mid-activity: at a desk in class, or standing about elsewhere; never already somewhere safe.
+  const seats = sit.place === "kelas" ? roomSeats(room) : [];
+  const mates: [number, number, number, number][] = seats.length
+    ? CLASSMATE_SEATS.map((i) => [seats[i].x, seats[i].z, seats[i].ry, layer])
+    : sit.spots.slice(0, CLASSMATE_SEATS.length).map(([x, z, ry]) => [x, z, ry, layer]);
+  const free = seats.length ? seats.filter((_, i) => !CLASSMATE_SEATS.includes(i)).map((s) => [s.x, s.z, s.ry] as const) : sit.spots.slice(CLASSMATE_SEATS.length);
+  const [px, pz, ry] = free[Math.floor(Math.random() * free.length)] ?? sit.spots[0];
   Object.assign(player, {
-    x: seat.x,
-    z: seat.z,
+    x: px,
+    z: pz,
     layer,
-    y: groundY(seat.x, seat.z, layer),
-    heading: seat.ry,
+    y: groundY(px, pz, layer),
+    heading: ry,
     crouch: false,
     moving: false,
     running: false,
     wading: false,
-    seated: true,
+    seated: seats.length > 0,
     cover: -1,
   });
-  look.yaw = seat.ry + Math.PI;
-  const { hazards, goals, risks } = predict(scenario, school);
-  const rnd = random(seed);
+  look.yaw = ry + Math.PI;
+  const { hazards, goals: safe, risks } = predict(scenario, school);
+  // A fallen power pole closes one assembly point, as long as another one stays open.
+  const closedGoal = sit.closedGoal && safe.length > 1 && safe.some(([x, z]) => x === sit.closedGoal![0] && z === sit.closedGoal![1]) ? sit.closedGoal : null;
+  const goals = closedGoal ? safe.filter(([x, z]) => x !== closedGoal[0] || z !== closedGoal[1]) : safe;
   const plan = timeline(scenario, seed);
   const quake = scenario.kind === "gempa";
-  const building = PLAN.rooms.find((r) => r.id === room)!.b;
-  const exits = roomDoors(room);
-  const blocked = quake && risks[building] >= 60 && exits.length > 1 ? [exits[Math.floor(rnd() * exits.length)].id] : [];
+  const exits = room ? roomDoors(room) : [];
+  // Rubble can bury a doorway of any building; a weak one always loses one.
+  const blocked = quake && sit.room && exits.length > 1 && (risks[sit.room.b] >= 60 || rnd() < 0.45) ? [exits[Math.floor(rnd() * exits.length)].id] : [];
   const upstairs = scenario.kind === "banjir";
   // A weak building's shelter room is no shelter; if every building is weak, the best of them still beats outdoors.
   const strong = PLAN.rooms.filter((r) => r.shelter && risks[r.b] < 40);
-  const shelters = scenario.kind !== "angin" ? [] : strong.length ? strong : PLAN.rooms.filter((r) => r.shelter);
-  const field = safetyField(goals, hazards, upstairs, blocked, shelters);
+  const pool = scenario.kind !== "angin" ? [] : strong.length ? strong : PLAN.rooms.filter((r) => r.shelter);
+  // A jammed door takes one shelter out of use, unless it is the only one.
+  const lockedRoom = sit.lockedRoom && pool.length > 1 && pool.some((r) => r.id === sit.lockedRoom) ? sit.lockedRoom : null;
+  const shelters = pool.filter((r) => r.id !== lockedRoom);
+  const locked = lockedRoom ? roomDoors(lockedRoom).map((d) => d.id) : [];
+  const field = safetyField(goals, hazards, upstairs, blocked, shelters, sit.fallen ? fallenBox(sit.fallen) : null);
   const route = routeFrom(field, player.x, player.z, layer);
   const falls = new Map<number, number>();
   const breaks = new Map<number, number>();
@@ -370,6 +408,11 @@ export function startDrill(
     breaks,
     outsideS: 0,
     track: blankTrack(),
+    lane: sit.lane,
+    situation: sit,
+    mates,
+    locked,
+    closedGoal,
   });
   setState({
     phase: "running",
@@ -381,7 +424,7 @@ export function startDrill(
     result: null,
     chatOpen: false,
     mapOpen: false,
-    closedDoors: [],
+    closedDoors: locked,
     power: true,
     gas: true,
   });
@@ -405,7 +448,7 @@ export function finishDrill(reached: boolean) {
     optimalLen: run.optimalLen,
     leadS: run.timeline.shake?.[1] ?? run.timeline.wind?.[1] ?? 0,
     hintUsed: run.hintUsed,
-    checks: grade(s.scenario.kind, tracked),
+    checks: grade(s.scenario.kind, tracked, !!run.situation && outdoors(run.situation)),
   };
   // The results show the optimal route from the start, not whatever hint was last drawn.
   setState({ phase: "done", route: run.optimalRoute, showRoute: true, result: { ...stats, score: scoreDrill(stats) } });

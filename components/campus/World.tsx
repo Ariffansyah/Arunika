@@ -44,7 +44,7 @@ import Avatar from "./Avatar";
 import { Buildings } from "./Building";
 import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, Landslide, QuakeDebris, Rain, Vortex } from "./Effects";
 import { fadeTo, hides } from "./fade";
-import { drillTime, getState, player, predict, run, useDrill } from "./drillStore";
+import { drillTime, fallenAt, getState, player, predict, run, useDrill } from "./drillStore";
 import { interact, wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
@@ -345,8 +345,11 @@ export function Props({ fade = false }: { fade?: boolean }) {
   );
 }
 
-function AssemblyPoints({ safe }: { safe: Tile[] }) {
+function AssemblyPoints({ safe: predicted }: { safe: Tile[] }) {
   const phase = useDrill((s) => s.phase);
+  useDrill((s) => s.startAt);
+  // During a drill its own situation decides, such as a pole down on one of them.
+  const safe = phase === "idle" ? predicted : run.goals;
   return ASSEMBLY.map(([x, z]) => {
     const ok = safe.some(([sx, sz]) => sx === x && sz === z);
     const [cx, cz] = tileCenter(x, z);
@@ -365,6 +368,68 @@ function AssemblyPoints({ safe }: { safe: Tile[] }) {
       </group>
     );
   });
+}
+
+const FALL_S = 1.4;
+
+// The tree that comes down across a path in this drill, tipping over from its base.
+function FallenTree() {
+  const ref = useRef<Group>(null);
+  const tip = useRef<Group>(null);
+  useFrame(() => {
+    const g = ref.current;
+    const t = tip.current;
+    const f = run.situation?.fallen;
+    if (!g || !t) return;
+    const s = getState();
+    const at = fallenAt();
+    g.visible = !!f && s.phase !== "idle" && drillTime() >= at - 0.2;
+    if (!g.visible || !f) return;
+    const p = Math.min(1, Math.max(0, (drillTime() - at) / FALL_S));
+    const angle = (Math.PI / 2) * p * p;
+    const [bx, bz] = f.along === "x" ? [f.x - 2.6, f.z] : [f.x, f.z - 2.6];
+    g.position.set(bx, elevationAt(bx, bz), bz);
+    t.rotation.set(f.along === "z" ? angle : 0, 0, f.along === "x" ? -angle : 0);
+  });
+  return (
+    <group ref={ref} visible={false}>
+      <group ref={tip}>
+        <Model src={M.trees[2]} fit={{ height: 7 }} />
+      </group>
+    </group>
+  );
+}
+
+// A power pole down across the assembly point the drill closed, wires and all.
+function FallenPole() {
+  const ref = useRef<Group>(null);
+  useFrame(() => {
+    const g = ref.current;
+    if (!g) return;
+    const goal = run.closedGoal;
+    g.visible = !!goal && getState().phase !== "idle" && drillTime() >= (run.timeline.shake?.[1] ?? 0) * 0.5;
+    if (!g.visible || !goal) return;
+    const [x, z] = tileCenter(...goal);
+    g.position.set(x - 3, elevationAt(x - 3, z - 1) + 0.18, z - 1);
+  });
+  return (
+    <group ref={ref} visible={false} rotation-y={0.5}>
+      <mesh rotation-z={Math.PI / 2} position={[4, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.13, 0.17, 9, 10]} />
+        <meshStandardMaterial color="#8d8f8c" />
+      </mesh>
+      <mesh position={[8, 0.1, 0]} rotation-y={Math.PI / 2} castShadow>
+        <boxGeometry args={[1.6, 0.12, 0.12]} />
+        <meshStandardMaterial color="#5a5f63" />
+      </mesh>
+      {[-0.6, 0.6].map((dz) => (
+        <mesh key={dz} position={[5, 0.02, dz * 2]} rotation-z={Math.PI / 2} rotation-y={dz * 0.3}>
+          <cylinderGeometry args={[0.015, 0.015, 9, 4]} />
+          <meshStandardMaterial color="#1d1f22" />
+        </mesh>
+      ))}
+    </group>
+  );
 }
 
 function Warden() {
@@ -429,7 +494,7 @@ function Water() {
     const s = getState();
     const m = ref.current;
     if (!m) return;
-    const level = s.phase === "idle" ? 0 : waterLevel(s.scenario, s.phase === "running" ? (Date.now() - s.startAt) / 1000 : Infinity);
+    const level = s.phase === "idle" ? 0 : waterLevel(s.scenario, s.phase === "running" ? (Date.now() - s.startAt) / 1000 : Infinity, run.timeline.rise);
     m.visible = level > 0;
     if (!m.visible) return;
     m.position.y = level;
@@ -590,6 +655,10 @@ export default function World({
       <Rain />
       <Beacons />
       <AssemblyPoints safe={goals} />
+      <Suspense fallback={null}>
+        <FallenTree />
+      </Suspense>
+      <FallenPole />
       <Warden />
       <PromptLabel />
       <VaultLabel />

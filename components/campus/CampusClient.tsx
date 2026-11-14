@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import RequireAuth, { Notice, type Me } from "@/components/RequireAuth";
 import { MAP, SPAWN, mapFromUrl, tileCenter } from "@/lib/campus";
-import { classrooms } from "@/lib/floorplan";
 import { groundY } from "@/lib/nav";
 import type { Scenario } from "@/lib/sim";
 import { avatarOf } from "@/lib/supabase";
@@ -37,11 +36,10 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
   }, [room]);
 
   const onStart = (s: Scenario) => {
-    const rooms = classrooms();
-    const room = rooms[Math.floor(Math.random() * rooms.length)].id;
     const seed = Math.floor(Math.random() * 2 ** 31);
-    startDrill(s, me.school, 1500, room, seed);
-    broadcastDrill(s, room, seed);
+    // Long enough to read where the drill starts.
+    startDrill(s, me.school, 3000, seed);
+    broadcastDrill(s, seed);
   };
 
   return (

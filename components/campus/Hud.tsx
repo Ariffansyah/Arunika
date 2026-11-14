@@ -171,7 +171,12 @@ function Instruction({ t }: { t: number }) {
   const scenario = useDrill((s) => s.scenario);
   const hint = useDrill((s) => s.showRoute);
   const report = useDrill((s) => s.prompt?.id === "lapor");
-  if (t < 0) return <p className="text-2xl font-extrabold">Bersiap… {Math.ceil(-t)}</p>;
+  if (t < 0)
+    return (
+      <p className="text-lg font-extrabold leading-snug">
+        {run.situation?.brief} <span className="tabular-nums text-fajar">Mulai {Math.ceil(-t)}…</span>
+      </p>
+    );
   const { wind, slide } = run.timeline;
   const shaking = scenario.kind === "gempa" && shakingAt(t);
   const after = scenario.kind === "gempa" && aftershockAt(t);
@@ -213,7 +218,7 @@ function Instruction({ t }: { t: number }) {
       </p>
       <p className="tabular-nums text-redup">
         Waktu {t.toFixed(1)} dtk
-        {scenario.kind === "banjir" && <> · Tinggi air {waterLevel(scenario, t).toFixed(2)} m</>}
+        {scenario.kind === "banjir" && <> · Tinggi air {waterLevel(scenario, t, run.timeline.rise).toFixed(2)} m</>}
         {wind && t < wind[0] && <> · Angin tiba {Math.ceil(wind[0] - t)} dtk</>}
       </p>
       <div className="flex flex-wrap gap-2">

@@ -1,8 +1,10 @@
 import { WARDEN, elevationAt, tileCenter } from "@/lib/campus";
+import { fallenBox } from "@/lib/situation";
 import { PLAN, WALL } from "@/lib/floorplan";
 import { groundY, type Extra } from "@/lib/nav";
 import {
   drillTime,
+  fallenAt,
   finishDrill,
   getState,
   inShelter,
@@ -30,10 +32,12 @@ const SPOT_LABEL = {
 };
 
 export const isDoor = (id: string) => DOORS.has(id);
+// Jammed only for the drill that jammed it.
+const jammed = (id: string) => getState().phase === "running" && run.locked.includes(id);
 
 export function setDoor(id: string, open: boolean, tell = true) {
   const closed = getState().closedDoors;
-  if (open !== closed.includes(id)) return;
+  if (open !== closed.includes(id) || jammed(id)) return;
   setState({ closedDoors: open ? closed.filter((d) => d !== id) : [...closed, id] });
   if (tell) net.send?.("door", { id, open });
 }
@@ -45,16 +49,24 @@ export function raiseAlarm(tell = true) {
 }
 
 // A closed door, or one buried in rubble, fills its opening like the wall around it, up to the door's height.
-export const closedDoors: Extra = (x0, z0, x1, z1, lo, hi) =>
-  [...getState().closedDoors, ...run.blocked].some((id) => {
+// A tree down across a path does the same once it has fallen, up to its trunk.
+export const closedDoors: Extra = (x0, z0, x1, z1, lo, hi) => {
+  const f = run.situation?.fallen;
+  if (f && getState().phase !== "idle" && drillTime() >= fallenAt()) {
+    const b = fallenBox(f);
+    if (b.x0 < x1 && b.x1 > x0 && b.z0 < z1 && b.z1 > z0 && b.y0 < hi && b.y1 > lo) return true;
+  }
+  return [...getState().closedDoors, ...run.blocked].some((id) => {
     const d = DOORS.get(id)!;
     const [hx, hz] = d.along === "x" ? [d.w / 2, WALL] : [WALL, d.w / 2];
     return d.x - hx < x1 && d.x + hx > x0 && d.z - hz < z1 && d.z + hz > z0 && d.y < hi && d.y + 2.1 > lo;
   });
+};
 
 // Classmates open a closed door in their way, as anyone leaving a room would.
 export function openDoorsNear(x: number, z: number, y: number) {
   for (const id of getState().closedDoors) {
+    if (jammed(id)) continue;
     const d = DOORS.get(id)!;
     if (Math.hypot(d.x - x, d.z - z) < 1.2 && Math.abs(d.y - y) < 1) setDoor(id, true, false);
   }
@@ -107,7 +119,7 @@ export function findPrompt(): Prompt | null {
     consider(`meja-${i}`, "Berlindung di bawah meja", it.x, it.z, it.y, 1.1);
   }
   for (const d of PLAN.doors) {
-    if (!run.blocked.includes(d.id)) consider(d.id, s.closedDoors.includes(d.id) ? "Buka pintu" : "Tutup pintu", d.x, d.z, d.y, 1.7);
+    if (!run.blocked.includes(d.id)) consider(d.id, jammed(d.id) ? "Pintu macet" : s.closedDoors.includes(d.id) ? "Buka pintu" : "Tutup pintu", d.x, d.z, d.y, 1.7);
   }
   PLAN.spots.forEach((sp, i) => consider(`${sp.kind}-${i}`, SPOT_LABEL[sp.kind](), sp.x, sp.z, groundY(sp.x, sp.z, sp.floor), 1.9));
   // Landslide signs are read from a few metres away, from the edge of the slope.

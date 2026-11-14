@@ -3,7 +3,6 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
 import { MAP, SITE_D, SITE_W } from "@/lib/campus";
-import { classrooms } from "@/lib/floorplan";
 import { INTENSITY, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { ANIMS } from "@/components/Character";
@@ -71,9 +70,9 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
       .on("broadcast", { event: "alarm" }, () => raiseAlarm(false))
       .on("broadcast", { event: "drill" }, ({ payload }) => {
         const s = parseScenario(payload?.scenario);
-        const room = classrooms().find((r) => r.id === payload?.room)?.id;
         const seed = num(payload?.seed, 0, 2 ** 31);
-        if (s && room && seed !== null) startDrill(s, school, 1500, room, Math.floor(seed));
+        // The seed alone sets where the drill starts and what goes wrong, the same for everyone.
+        if (s && seed !== null) startDrill(s, school, 3000, Math.floor(seed));
       })
       .subscribe(async (st) => {
         if (st === "SUBSCRIBED") {
@@ -109,8 +108,8 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
     };
   }, [room, me.id, me.name, me.avatar, school]);
 
-  const broadcastDrill = (scenario: Scenario, room: string, seed: number) =>
-    channel.current?.send({ type: "broadcast", event: "drill", payload: { scenario, room, seed } });
+  const broadcastDrill = (scenario: Scenario, seed: number) =>
+    channel.current?.send({ type: "broadcast", event: "drill", payload: { scenario, seed } });
 
   return { peers, status, broadcastDrill };
 }

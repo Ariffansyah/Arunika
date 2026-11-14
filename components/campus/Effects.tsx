@@ -14,7 +14,7 @@ import { closedDoors, openDoorsNear } from "./interact";
 
 const wading = (x: number, z: number, layer = 0) => {
   const s = getState();
-  const level = s.phase === "idle" ? 0 : waterLevel(s.scenario, s.phase === "running" ? drillTime() : Infinity);
+  const level = s.phase === "idle" ? 0 : waterLevel(s.scenario, s.phase === "running" ? drillTime() : Infinity, run.timeline.rise);
   return level - groundY(x, z, layer);
 };
 
@@ -60,22 +60,24 @@ function Classmate({ i }: { i: number }) {
     const s = getState();
     const st = me.current;
     if (!g) return;
-    const room = s.phase === "idle" ? HOME_ROOM : s.room;
-    const key = `${room}:${s.phase === "idle" ? "idle" : s.startAt}`;
+    const key = s.phase === "idle" ? "idle" : String(s.startAt);
     if (st.key !== key) {
-      const seat = roomSeats(room)[CLASSMATE_SEATS[i]];
-      const layer = PLAN.rooms.find((r) => r.id === room)!.floor;
-      Object.assign(st, { x: seat.x, z: seat.z, layer, heading: seat.ry, face: seat.ry, key, anim: "sit", spot: null });
+      // Between drills the class sits in the first classroom; a drill puts them wherever it starts.
+      const seat = roomSeats(HOME_ROOM)[CLASSMATE_SEATS[i]];
+      const [x, z, ry, layer] = s.phase === "idle" ? [seat.x, seat.z, seat.ry, PLAN.rooms.find((r) => r.id === HOME_ROOM)!.floor] : (run.mates[i] ?? run.mates[0]);
+      Object.assign(st, { x, z, layer, heading: ry, face: ry, key, anim: "sit", spot: null });
     }
+    const seated = s.phase === "idle" || run.situation?.place === "kelas";
     const t = drillTime();
     const quake = s.scenario.kind === "gempa";
     const shaking = quake && shakingAt(t);
     const field = s.phase !== "idle" ? run.field : null;
 
-    if (!field || t < 0) st.anim = "sit";
-    else if (shaking) st.anim = "cover";
+    if (!field || t < 0) st.anim = seated ? "sit" : "idle";
+    // At a desk they duck under it; anywhere else they drop where they stand.
+    else if (shaking) st.anim = seated ? "cover" : "crouch";
     else if (quake && aftershockAt(t)) st.anim = "crouch";
-    else if (t < (run.timeline.shake?.[1] ?? 0) + delay) st.anim = quake ? "idle" : "sit";
+    else if (t < (run.timeline.shake?.[1] ?? 0) + delay) st.anim = quake || !seated ? "idle" : "sit";
     else {
       let to: { x: number; z: number } | null = null;
       if (st.spot) {
