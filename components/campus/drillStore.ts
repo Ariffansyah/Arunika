@@ -24,7 +24,7 @@ import { fallenBox, outdoors, situation, type Situation } from "@/lib/situation"
 import type { School } from "@/lib/supabase";
 import type { Anim } from "@/components/Character";
 
-export type DrillResult = DrillStats & { score: number };
+export type DrillResult = DrillStats & { score: number; guided: boolean };
 // What E (or the Aksi button) would do right now, shown next to the thing it acts on.
 export type Prompt = { id: string; label: string; x: number; y: number; z: number };
 // Metres, with height so the route can be drawn up and down stairs.
@@ -49,6 +49,8 @@ type State = {
   power: boolean;
   gas: boolean;
   mapOpen: boolean;
+  // A practice run: the route is shown, there is no time limit, and nothing is scored or shared.
+  guided: boolean;
 };
 
 let state: State = {
@@ -68,6 +70,7 @@ let state: State = {
   power: true,
   gas: true,
   mapOpen: false,
+  guided: false,
 };
 
 const listeners = new Set<() => void>();
@@ -338,7 +341,7 @@ const roomDoors = (room: string) => {
   return PLAN.doors.filter((d) => d.b === r.b && d.floor === r.floor && d.x > r.x0 - 0.3 && d.x < r.x1 + 0.3 && d.z > r.z0 - 0.3 && d.z < r.z1 + 0.3);
 };
 
-export function startDrill(scenario: Scenario, school: School | null, delayMs = 1500, seed = Math.floor(Math.random() * 2 ** 31)) {
+export function startDrill(scenario: Scenario, school: School | null, delayMs = 1500, seed = Math.floor(Math.random() * 2 ** 31), guided = false) {
   const sit = situation(scenario, seed);
   const rnd = random(seed);
   const room = sit.room?.id ?? "";
@@ -368,7 +371,7 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
   // A fallen power pole closes one assembly point, as long as another one stays open.
   const closedGoal = sit.closedGoal && safe.length > 1 && safe.some(([x, z]) => x === sit.closedGoal![0] && z === sit.closedGoal![1]) ? sit.closedGoal : null;
   const goals = closedGoal ? safe.filter(([x, z]) => x !== closedGoal[0] || z !== closedGoal[1]) : safe;
-  const plan = timeline(scenario, seed);
+  const plan = { ...timeline(scenario, seed), ...(guided ? { limit: Infinity } : {}) };
   const quake = scenario.kind === "gempa";
   const exits = room ? roomDoors(room) : [];
   // Rubble can bury a doorway of any building; a weak one always loses one.
@@ -420,21 +423,28 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     room,
     startAt: Date.now() + delayMs,
     route,
-    showRoute: false,
+    showRoute: guided,
     result: null,
     chatOpen: false,
     mapOpen: false,
     closedDoors: locked,
     power: true,
     gas: true,
+    guided,
   });
 }
 
 export function showHint() {
   if (!run.field) return;
-  run.hintUsed = true;
+  run.hintUsed = !getState().guided;
   setState({ route: routeFrom(run.field, player.x, player.z, player.layer), showRoute: true });
 }
+
+// The checklist as it stands mid-drill, for the guided practice.
+export const liveChecks = () => {
+  const s = getState();
+  return grade(s.scenario.kind, { ...run.track, powerOff: !s.power }, !!run.situation && outdoors(run.situation));
+};
 
 export function finishDrill(reached: boolean) {
   const s = getState();
@@ -451,5 +461,5 @@ export function finishDrill(reached: boolean) {
     checks: grade(s.scenario.kind, tracked, !!run.situation && outdoors(run.situation)),
   };
   // The results show the optimal route from the start, not whatever hint was last drawn.
-  setState({ phase: "done", route: run.optimalRoute, showRoute: true, result: { ...stats, score: scoreDrill(stats) } });
+  setState({ phase: "done", route: run.optimalRoute, showRoute: true, result: { ...stats, score: scoreDrill(stats), guided: s.guided } });
 }

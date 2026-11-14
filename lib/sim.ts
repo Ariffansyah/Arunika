@@ -366,13 +366,15 @@ export type Tracked = {
   slopeS: number;
 };
 
-export type Check = { label: string; ok: boolean; got: number; max: number };
+// `pending` marks a step that has not come up yet in a drill still running, such as a report not yet made.
+export type Check = { label: string; ok: boolean; got: number; max: number; pending: boolean };
 
-const check = (label: string, max: number, part: number, ok = part >= 1): Check => ({
+const check = (label: string, max: number, part: number, ok = part >= 1, pending = false): Check => ({
   label,
   ok,
   got: Math.round(max * Math.min(1, Math.max(0, part))),
   max,
+  pending,
 });
 
 // The procedure for each disaster as a checklist; points add up to 1000. `outside` is a quake that
@@ -383,40 +385,40 @@ export function grade(kind: Scenario["kind"], t: Tracked, outside = false): Chec
     const cover = t.shakeS ? (t.deskS + 0.5 * (t.coverS - t.deskS)) / t.shakeS / 0.8 : 1;
     const after = t.aftershockS ? t.aftershockCoverS / t.aftershockS / 0.5 : 1;
     return [
-      check(outside ? "Merunduk di tempat terbuka saat guncangan" : "Berlindung di bawah meja saat guncangan", 200, cover),
+      check(outside ? "Merunduk di tempat terbuka saat guncangan" : "Berlindung di bawah meja saat guncangan", 200, cover, cover >= 1, !t.shakeS),
       check("Tetap di tempat selama guncangan", 100, t.shakeMoved < 2 ? 1 : 0),
       check(outside ? "Menjauhi gedung dan pohon" : "Menjauhi jendela dan lemari", 100, t.nearFallS < 1 ? 1 : 0),
       check("Berjalan, tidak berlari di dalam gedung", 100, t.runIndoorS < 1 ? 1 : 0),
       check("Tidak kembali masuk gedung", 100, t.reentered ? 0 : 1),
       check("Menghindari reruntuhan di luar gedung", 100, 1 - t.debrisS / 10, t.debrisS < 2),
-      check("Merunduk di luar gedung saat gempa susulan", 100, t.aftershockIndoorS < 1 ? after : 0),
-      check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0),
+      check("Merunduk di luar gedung saat gempa susulan", 100, t.aftershockIndoorS < 1 ? after : 0, undefined, !t.aftershockS),
+      check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0, undefined, !t.reached),
     ];
   }
   if (kind === "angin") {
     return [
-      check("Masuk ke ruang aman sebelum angin tiba", 300, t.sheltered ? 1 : 0),
+      check("Masuk ke ruang aman sebelum angin tiba", 300, t.sheltered ? 1 : 0, undefined, !t.windS && !t.sheltered),
       check("Menjauhi jendela saat angin melintas", 150, t.windWindowS < 1 ? 1 : 0),
-      check("Merunduk dan melindungi kepala", 150, t.windS ? t.windCoverS / t.windS / 0.5 : 0),
+      check("Merunduk dan melindungi kepala", 150, t.windS ? t.windCoverS / t.windS / 0.5 : 0, undefined, !t.windS),
       check("Tidak di luar atau di kantin saat angin", 150, t.windExposedS < 1 ? 1 : 0),
       check("Tetap di ruang aman sampai angin reda", 100, t.leftShelter ? 0 : 1),
-      check("Lapor ke guru setelah angin reda", 150, t.reached ? 1 : 0),
+      check("Lapor ke guru setelah angin reda", 150, t.reached ? 1 : 0, undefined, !t.reached),
     ];
   }
   if (kind === "longsor") {
     return [
-      check("Memeriksa tanda longsor di lereng", 150, t.signSeen ? 1 : 0),
-      check("Membunyikan kentongan", 150, t.alarm ? 1 : 0),
+      check("Memeriksa tanda longsor di lereng", 150, t.signSeen ? 1 : 0, undefined, !t.signSeen),
+      check("Membunyikan kentongan", 150, t.alarm ? 1 : 0, undefined, !t.alarm),
       check("Menjauh dari lereng sebelum longsor", 300, t.caught ? 0 : 1),
       check("Tidak naik ke bukit atau mendekati lereng", 200, t.slopeS < 2 ? 1 : 0),
-      check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0),
+      check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0, undefined, !t.reached),
     ];
   }
   return [
-    check("Mematikan listrik di panel", 150, t.powerOff ? 1 : 0),
-    check("Membunyikan kentongan", 150, t.alarm ? 1 : 0),
+    check("Mematikan listrik di panel", 150, t.powerOff ? 1 : 0, undefined, !t.powerOff),
+    check("Membunyikan kentongan", 150, t.alarm ? 1 : 0, undefined, !t.alarm),
     check("Tidak melewati air setinggi lutut", 300, 1 - t.deepWaterS / 20, t.deepWaterS < 3),
-    check("Naik ke tempat tinggi dan lapor", 400, t.reached ? 1 : 0),
+    check("Naik ke tempat tinggi dan lapor", 400, t.reached ? 1 : 0, undefined, !t.reached),
   ];
 }
 

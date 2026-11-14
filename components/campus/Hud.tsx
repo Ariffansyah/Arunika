@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Layers, Link2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Eye, Layers, Link2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -9,16 +9,13 @@ import { H, MAP, TILE, W } from "@/lib/campus";
 import { MAPS } from "@/lib/maps";
 import { INTENSITY, SCENARIO_LABEL, waterLevel, within, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
-import { aftershockAt, finishDrill, input, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
+import { aftershockAt, finishDrill, input, liveChecks, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
 import { interact } from "./interact";
+import Learn from "./Learn";
+import { KindPicker, btn, ghost, panel, primary, radio } from "./ui";
 import { rumble, siren } from "./sound";
 import type { Peer } from "./useRoom";
 
-const panel = "rounded-lg border border-malam-3 bg-malam/92 p-4 shadow-lg";
-const btn =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 font-semibold active:translate-y-px disabled:opacity-60";
-const primary = `${btn} bg-fajar text-malam hover:bg-fajar-tua`;
-const ghost = `${btn} border border-malam-3 text-pasir hover:border-redup`;
 
 export const ROOM_PATTERN = /^[a-z0-9-]{3,40}$/i;
 
@@ -94,8 +91,6 @@ function Minimap() {
 }
 
 const campusUrl = (room: string, map: string) => `/kampus?room=${encodeURIComponent(room)}&peta=${map}`;
-const radio =
-  "flex min-h-11 items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold has-checked:border-fajar has-checked:text-fajar has-focus-visible:outline-2 has-focus-visible:outline-fajar";
 
 function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario) => void }) {
   const scenario = useDrill((s) => s.scenario);
@@ -126,23 +121,7 @@ function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario
           ))}
         </div>
       </fieldset>
-      <fieldset>
-        <legend className="text-sm font-semibold">Skenario</legend>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {MAP.disasters.map((k) => (
-            <label key={k} className={radio}>
-              <input
-                type="radio"
-                name="kind"
-                className="sr-only"
-                checked={scenario.kind === k}
-                onChange={() => setState({ scenario: { kind: k, intensity: INTENSITY[k].start } })}
-              />
-              {SCENARIO_LABEL[k]}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <KindPicker legend="Skenario" />
       <label className="block text-sm font-semibold" htmlFor="intensity">
         {`${meta.label}: ${scenario.intensity.toFixed(meta.step < 1 ? 1 : 0)} ${meta.unit}`.trim()}
         <input
@@ -167,9 +146,33 @@ function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario
   );
 }
 
+// The checklist as it stands, for the guided practice: done, broken, or still to come.
+function LiveChecks() {
+  return (
+    <ul className="space-y-1">
+      {liveChecks().map((c) => (
+        <li key={c.label} className={`flex items-start gap-2 ${c.pending ? "text-redup" : ""}`}>
+          {c.pending ? (
+            <Circle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          ) : c.ok ? (
+            <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-aman" />
+          ) : (
+            <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-bahaya" />
+          )}
+          <span>
+            <span className="sr-only">{c.pending ? "Belum: " : c.ok ? "Sudah: " : "Terlewat: "}</span>
+            {c.label}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Instruction({ t }: { t: number }) {
   const scenario = useDrill((s) => s.scenario);
   const hint = useDrill((s) => s.showRoute);
+  const guided = useDrill((s) => s.guided);
   const report = useDrill((s) => s.prompt?.id === "lapor");
   if (t < 0)
     return (
@@ -221,12 +224,42 @@ function Instruction({ t }: { t: number }) {
         {scenario.kind === "banjir" && <> · Tinggi air {waterLevel(scenario, t, run.timeline.rise).toFixed(2)} m</>}
         {wind && t < wind[0] && <> · Angin tiba {Math.ceil(wind[0] - t)} dtk</>}
       </p>
+      {guided && <LiveChecks />}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={ghost} onClick={showHint} disabled={hint}>
-          {hint ? "Jalur AI ditampilkan" : "Tampilkan jalur AI (−150 poin)"}
-        </button>
+        {!guided && (
+          <button type="button" className={ghost} onClick={showHint} disabled={hint}>
+            {hint ? "Jalur AI ditampilkan" : "Tampilkan jalur AI (−150 poin)"}
+          </button>
+        )}
         <button type="button" className={ghost} onClick={() => finishDrill(false)}>
           Akhiri latihan
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GuidedResults({ result, onStart }: { result: DrillResult; onStart: () => void }) {
+  return (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-extrabold">Latihan selesai</h2>
+      <ul className="space-y-1">
+        {result.checks.map((c) => (
+          <li key={c.label} className="flex items-start gap-2">
+            {c.ok ? <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-aman" /> : <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-bahaya" />}
+            <span>
+              <span className="sr-only">{c.ok ? "Benar: " : "Belum: "}</span>
+              {c.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="grid gap-2">
+        <button type="button" className={primary} onClick={onStart}>
+          Mulai simulasi
+        </button>
+        <button type="button" className={ghost} onClick={() => setState({ phase: "idle", showRoute: false, result: null })}>
+          Kembali belajar
         </button>
       </div>
     </div>
@@ -409,14 +442,18 @@ export default function Hud({
   status,
   school,
   onStart,
+  onGuided,
 }: {
   room: string;
   peers: Peer[];
   status: "connecting" | "online" | "offline";
   school: School | null;
   onStart: (s: Scenario) => void;
+  onGuided: (s: Scenario) => void;
 }) {
   const phase = useDrill((s) => s.phase);
+  const guided = useDrill((s) => s.guided);
+  const [tab, setTab] = useState<"belajar" | "simulasi">("belajar");
   const scenario = useDrill((s) => s.scenario);
   const startAt = useDrill((s) => s.startAt);
   const result = useDrill((s) => s.result);
@@ -426,6 +463,13 @@ export default function Hud({
   const t = useDrillClock();
   const router = useRouter();
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
+
+  // In the guided practice the route follows the player, so it always starts underfoot.
+  useEffect(() => {
+    if (phase !== "running" || !guided) return;
+    const id = setInterval(showHint, 1000);
+    return () => clearInterval(id);
+  }, [phase, guided]);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -524,9 +568,30 @@ export default function Hud({
       </div>
 
       <div className={`${panel} pointer-events-auto max-h-[70dvh] w-full max-w-sm overflow-y-auto text-sm pointer-coarse:mb-[14rem]`}>
-        {phase === "idle" && <ScenarioPicker room={room} onStart={onStart} />}
+        {phase === "idle" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              {(["belajar", "simulasi"] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={tab === k}
+                  onClick={() => setTab(k)}
+                  className={`${radio} ${tab === k ? "border-fajar text-fajar" : ""}`}
+                >
+                  {k === "belajar" ? "Belajar" : "Simulasi"}
+                </button>
+              ))}
+            </div>
+            {tab === "belajar" ? (
+              <Learn onGuided={() => onGuided(scenario)} onStart={() => onStart(scenario)} />
+            ) : (
+              <ScenarioPicker room={room} onStart={onStart} />
+            )}
+          </div>
+        )}
         {phase === "running" && <Instruction t={t} />}
-        {phase === "done" && result && <Results result={result} room={room} schoolId={school?.id ?? null} />}
+        {phase === "done" && result && (result.guided ? <GuidedResults result={result} onStart={() => onStart(result.scenario)} /> : <Results result={result} room={room} schoolId={school?.id ?? null} />)}
       </div>
       <TouchPad />
       {mapOpen && <MapOverlay />}
