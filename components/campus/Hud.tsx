@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
-import { H, TILE, W } from "@/lib/campus";
+import { H, MAP, TILE, W } from "@/lib/campus";
+import { MAPS } from "@/lib/maps";
 import { INTENSITY, SCENARIO_LABEL, waterLevel, within, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { aftershockAt, finishDrill, input, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
@@ -92,7 +93,11 @@ function Minimap() {
   );
 }
 
-function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
+const campusUrl = (room: string, map: string) => `/kampus?room=${encodeURIComponent(room)}&peta=${map}`;
+const radio =
+  "flex min-h-11 items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold has-checked:border-fajar has-checked:text-fajar has-focus-visible:outline-2 has-focus-visible:outline-fajar";
+
+function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario) => void }) {
   const scenario = useDrill((s) => s.scenario);
   const meta = INTENSITY[scenario.kind];
   return (
@@ -104,13 +109,28 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
       }}
     >
       <fieldset>
+        <legend className="text-sm font-semibold">Peta</legend>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {Object.values(MAPS).map((m) => (
+            <label key={m.id} className={radio}>
+              <input
+                type="radio"
+                name="peta"
+                className="sr-only"
+                checked={MAP.id === m.id}
+                // The layout is fixed for a page load, so another map is another page.
+                onChange={() => location.assign(campusUrl(room, m.id))}
+              />
+              {m.name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <fieldset>
         <legend className="text-sm font-semibold">Skenario</legend>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          {(["gempa", "banjir", "angin", "longsor"] as const).map((k) => (
-            <label
-              key={k}
-              className="flex min-h-11 items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold has-checked:border-fajar has-checked:text-fajar has-focus-visible:outline-2 has-focus-visible:outline-fajar"
-            >
+          {MAP.disasters.map((k) => (
+            <label key={k} className={radio}>
               <input
                 type="radio"
                 name="kind"
@@ -227,6 +247,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
         school_id: schoolId,
         room,
         scenario: result.scenario.kind,
+        map: MAP.id,
         intensity: result.scenario.intensity,
         score: result.score,
         time_s: Math.round(result.timeS * 10) / 10,
@@ -237,6 +258,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
         .from("drill_results")
         .select("score, time_s, profiles(display_name)")
         .eq("room", room)
+        .eq("map", MAP.id)
         .eq("scenario", result.scenario.kind)
         .not("user_id", "is", null)
         .order("score", { ascending: false })
@@ -421,7 +443,9 @@ export default function Hud({
             <Link href="/" className="font-extrabold text-pasir">
               Arunika<span className="text-fajar">.</span>
             </Link>
-            <span className="text-redup">{school?.name ?? "Kampus contoh"}</span>
+            <span className="text-redup">
+              {school?.name ?? "Kampus contoh"} · {MAP.name}
+            </span>
           </div>
           <p>
             Ruang <strong>{room.length > 12 ? `${room.slice(0, 8)}…` : room}</strong> ·{" "}
@@ -437,7 +461,7 @@ export default function Hud({
               onClick={() =>
                 // The clipboard API is missing on plain-http pages; that throws synchronously, so start from a promise.
                 Promise.resolve()
-                  .then(() => navigator.clipboard.writeText(`${location.origin}/kampus?room=${encodeURIComponent(room)}`))
+                  .then(() => navigator.clipboard.writeText(`${location.origin}${campusUrl(room, MAP.id)}`))
                   .then(() => setCopied("ok"))
                   .catch(() => setCopied("fail"))
               }
@@ -451,7 +475,7 @@ export default function Hud({
             onSubmit={(e) => {
               e.preventDefault();
               const code = String(new FormData(e.currentTarget).get("room")).trim();
-              if (ROOM_PATTERN.test(code)) router.push(`/kampus?room=${encodeURIComponent(code)}`);
+              if (ROOM_PATTERN.test(code)) router.push(campusUrl(code, MAP.id));
             }}
           >
             <label htmlFor="room" className="sr-only">
@@ -495,7 +519,7 @@ export default function Hud({
       </div>
 
       <div className={`${panel} pointer-events-auto max-h-[70dvh] w-full max-w-sm overflow-y-auto text-sm pointer-coarse:mb-[14rem]`}>
-        {phase === "idle" && <ScenarioPicker onStart={onStart} />}
+        {phase === "idle" && <ScenarioPicker room={room} onStart={onStart} />}
         {phase === "running" && <Instruction t={t} />}
         {phase === "done" && result && <Results result={result} room={room} schoolId={school?.id ?? null} />}
       </div>

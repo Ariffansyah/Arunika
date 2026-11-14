@@ -142,7 +142,7 @@ test("a landslide leaves a safe assembly point off the slope, and buildings belo
   const risks = campusRisks(main, site, s, 2026);
   const goals = safeAssembly(s, hazardTiles(s, risks));
   assert.ok(goals.length >= 1);
-  for (const g of goals) assert.ok(!inRunout(...tileCenter(...g)));
+  for (const g of goals) assert.ok(!inRunout(...tileCenter(...g)) && tileAt(...g) !== "A", "off the slope and off the hill");
   const ranked = Object.entries(risks).sort((a, b) => b[1] - a[1]);
   assert.ok(ranked[0][1] > ranked.at(-1)![1], `${ranked[0][0]} below the slope is more at risk`);
 });

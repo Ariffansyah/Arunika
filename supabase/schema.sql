@@ -53,7 +53,13 @@ create table if not exists public.assessments (
 alter table public.drill_results drop constraint if exists drill_results_scenario_check;
 alter table public.drill_results add constraint drill_results_scenario_check check (scenario in ('gempa', 'banjir', 'angin', 'longsor'));
 
-create index if not exists drill_results_room_idx on public.drill_results (room, scenario, score desc);
+-- Each campus map has its own leaderboard; results from before maps existed were all on the coastal campus.
+alter table public.drill_results add column if not exists map text not null default 'pesisir';
+alter table public.drill_results drop constraint if exists drill_results_map_check;
+alter table public.drill_results add constraint drill_results_map_check check (map in ('pesisir', 'pegunungan', 'kota'));
+
+drop index if exists drill_results_room_idx;
+create index if not exists drill_results_room_map_idx on public.drill_results (room, map, scenario, score desc);
 create index if not exists assessments_school_idx on public.assessments (school_id, created_at desc);
 
 -- Aggregates only: no names or user ids leave this view.

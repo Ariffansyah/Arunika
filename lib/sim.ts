@@ -147,11 +147,11 @@ function nearChar(x: number, z: number, c: string, r: number) {
   return false;
 }
 
-// A whirlwind is sat out indoors, so it has no safe open-air assembly point.
+// A whirlwind is sat out indoors, so it has no safe open-air assembly point; in a landslide nobody climbs the hill.
 export function safeAssembly(s: Scenario, hazards: Set<number>): Tile[] {
   if (s.kind === "angin") return [];
   return ASSEMBLY.filter(([x, z]) =>
-    s.kind === "banjir" ? tileElevation(x, z) > s.intensity + 0.2 : !hazards.has(idx(x, z)),
+    s.kind === "banjir" ? tileElevation(x, z) > s.intensity + 0.2 : !hazards.has(idx(x, z)) && !(s.kind === "longsor" && nearChar(x, z, "h", 1)),
   );
 }
 

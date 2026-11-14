@@ -2,7 +2,7 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
-import { SITE_D, SITE_W } from "@/lib/campus";
+import { MAP, SITE_D, SITE_W } from "@/lib/campus";
 import { classrooms } from "@/lib/floorplan";
 import { INTENSITY, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
@@ -20,6 +20,7 @@ function parseScenario(p: unknown): Scenario | null {
   const s = p as { kind?: unknown; intensity?: unknown } | null;
   if (typeof s?.kind !== "string" || !Object.hasOwn(INTENSITY, s.kind)) return null;
   const kind = s.kind as Scenario["kind"];
+  if (!MAP.disasters.includes(kind)) return null;
   const v = num(s.intensity, ...INTENSITY[kind].range);
   return v === null ? null : { kind, intensity: v };
 }
@@ -31,7 +32,8 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
 
   useEffect(() => {
     const sb = supabase();
-    const ch = sb.channel(`room:${room}`, { config: { presence: { key: me.id }, broadcast: { self: false } } });
+    // Players on different maps would walk through each other's walls, so each map has its own channel.
+    const ch = sb.channel(`room:${room}:${MAP.id}`, { config: { presence: { key: me.id }, broadcast: { self: false } } });
     channel.current = ch;
 
     let joined = false;
