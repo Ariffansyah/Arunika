@@ -125,7 +125,8 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
   });
   return (
     <group ref={ref}>
-      <Character look={STUDENTS[i]} speed={1.2} anim={() => (walking.current ? "sprint" : "idle")} />
+      {/* The run clip is timed for 3.5 m/s; these students sprint faster, so their legs keep up. */}
+      <Character look={STUDENTS[i]} speed={RUN_SPEED / 3.5} anim={() => (walking.current ? "sprint" : "idle")} />
     </group>
   );
 }

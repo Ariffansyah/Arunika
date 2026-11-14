@@ -8,7 +8,7 @@ import Model, { M } from "@/components/Model";
 import { ASSEMBLY, TILE, W, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
 import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
-import { RUNOUT, random, vortexAt, waterLevel, within } from "@/lib/sim";
+import { RUNOUT, WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
 import { CLASSMATE_SEATS, SIGNS, aftershockAt, drillTime, getState, roomSeats, run, shakingAt } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
 
@@ -26,8 +26,9 @@ const mates = LOOKS.map(() => ({ x: 0, z: 0 }));
 // Drills teach walking briskly, not running: classmates model that, ducking first when the ground shakes.
 function Classmate({ i }: { i: number }) {
   const ref = useRef<Group>(null);
-  const me = useRef({ x: 0, z: 0, layer: 0, heading: 0, key: "", anim: "sit" as Anim });
+  const me = useRef({ x: 0, z: 0, layer: 0, heading: 0, key: "", anim: "sit" as Anim, under: 0 });
   const speed = 1.3 + ((i * 37) % 10) / 25;
+  const height = 1.45 + (i % 3) * 0.08;
   const delay = 0.3 + ((i * 53) % 10) / 6;
 
   useFrame((_, dt) => {
@@ -88,15 +89,15 @@ function Classmate({ i }: { i: number }) {
     }
     mates[i].x = st.x;
     mates[i].z = st.z;
-    // Ducking at their seat puts them under the desk in front of them.
-    const under = st.anim === "cover" ? 0.45 : 0;
-    g.position.set(st.x + Math.sin(st.heading) * under, groundY(st.x, st.z, st.layer), st.z + Math.cos(st.heading) * under);
+    // Ducking at their seat slides them under the desk in front of them.
+    st.under += ((st.anim === "cover" ? 0.45 : 0) - st.under) * (1 - Math.exp(-dt * 10));
+    g.position.set(st.x + Math.sin(st.heading) * st.under, groundY(st.x, st.z, st.layer), st.z + Math.cos(st.heading) * st.under);
     g.rotation.y = st.heading;
   });
 
   return (
     <group ref={ref}>
-      <Character look={LOOKS[i]} height={1.45 + (i % 3) * 0.08} speed={1.1} anim={() => me.current.anim} />
+      <Character look={LOOKS[i]} height={height} speed={(speed / WALK_SPEED) * (1.6 / height)} anim={() => me.current.anim} />
     </group>
   );
 }

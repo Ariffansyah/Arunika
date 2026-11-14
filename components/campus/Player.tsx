@@ -62,6 +62,9 @@ export default function Player({ look: character, name }: { look: Look; name: st
   const camLift = useRef(0);
   const eye = useRef(new Vector3());
   const pivotAt = useRef(new Vector3());
+  const tuck = useRef(0);
+  const eyeHeight = useRef(1.35);
+  const deskAt = useRef<[number, number]>([0, 0]);
 
   useEffect(() => {
     reducedMotion.current = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -192,9 +195,13 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const g = ref.current;
     if (g) {
       g.position.set(player.x, player.y, player.z);
-      // Curled up, the body fits right under the desk; the player stays where they stood, which is clear of it.
+      // Curled up, the body slides right under the desk; the player stays where they stood, which is clear of it.
       const desk = PLAN.items[player.cover];
-      if (desk) g.position.set(desk.x, player.y, desk.z);
+      if (desk) deskAt.current = [desk.x, desk.z];
+      tuck.current += ((desk ? 1 : 0) - tuck.current) * (1 - Math.exp(-dt * 10));
+      const [ux, uz] = deskAt.current;
+      g.position.x += (ux - player.x) * tuck.current;
+      g.position.z += (uz - player.z) * tuck.current;
       g.rotation.y = player.heading;
       g.visible = !first;
     }
@@ -202,7 +209,10 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const strength = running && s.scenario.kind === "gempa" ? (shakingAt(t) ? 1 : aftershockAt(t) ? 0.45 : 0) : 0;
     const shake = strength * (0.05 + (s.scenario.intensity - 5) * 0.04) * (reducedMotion.current ? 0.2 : 1);
     const jitter = () => (Math.random() - 0.5) * shake;
-    const target = eye.current.set(player.x, player.y + (player.cover >= 0 ? 0.5 : player.crouch ? 0.75 : player.seated ? 1.05 : 1.35), player.z);
+    // Eased like the body's own crossfade, so ducking or standing up doesn't jolt the view.
+    const eyeTo = player.cover >= 0 ? 0.5 : player.crouch ? 0.75 : player.seated ? 1.05 : 1.35;
+    eyeHeight.current += (eyeTo - eyeHeight.current) * (1 - Math.exp(-dt * 10));
+    const target = eye.current.set(player.x, player.y + eyeHeight.current, player.z);
 
     if (first) {
       camera.position.set(target.x + jitter(), target.y + jitter(), target.z + jitter());
