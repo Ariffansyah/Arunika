@@ -44,21 +44,26 @@ export type Tile = [x: number, z: number];
 export type Material = "beton_bertulang" | "bata_tanpa_tulangan" | "kayu" | "baja_ringan";
 export type Soil = "keras" | "sedang" | "lunak";
 
+export type BuildingKind = "kelas" | "kantor" | "perpustakaan" | "kantin" | "musholla";
+
 export type Building = {
   name: string;
+  kind: BuildingKind;
   floors: number;
   // Undefined means the school's main material from its profile.
   material?: Material;
   yearOffset: number;
+  // The face with the corridor or main doors.
+  entrance: "N" | "S" | "E" | "W";
 };
 
 export const BUILDINGS: Record<string, Building> = {
-  "1": { name: "Gedung Kelas A", floors: 2, yearOffset: 0 },
-  "2": { name: "Gedung Kelas B", floors: 1, material: "bata_tanpa_tulangan", yearOffset: -8 },
-  "3": { name: "Kantor Guru & TU", floors: 1, material: "beton_bertulang", yearOffset: 15 },
-  "4": { name: "Perpustakaan", floors: 1, material: "kayu", yearOffset: -12 },
-  "5": { name: "Kantin", floors: 1, material: "baja_ringan", yearOffset: 6 },
-  "6": { name: "Musholla", floors: 1, material: "beton_bertulang", yearOffset: 10 },
+  "1": { name: "Gedung Kelas A", kind: "kelas", floors: 2, yearOffset: 0, entrance: "S" },
+  "2": { name: "Gedung Kelas B", kind: "kelas", floors: 1, material: "bata_tanpa_tulangan", yearOffset: -8, entrance: "N" },
+  "3": { name: "Kantor Guru & TU", kind: "kantor", floors: 1, material: "beton_bertulang", yearOffset: 15, entrance: "S" },
+  "4": { name: "Perpustakaan", kind: "perpustakaan", floors: 1, material: "kayu", yearOffset: -12, entrance: "E" },
+  "5": { name: "Kantin", kind: "kantin", floors: 1, material: "baja_ringan", yearOffset: 6, entrance: "W" },
+  "6": { name: "Musholla", kind: "musholla", floors: 1, material: "beton_bertulang", yearOffset: 10, entrance: "S" },
 };
 
 export const ASSEMBLY_NAMES: Record<string, string> = {
