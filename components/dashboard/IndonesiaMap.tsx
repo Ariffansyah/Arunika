@@ -1,9 +1,10 @@
 "use client";
 
-import { Html, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { useEffect, useMemo, useState } from "react";
 import { ExtrudeGeometry, Shape, Vector2 } from "three";
+import Html from "@/components/Html";
 
 export type MapSchool = { id: string; name: string; lat: number; lon: number; exposure: number; color: string };
 

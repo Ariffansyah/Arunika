@@ -1,6 +1,6 @@
 "use client";
 
-import { Html, Line, Sky } from "@react-three/drei";
+import { Line, Sky } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import {
@@ -34,6 +34,7 @@ import {
 import { QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
+import Html from "@/components/Html";
 import Model, { M } from "@/components/Model";
 import Avatar from "./Avatar";
 import { Beacons, Classmates, FloodDebris, QuakeDebris } from "./Effects";

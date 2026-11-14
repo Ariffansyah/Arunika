@@ -1,6 +1,6 @@
 "use client";
 
-import { Html } from "@react-three/drei";
+import Html from "@/components/Html";
 import { Suspense } from "react";
 import Character, { type Anim, type Look } from "@/components/Character";
 
