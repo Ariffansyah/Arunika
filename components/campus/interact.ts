@@ -1,8 +1,7 @@
 import { WARDEN, tileCenter } from "@/lib/campus";
 import { PLAN, WALL } from "@/lib/floorplan";
 import { groundY, type Extra } from "@/lib/nav";
-import { QUAKE_SHAKE_S } from "@/lib/sim";
-import { finishDrill, getState, net, openChat, player, run, setState, type Prompt } from "./drillStore";
+import { drillTime, finishDrill, getState, isUpstairs, net, openChat, player, run, setState, shakingAt, type Prompt } from "./drillStore";
 import { kentongan } from "./sound";
 
 const REACH = 1.4;
@@ -27,12 +26,13 @@ export function setDoor(id: string, open: boolean, tell = true) {
 
 export function raiseAlarm(tell = true) {
   kentongan();
+  if (getState().phase === "running") run.track.alarm = true;
   if (tell) net.send?.("alarm", {});
 }
 
-// A closed door fills its opening like the wall around it, up to the door's height.
+// A closed door, or one buried in rubble, fills its opening like the wall around it, up to the door's height.
 export const closedDoors: Extra = (x0, z0, x1, z1, lo, hi) =>
-  getState().closedDoors.some((id) => {
+  [...getState().closedDoors, ...run.blocked].some((id) => {
     const d = DOORS.get(id)!;
     const [hx, hz] = d.along === "x" ? [d.w / 2, WALL] : [WALL, d.w / 2];
     return d.x - hx < x1 && d.x + hx > x0 && d.z - hz < z1 && d.z + hz > z0 && d.y < hi && d.y + 2.1 > lo;
@@ -46,12 +46,15 @@ export function openDoorsNear(x: number, z: number, y: number) {
   }
 }
 
+const inRefuge = () => run.upstairs && isUpstairs(player.x, player.z, player.layer);
+
 export const atGoal = () =>
-  player.layer === 0 &&
-  run.goals.some((g) => {
-    const [gx, gz] = tileCenter(...g);
-    return Math.hypot(gx - player.x, gz - player.z) < 4.8;
-  });
+  inRefuge() ||
+  (player.layer === 0 &&
+    run.goals.some((g) => {
+      const [gx, gz] = tileCenter(...g);
+      return Math.hypot(gx - player.x, gz - player.z) < 4.8;
+    }));
 
 // The warden waits beside the first safe assembly point during a drill to take reports.
 export function wardenSpot(): [number, number] {
@@ -63,10 +66,11 @@ export function wardenSpot(): [number, number] {
 
 export function findPrompt(): Prompt | null {
   const s = getState();
-  const t = (Date.now() - s.startAt) / 1000;
+  const t = drillTime();
   const running = s.phase === "running";
-  const shaking = running && s.scenario.kind === "gempa" && t < QUAKE_SHAKE_S;
-  if (running && t >= 0 && !shaking && atGoal()) {
+  if (running && t >= 0 && !shakingAt(t) && atGoal()) {
+    // Upstairs refuges have no warden; the report goes to the teacher there.
+    if (inRefuge()) return { id: "lapor", label: "Lapor ke guru", x: player.x, y: player.y + 2.2, z: player.z };
     const [x, z] = wardenSpot();
     return { id: "lapor", label: "Lapor ke petugas", x, y: groundY(x, z, 0) + 2.3, z };
   }
@@ -83,7 +87,9 @@ export function findPrompt(): Prompt | null {
     const it = PLAN.items[i];
     consider(`meja-${i}`, "Berlindung di bawah meja", it.x, it.z, it.y, 1.1);
   }
-  for (const d of PLAN.doors) consider(d.id, s.closedDoors.includes(d.id) ? "Buka pintu" : "Tutup pintu", d.x, d.z, d.y, 1.7);
+  for (const d of PLAN.doors) {
+    if (!run.blocked.includes(d.id)) consider(d.id, s.closedDoors.includes(d.id) ? "Buka pintu" : "Tutup pintu", d.x, d.z, d.y, 1.7);
+  }
   PLAN.spots.forEach((sp, i) => consider(`${sp.kind}-${i}`, SPOT_LABEL[sp.kind](), sp.x, sp.z, groundY(sp.x, sp.z, sp.floor), 1.9));
   if (!best && !running) {
     const [x, z] = wardenSpot();

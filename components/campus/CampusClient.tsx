@@ -34,8 +34,9 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
   const onStart = (s: Scenario) => {
     const rooms = classrooms();
     const room = rooms[Math.floor(Math.random() * rooms.length)].id;
-    startDrill(s, me.school, 1500, room);
-    broadcastDrill(s, room);
+    const seed = Math.floor(Math.random() * 2 ** 31);
+    startDrill(s, me.school, 1500, room, seed);
+    broadcastDrill(s, room, seed);
   };
 
   return (

@@ -67,7 +67,8 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
       .on("broadcast", { event: "drill" }, ({ payload }) => {
         const s = parseScenario(payload?.scenario);
         const room = classrooms().find((r) => r.id === payload?.room)?.id;
-        if (s && room) startDrill(s, school, 1500, room);
+        const seed = num(payload?.seed, 0, 2 ** 31);
+        if (s && room && seed !== null) startDrill(s, school, 1500, room, Math.floor(seed));
       })
       .subscribe(async (st) => {
         if (st === "SUBSCRIBED") {
@@ -103,8 +104,8 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
     };
   }, [room, me.id, me.name, me.avatar, school]);
 
-  const broadcastDrill = (scenario: Scenario, room: string) =>
-    channel.current?.send({ type: "broadcast", event: "drill", payload: { scenario, room } });
+  const broadcastDrill = (scenario: Scenario, room: string, seed: number) =>
+    channel.current?.send({ type: "broadcast", event: "drill", payload: { scenario, room, seed } });
 
   return { peers, status, broadcastDrill };
 }

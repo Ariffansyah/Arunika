@@ -6,16 +6,11 @@ import { Color, Object3D, type Group, type InstancedMesh, type Mesh } from "thre
 import Character, { type Anim, type Look } from "@/components/Character";
 import Model, { M } from "@/components/Model";
 import { ASSEMBLY, TILE, W, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
-import { PLAN, classrooms } from "@/lib/floorplan";
+import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
-import { QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
-import { CLASSMATE_SEATS, getState, roomSeats, run } from "./drillStore";
+import { random, waterLevel } from "@/lib/sim";
+import { CLASSMATE_SEATS, aftershockAt, drillTime, getState, roomSeats, run, shakingAt } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
-
-const drillTime = () => {
-  const s = getState();
-  return s.phase === "idle" ? -Infinity : (Date.now() - s.startAt) / 1000;
-};
 
 const wading = (x: number, z: number, layer = 0) => {
   const s = getState();
@@ -49,12 +44,12 @@ function Classmate({ i }: { i: number }) {
     }
     const t = drillTime();
     const quake = s.scenario.kind === "gempa";
-    const shaking = quake && t >= 0 && t < QUAKE_SHAKE_S;
+    const shaking = quake && shakingAt(t);
     const field = s.phase !== "idle" ? run.field : null;
 
     if (!field || t < 0) st.anim = "sit";
-    else if (shaking) st.anim = "crouch";
-    else if (t < (quake ? QUAKE_SHAKE_S : 0) + delay) st.anim = quake ? "idle" : "sit";
+    else if (shaking || (quake && aftershockAt(t))) st.anim = "crouch";
+    else if (t < (run.timeline.shake?.[1] ?? 0) + delay) st.anim = quake ? "idle" : "sit";
     else {
       const next = distanceAt(field, st.x, st.z, st.layer) > 0 ? nextStep(field, st.x, st.z, st.layer) : null;
       if (next) {
@@ -92,7 +87,9 @@ function Classmate({ i }: { i: number }) {
     }
     mates[i].x = st.x;
     mates[i].z = st.z;
-    g.position.set(st.x, groundY(st.x, st.z, st.layer), st.z);
+    // Ducking at their seat puts them under the desk in front of them.
+    const under = shaking ? 0.35 : 0;
+    g.position.set(st.x + Math.sin(st.heading) * under, groundY(st.x, st.z, st.layer), st.z + Math.cos(st.heading) * under);
     g.rotation.y = st.heading;
   });
 
@@ -145,7 +142,8 @@ export function QuakeDebris() {
       chunks.current = pick.map((k, n) => {
         const x = ((k % W) + 0.2 + ((n * 37) % 10) / 16) * TILE;
         const z = (Math.floor(k / W) + 0.2 + ((n * 53) % 10) / 16) * TILE;
-        return { x, z, y0: 4 + ((n * 17) % 10) / 2.5, at: 0.4 + ((n * 29) % 100) / 100 * (QUAKE_SHAKE_S - 1.4), spin: (n % 7) - 3 };
+        const end = run.timeline.shake?.[1] ?? 8;
+        return { x, z, y0: 4 + ((n * 17) % 10) / 2.5, at: 0.4 + (((n * 29) % 100) / 100) * (end - 1.4), spin: (n % 7) - 3 };
       });
     }
     const t = drillTime();
@@ -240,3 +238,107 @@ export function Beacons() {
   });
 }
 
+
+const SHARDS_PER_PANE = 6;
+const GLASS = new Color("#cfe6f2");
+
+// Broken windows leave glass on the floor on both sides, the reason to stay away from them while it shakes.
+export function GlassShards() {
+  const ref = useRef<InstancedMesh>(null);
+  const drill = useRef(-1);
+  const shown = useRef(-1);
+  const spots = useRef<{ x: number; y: number; z: number; ry: number; at: number }[]>([]);
+  const o = useRef(new Object3D());
+
+  useFrame(() => {
+    const mesh = ref.current;
+    const s = getState();
+    if (!mesh) return;
+    if (drill.current !== s.startAt) {
+      drill.current = s.startAt;
+      shown.current = -1;
+      const rnd = random(run.seed + 17);
+      spots.current = [...run.breaks].flatMap(([i, at]) => {
+        const p = PLAN.panes[i];
+        const floor = PLAN.floorY[p.b] + p.floor * STOREY;
+        return Array.from({ length: SHARDS_PER_PANE }, () => {
+          const along = (rnd() - 0.5) * p.w;
+          const off = (rnd() < 0.5 ? -1 : 1) * (0.15 + rnd() * 0.8);
+          const [x, z] = p.along === "x" ? [p.x + along, p.z + off] : [p.x + off, p.z + along];
+          return { x, y: floor + 0.02, z, ry: rnd() * Math.PI, at };
+        });
+      });
+    }
+    const t = s.phase === "idle" ? -1 : drillTime();
+    const count = spots.current.filter((sp) => t >= sp.at).length;
+    if (count === shown.current) return;
+    shown.current = count;
+    let n = 0;
+    for (const sp of spots.current) {
+      if (t < sp.at) continue;
+      o.current.position.set(sp.x, sp.y, sp.z);
+      o.current.rotation.set(0, sp.ry, 0);
+      o.current.updateMatrix();
+      mesh.setMatrixAt(n++, o.current.matrix);
+    }
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, PLAN.panes.length * SHARDS_PER_PANE]} frustumCulled={false}>
+      <boxGeometry args={[0.18, 0.015, 0.1]} />
+      <meshStandardMaterial color={GLASS} transparent opacity={0.6} roughness={0.1} />
+    </instancedMesh>
+  );
+}
+
+// Rubble from the damaged wall buries one doorway of a weak building, so the class has to use another.
+export function DoorRubble() {
+  const ref = useRef<InstancedMesh>(null);
+  const drill = useRef(-1);
+  const o = useRef(new Object3D());
+  useLayoutEffect(() => {
+    const mesh = ref.current!;
+    for (let i = 0; i < 24; i++) mesh.setColorAt(i, i % 3 ? CONCRETE : ROOF);
+    mesh.count = 0;
+  }, []);
+  useFrame(() => {
+    const mesh = ref.current;
+    const s = getState();
+    if (!mesh) return;
+    const end = run.timeline.shake?.[1] ?? 0;
+    const show = s.phase !== "idle" && run.blocked.length > 0 && drillTime() >= end * 0.7;
+    if (!show) {
+      mesh.count = 0;
+      drill.current = -1;
+      return;
+    }
+    if (drill.current === s.startAt) return;
+    drill.current = s.startAt;
+    const rnd = random(run.seed + 29);
+    let n = 0;
+    for (const id of run.blocked) {
+      const d = PLAN.doors.find((door) => door.id === id)!;
+      for (let k = 0; k < 12; k++) {
+        const along = (rnd() - 0.5) * (d.w + 0.6);
+        const off = (rnd() - 0.5) * 1.4;
+        const [x, z] = d.along === "x" ? [d.x + along, d.z + off] : [d.x + off, d.z + along];
+        const size = 0.35 + rnd() * 0.45;
+        o.current.position.set(x, d.y + size * 0.35 + rnd() * 0.5, z);
+        o.current.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+        o.current.scale.set(size, size * 0.6, size * 0.8);
+        o.current.updateMatrix();
+        mesh.setMatrixAt(n++, o.current.matrix);
+      }
+    }
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, 24]} castShadow frustumCulled={false}>
+      <boxGeometry />
+      <meshStandardMaterial color="#ffffff" />
+    </instancedMesh>
+  );
+}

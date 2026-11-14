@@ -1,16 +1,22 @@
 import { useSyncExternalStore } from "react";
 import { SPAWN, TILE, idx, tileCenter, type Tile } from "@/lib/campus";
 import { PLAN, classrooms } from "@/lib/floorplan";
-import { cellCenter, flowField, groundY, routeFrom, routeLength } from "@/lib/nav";
+import { buildingAt, cellCenter, flowField, groundY, routeFrom, routeLength, upperFloorAt } from "@/lib/nav";
 import {
   campusRisks,
+  grade,
   hazardTiles,
+  random,
   safeAssembly,
   scoreDrill,
+  timeline,
+  within,
   type DrillStats,
   type Scenario,
   type Site,
   type Structure,
+  type Timeline,
+  type Tracked,
 } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 
@@ -94,18 +100,96 @@ export const net = { send: null as ((event: string, payload: Record<string, unkn
 // yaw 0 puts the camera south of the player, looking north.
 export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05 };
 export const remotes = new Map<string, { x: number; z: number; layer: number; crouch: boolean; at: number }>();
+const blankTrack = (): Tracked => ({
+  reached: false,
+  shakeS: 0,
+  coverS: 0,
+  deskS: 0,
+  shakeMoved: 0,
+  nearFallS: 0,
+  runIndoorS: 0,
+  reentered: false,
+  debrisS: 0,
+  aftershockS: 0,
+  aftershockCoverS: 0,
+  aftershockIndoorS: 0,
+  powerOff: false,
+  alarm: false,
+  deepWaterS: 0,
+});
+
 export const run = {
   hazards: new Set<number>(),
   goals: [] as Tile[],
   walked: 0,
-  hazardS: 0,
-  coverS: 0,
   hintUsed: false,
   optimalLen: 0,
   optimalRoute: null as Route | null,
   // Walking distance to safety from every spot on the campus, for hints and classmates.
   field: null as Float64Array | null,
+  seed: 0,
+  timeline: { shake: null, aftershock: null, limit: 240 } as Timeline,
+  // Doorways buried by rubble: a damaged building loses an exit, so the class must use the other door.
+  blocked: [] as string[],
+  // In a flood the upper floor of Gedung Kelas A is a refuge (vertical evacuation).
+  upstairs: false,
+  // When each tall piece of furniture topples and each window breaks, by index into PLAN.items / PLAN.panes.
+  falls: new Map<number, number>(),
+  breaks: new Map<number, number>(),
+  outsideS: 0,
+  track: blankTrack(),
 };
+
+export const drillTime = () => {
+  const s = getState();
+  return s.phase === "idle" ? -Infinity : (Date.now() - s.startAt) / 1000;
+};
+export const shakingAt = (t: number) => within(run.timeline.shake, t);
+export const aftershockAt = (t: number) => within(run.timeline.aftershock, t);
+
+const TALL = PLAN.items.flatMap((it, i) => (it.size[1] >= 1.5 ? [i] : []));
+
+// How far a tall piece of furniture has toppled, as an angle from upright.
+export function fallTilt(i: number) {
+  const at = run.falls.get(i);
+  if (at === undefined || getState().phase === "idle") return 0;
+  const p = Math.min(1, Math.max(0, (drillTime() - at) / 0.6));
+  return (Math.PI / 2) * p * p;
+}
+
+// Glass and tall furniture are what hurts people indoors in an earthquake.
+function nearFalling() {
+  const b = buildingAt(player.x, player.z);
+  if (!b) return false;
+  const near = (x: number, z: number, floor: number, owner: string) =>
+    owner === b && floor === player.layer && Math.hypot(x - player.x, z - player.z) < 1.3;
+  return PLAN.panes.some((p) => near(p.x, p.z, p.floor, p.b)) || TALL.some((i) => near(PLAN.items[i].x, PLAN.items[i].z, PLAN.items[i].floor, PLAN.items[i].b));
+}
+
+// Called every frame of a running drill with the distance just walked and the water depth at the player.
+export function trackDrill(dt: number, t: number, moved: number, depth: number) {
+  const tr = run.track;
+  const inside = buildingAt(player.x, player.z) !== null;
+  const covering = player.crouch || player.cover >= 0;
+  if (shakingAt(t)) {
+    tr.shakeS += dt;
+    if (covering) tr.coverS += dt;
+    if (player.cover >= 0) tr.deskS += dt;
+    tr.shakeMoved += moved;
+    if (nearFalling()) tr.nearFallS += dt;
+  } else if (getState().scenario.kind === "gempa") {
+    if (inside && player.running) tr.runIndoorS += dt;
+    if (!inside) run.outsideS += dt;
+    else if (run.outsideS > 3) tr.reentered = true;
+    if (!inside && run.hazards.has(idx(Math.floor(player.x / TILE), Math.floor(player.z / TILE)))) tr.debrisS += dt;
+    if (aftershockAt(t)) {
+      tr.aftershockS += dt;
+      if (covering) tr.aftershockCoverS += dt;
+      if (inside) tr.aftershockIndoorS += dt;
+    }
+  }
+  if (depth >= 0.5) tr.deepWaterS += dt;
+}
 
 // Seats the classmates take in whichever classroom the drill starts in; players get the rest.
 export const CLASSMATE_SEATS = [1, 2, 6, 9, 11, 14, 17, 20, 22, 25, 27, 30];
@@ -140,21 +224,41 @@ export function predict(s: Scenario, school: School | null, year?: number) {
 
 export const GOAL_RADIUS = 4.5;
 
-function safetyField(goals: Tile[], hazards: Set<number>) {
+// The upper floor of Gedung Kelas A, not its stairs.
+export const isUpstairs = (x: number, z: number, layer: number) => layer === 1 && upperFloorAt(x, z);
+
+function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blocked: string[]) {
   const centres = goals.map((g) => tileCenter(...g));
+  const rubble = PLAN.doors.filter((d) => blocked.includes(d.id));
   return flowField(
     (layer, k) => {
       const [x, z] = cellCenter(k);
-      return layer === 0 && centres.some(([gx, gz]) => Math.hypot(gx - x, gz - z) < GOAL_RADIUS);
+      return (layer === 0 && centres.some(([gx, gz]) => Math.hypot(gx - x, gz - z) < GOAL_RADIUS)) || (upstairs && isUpstairs(x, z, layer));
     },
     (layer, k) => {
       const [x, z] = cellCenter(k);
       return layer === 0 && hazards.has(idx(Math.floor(x / TILE), Math.floor(z / TILE)));
     },
+    (layer, k) => {
+      const [x, z] = cellCenter(k);
+      return rubble.some((d) => d.floor === layer && Math.hypot(d.x - x, d.z - z) < 0.8);
+    },
   );
 }
 
-export function startDrill(scenario: Scenario, school: School | null, delayMs = 1500, room = classrooms()[0].id) {
+// Doors of the drill's classroom: the walls of a room touch it within a wall's thickness.
+const roomDoors = (room: string) => {
+  const r = PLAN.rooms.find((q) => q.id === room)!;
+  return PLAN.doors.filter((d) => d.b === r.b && d.floor === r.floor && d.x > r.x0 - 0.3 && d.x < r.x1 + 0.3 && d.z > r.z0 - 0.3 && d.z < r.z1 + 0.3);
+};
+
+export function startDrill(
+  scenario: Scenario,
+  school: School | null,
+  delayMs = 1500,
+  room = classrooms()[0].id,
+  seed = Math.floor(Math.random() * 2 ** 31),
+) {
   // A drill begins mid-lesson: everyone at a desk in the same classroom, never already somewhere safe.
   const free = roomSeats(room).filter((_, i) => !CLASSMATE_SEATS.includes(i));
   const seat = free[Math.floor(Math.random() * free.length)];
@@ -173,19 +277,39 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     cover: -1,
   });
   look.yaw = seat.ry + Math.PI;
-  const { hazards, goals } = predict(scenario, school);
-  const field = safetyField(goals, hazards);
+  const { hazards, goals, risks } = predict(scenario, school);
+  const rnd = random(seed);
+  const plan = timeline(scenario, seed);
+  const quake = scenario.kind === "gempa";
+  const building = PLAN.rooms.find((r) => r.id === room)!.b;
+  const exits = roomDoors(room);
+  const blocked = quake && risks[building] >= 60 && exits.length > 1 ? [exits[Math.floor(rnd() * exits.length)].id] : [];
+  const upstairs = scenario.kind === "banjir";
+  const field = safetyField(goals, hazards, upstairs, blocked);
   const route = routeFrom(field, player.x, player.z, layer);
+  const falls = new Map<number, number>();
+  const breaks = new Map<number, number>();
+  if (quake && plan.shake) {
+    const end = plan.shake[1];
+    if (scenario.intensity >= 6.5) for (const i of TALL) if (rnd() < 0.6) falls.set(i, end * (0.25 + 0.5 * rnd()));
+    if (scenario.intensity >= 6) PLAN.panes.forEach((_, i) => rnd() < 0.5 && breaks.set(i, end * (0.15 + 0.6 * rnd())));
+  }
   Object.assign(run, {
     hazards,
     goals,
     walked: 0,
-    hazardS: 0,
-    coverS: 0,
     hintUsed: false,
     optimalLen: routeLength(route),
     optimalRoute: route,
     field,
+    seed,
+    timeline: plan,
+    blocked,
+    upstairs,
+    falls,
+    breaks,
+    outsideS: 0,
+    track: blankTrack(),
   });
   setState({
     phase: "running",
@@ -212,15 +336,16 @@ export function showHint() {
 export function finishDrill(reached: boolean) {
   const s = getState();
   if (s.phase !== "running") return;
+  const tracked = { ...run.track, reached, powerOff: !s.power };
   const stats: DrillStats = {
     scenario: s.scenario,
     reached,
     timeS: Math.max(0, (Date.now() - s.startAt) / 1000),
     walked: run.walked,
     optimalLen: run.optimalLen,
-    hazardS: run.hazardS,
-    coverS: run.coverS,
+    leadS: run.timeline.shake?.[1] ?? 0,
     hintUsed: run.hintUsed,
+    checks: grade(s.scenario.kind, tracked),
   };
   // The results show the optimal route from the start, not whatever hint was last drawn.
   setState({ phase: "done", route: run.optimalRoute, showRoute: true, result: { ...stats, score: scoreDrill(stats) } });

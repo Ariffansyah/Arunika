@@ -171,9 +171,88 @@ export const pathLength = (path: Tile[]) =>
 // Metres per second: a brisk evacuation walk and a run.
 export const WALK_SPEED = 1.5;
 export const RUN_SPEED = 3.5;
-export const QUAKE_SHAKE_S = 8;
-export const FLOOD_RISE_S = 20;
-export const DRILL_LIMIT_S = 180;
+export const FLOOD_RISE_S = 90;
+
+// Seeded so every player in a room sees the same drill.
+export function random(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export type Window = [from: number, to: number];
+export type Timeline = { shake: Window | null; aftershock: Window | null; limit: number };
+
+// Compressed real behaviour: a bigger quake shakes longer, and a strong one is followed by an aftershock.
+export const shakeSeconds = (magnitude: number) => 6 + (magnitude - 5) * 5;
+
+export function timeline(s: Scenario, seed: number): Timeline {
+  const rnd = random(seed);
+  if (s.kind !== "gempa") return { shake: null, aftershock: null, limit: 240 };
+  const shake = shakeSeconds(s.intensity);
+  const at = shake + 20 + rnd() * 15;
+  return { shake: [0, shake], aftershock: s.intensity >= 6 ? [at, at + 3 + (s.intensity - 5)] : null, limit: 240 };
+}
+
+export const within = (w: Window | null, t: number) => !!w && t >= w[0] && t < w[1];
+
+// What a player did during a drill, gathered as it runs.
+export type Tracked = {
+  reached: boolean;
+  shakeS: number;
+  coverS: number;
+  deskS: number;
+  shakeMoved: number;
+  nearFallS: number;
+  runIndoorS: number;
+  reentered: boolean;
+  debrisS: number;
+  aftershockS: number;
+  aftershockCoverS: number;
+  aftershockIndoorS: number;
+  powerOff: boolean;
+  alarm: boolean;
+  deepWaterS: number;
+};
+
+export type Check = { label: string; ok: boolean; got: number; max: number };
+
+const check = (label: string, max: number, part: number, ok = part >= 1): Check => ({
+  label,
+  ok,
+  got: Math.round(max * Math.min(1, Math.max(0, part))),
+  max,
+});
+
+// The procedure for each disaster as a checklist; points add up to 1000.
+export function grade(kind: Scenario["kind"], t: Tracked): Check[] {
+  if (kind === "gempa") {
+    // Under a desk counts fully, crouching in the open half; 80% of the shaking is enough for full marks.
+    const cover = t.shakeS ? (t.deskS + 0.5 * (t.coverS - t.deskS)) / t.shakeS / 0.8 : 1;
+    const after = t.aftershockS ? t.aftershockCoverS / t.aftershockS / 0.5 : 1;
+    return [
+      check("Berlindung di bawah meja saat guncangan", 200, cover),
+      check("Tetap di tempat selama guncangan", 100, t.shakeMoved < 2 ? 1 : 0),
+      check("Menjauhi jendela dan lemari", 100, t.nearFallS < 1 ? 1 : 0),
+      check("Berjalan, tidak berlari di dalam gedung", 100, t.runIndoorS < 1 ? 1 : 0),
+      check("Tidak kembali masuk gedung", 100, t.reentered ? 0 : 1),
+      check("Menghindari reruntuhan di luar gedung", 100, 1 - t.debrisS / 10, t.debrisS < 2),
+      check("Merunduk di luar gedung saat gempa susulan", 100, t.aftershockIndoorS < 1 ? after : 0),
+      check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0),
+    ];
+  }
+  return [
+    check("Mematikan listrik di panel", 150, t.powerOff ? 1 : 0),
+    check("Membunyikan kentongan", 150, t.alarm ? 1 : 0),
+    check("Tidak melewati air setinggi lutut", 300, 1 - t.deepWaterS / 20, t.deepWaterS < 3),
+    check("Naik ke tempat tinggi dan lapor", 400, t.reached ? 1 : 0),
+  ];
+}
 
 export type DrillStats = {
   scenario: Scenario;
@@ -181,21 +260,17 @@ export type DrillStats = {
   timeS: number;
   walked: number;
   optimalLen: number;
-  hazardS: number;
-  coverS: number;
+  // Time before anyone should start walking, such as the shaking.
+  leadS: number;
   hintUsed: boolean;
+  checks: Check[];
 };
 
 export function scoreDrill(d: DrillStats) {
   if (!d.reached) return 0;
-  const optimalTime = (d.scenario.kind === "gempa" ? QUAKE_SHAKE_S : 0) + d.optimalLen / WALK_SPEED;
-  const score =
-    1000 -
-    Math.max(0, d.timeS - optimalTime) * 5 -
-    Math.max(0, d.walked - d.optimalLen) * 3 -
-    d.hazardS * 20 -
-    (d.hintUsed ? 150 : 0) +
-    (d.scenario.kind === "gempa" ? (200 * Math.min(d.coverS, QUAKE_SHAKE_S)) / QUAKE_SHAKE_S : 0);
+  const optimalTime = d.leadS + d.optimalLen / WALK_SPEED;
+  const speed = 200 * Math.min(1, Math.max(0, 1 - Math.max(0, d.timeS - optimalTime) / 120));
+  const score = d.checks.reduce((sum, c) => sum + c.got, 0) + speed - (d.hintUsed ? 150 : 0);
   return Math.round(Math.min(1200, Math.max(0, score)));
 }
 

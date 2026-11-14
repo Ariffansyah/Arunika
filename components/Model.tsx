@@ -1,8 +1,8 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
-import type { ThreeElements } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useFrame, type ThreeElements } from "@react-three/fiber";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { Box3, Matrix4, Vector3, type BufferGeometry, type InstancedMesh, type Material, type Mesh } from "three";
 
 // Kenney kits (CC0), see the LICENSE.txt next to each kit in public/models.
@@ -60,29 +60,53 @@ export const preloadModels = (srcs: string[]) => srcs.forEach((s) => useGLTF.pre
 export type Placement = { x: number; y: number; z: number; ry: number; size: [number, number, number] };
 type Part = { geometry: BufferGeometry; material: Material; local: Matrix4 };
 
-function InstancedPart({ part, items, size, turn }: { part: Part; items: Placement[]; size: Vector3; turn: number }) {
+type Tilt = (k: number) => number;
+
+function InstancedPart({ part, items, size, turn, tilt }: { part: Part; items: Placement[]; size: Vector3; turn: number; tilt?: Tilt }) {
   const ref = useRef<InstancedMesh>(null);
-  useLayoutEffect(() => {
-    const mesh = ref.current!;
+  const angles = useRef<number[]>([]);
+  const write = useCallback(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
     const quarter = Math.abs(Math.sin(turn)) > 0.5;
     const m = new Matrix4();
     const r = new Matrix4();
+    const x = new Matrix4();
     const s = new Matrix4();
     items.forEach((it, k) => {
       const [w, h, d] = it.size;
+      const a = angles.current[k] ?? 0;
       s.makeScale((quarter ? d : w) / size.x, h / size.y, (quarter ? w : d) / size.z);
-      r.makeRotationY(it.ry + turn);
-      mesh.setMatrixAt(k, m.makeTranslation(it.x, it.y, it.z).multiply(r).multiply(s).multiply(part.local));
+      r.makeRotationY(it.ry);
+      // Tipping forward about the base; lifted so the back edge stays on the floor once it lies flat.
+      x.makeRotationX(a).multiply(new Matrix4().makeRotationY(turn));
+      mesh.setMatrixAt(k, m.makeTranslation(it.x, it.y + (Math.sin(a) * d) / 2, it.z).multiply(r).multiply(x).multiply(s).multiply(part.local));
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
   }, [items, part, size, turn]);
+  useLayoutEffect(() => {
+    angles.current = items.map(() => 0);
+    write();
+  }, [items, write]);
+  useFrame(() => {
+    if (!tilt) return;
+    let moved = false;
+    items.forEach((_, k) => {
+      const a = tilt(k);
+      if (a !== angles.current[k]) {
+        angles.current[k] = a;
+        moved = true;
+      }
+    });
+    if (moved) write();
+  });
   return <instancedMesh ref={ref} args={[part.geometry, part.material, items.length]} castShadow receiveShadow />;
 }
 
 // Every copy of a model as one InstancedMesh per mesh in it: a few hundred desks stay a handful of draw calls.
-// Each placement stretches the model to its size; `turn` points the model's front along +z.
-export function Instances({ src, items, turn = 0 }: { src: string; items: Placement[]; turn?: number }) {
+// Each placement stretches the model to its size; `turn` points the model's front along +z; `tilt` topples copies.
+export function Instances({ src, items, turn = 0, tilt }: { src: string; items: Placement[]; turn?: number; tilt?: Tilt }) {
   const { scene } = useGLTF(src);
   const { parts, size } = useMemo(() => {
     scene.updateMatrixWorld(true);
@@ -98,5 +122,5 @@ export function Instances({ src, items, turn = 0 }: { src: string; items: Placem
     return { parts, size: box.getSize(new Vector3()) };
   }, [scene]);
   if (!items.length) return null;
-  return parts.map((p, i) => <InstancedPart key={i} part={p} items={items} size={size} turn={turn} />);
+  return parts.map((p, i) => <InstancedPart key={i} part={p} items={items} size={size} turn={turn} tilt={tilt} />);
 }

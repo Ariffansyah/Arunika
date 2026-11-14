@@ -1,14 +1,14 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Layers, Link2 } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Eye, Layers, Link2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import { H, TILE, W } from "@/lib/campus";
-import { INTENSITY, QUAKE_SHAKE_S, SCENARIO_LABEL, waterLevel, type Scenario } from "@/lib/sim";
+import { INTENSITY, SCENARIO_LABEL, waterLevel, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
-import { finishDrill, input, player, setState, showHint, useDrill, type DrillResult } from "./drillStore";
+import { aftershockAt, finishDrill, input, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
 import { interact } from "./interact";
 import { rumble, siren } from "./sound";
 import type { Peer } from "./useRoom";
@@ -152,19 +152,27 @@ function Instruction({ t }: { t: number }) {
   const hint = useDrill((s) => s.showRoute);
   const report = useDrill((s) => s.prompt?.id === "lapor");
   if (t < 0) return <p className="text-2xl font-extrabold">Bersiap… {Math.ceil(-t)}</p>;
-  const shaking = scenario.kind === "gempa" && t < QUAKE_SHAKE_S;
+  const shaking = scenario.kind === "gempa" && shakingAt(t);
+  const after = scenario.kind === "gempa" && aftershockAt(t);
+  // The clock re-renders this ten times a second, often enough to follow the water at the player's feet.
+  const message =
+    scenario.kind === "gempa"
+      ? shaking
+        ? "Gempa! Berlindung di bawah meja (E), lindungi kepala, bertahan."
+        : after
+          ? "Gempa susulan! Merunduk di tempat terbuka dan lindungi kepala (C)."
+          : report
+            ? "Sudah di titik kumpul. Lapor ke petugas (E)."
+            : "Guncangan berhenti. Keluar dengan tertib, jangan berlari, menuju titik kumpul."
+      : report
+        ? "Sudah di tempat aman. Lapor (E)."
+        : player.wading
+          ? "Air setinggi lutut. Cari jalan yang lebih tinggi."
+          : "Air naik. Matikan listrik bila sempat, lalu naik ke bukit atau lantai 2 Gedung Kelas A.";
   return (
     <div className="space-y-3">
-      <p role="status" className={`font-bold leading-snug ${shaking ? "text-bahaya" : "text-fajar"}`}>
-        {scenario.kind === "gempa"
-          ? shaking
-            ? "Gempa! Merunduk, lindungi kepala, bertahan. Tahan C atau tombol Merunduk."
-            : report
-              ? "Sudah di titik kumpul. Lapor ke petugas (E)."
-              : "Guncangan berhenti. Jauhi gedung dan menuju titik kumpul yang aman."
-          : report
-            ? "Sudah di tempat aman. Lapor ke petugas (E)."
-            : "Air laut naik. Segera menuju tempat yang lebih tinggi."}
+      <p role="status" className={`font-bold leading-snug ${shaking || after ? "text-bahaya" : "text-fajar"}`}>
+        {message}
       </p>
       <p className="tabular-nums text-redup">
         Waktu {t.toFixed(1)} dtk
@@ -224,15 +232,9 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
 
   const lines: [string, string][] = [
     ["Skenario", SCENARIO_LABEL[result.scenario.kind]],
-    ["Hasil", result.reached ? "Sampai di titik kumpul" : "Tidak sampai di titik kumpul aman"],
     ["Waktu", `${result.timeS.toFixed(1)} dtk`],
-    ["Jarak ditempuh", `${result.walked.toFixed(0)} m (jalur optimal ${result.optimalLen.toFixed(0)} m)`],
-    ["Di zona bahaya", `${result.hazardS.toFixed(1)} dtk`],
-    ...(result.scenario.kind === "gempa"
-      ? [["Berlindung saat guncangan", `${Math.min(result.coverS, QUAKE_SHAKE_S).toFixed(1)} / ${QUAKE_SHAKE_S} dtk`] as [string, string]]
-      : []),
-    ["Bantuan jalur AI", result.hintUsed ? "Dipakai (−150)" : "Tidak dipakai"],
-    ["Jalur optimal", "Garis jingga di peta"],
+    ["Jarak", `${result.walked.toFixed(0)} m, jalur optimal ${result.optimalLen.toFixed(0)} m (garis jingga)`],
+    ["Jalur AI", result.hintUsed ? "Dipakai (−150)" : "Tidak dipakai"],
   ];
 
   return (
@@ -240,6 +242,26 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
       <p className="text-2xl font-extrabold">
         Skor <span className="tabular-nums text-fajar">{result.score}</span> poin
       </p>
+      <ul className="space-y-1">
+        {result.checks.map((c) => (
+          <li key={c.label} className="flex items-start justify-between gap-3">
+            <span className="flex items-start gap-2">
+              {c.ok ? (
+                <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-aman" />
+              ) : (
+                <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-bahaya" />
+              )}
+              <span>
+                <span className="sr-only">{c.ok ? "Benar: " : "Belum: "}</span>
+                {c.label}
+              </span>
+            </span>
+            <span className="tabular-nums text-redup">
+              {c.got}/{c.max}
+            </span>
+          </li>
+        ))}
+      </ul>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         {lines.map(([k, v]) => (
           <div key={k} className="contents">
@@ -355,9 +377,11 @@ export default function Hud({
 
   useEffect(() => {
     if (phase !== "running") return;
-    const quake = scenario.kind === "gempa";
-    const ids = [setTimeout(() => siren(), Math.max(0, startAt + (quake ? QUAKE_SHAKE_S * 1000 : 0) - Date.now()))];
-    if (quake) ids.push(setTimeout(() => rumble(QUAKE_SHAKE_S), Math.max(0, startAt - Date.now())));
+    const at = (s: number) => Math.max(0, startAt + s * 1000 - Date.now());
+    const { shake, aftershock } = run.timeline;
+    const ids = [setTimeout(() => siren(), at(shake?.[1] ?? 0))];
+    if (shake) ids.push(setTimeout(() => rumble(shake[1]), at(0)));
+    if (aftershock) ids.push(setTimeout(() => rumble(aftershock[1] - aftershock[0]), at(aftershock[0])));
     return () => ids.forEach(clearTimeout);
   }, [phase, startAt, scenario.kind]);
 
@@ -442,7 +466,7 @@ export default function Hud({
         </div>
       </div>
 
-      <div className={`${panel} pointer-events-auto w-full max-w-sm text-sm pointer-coarse:mb-[14rem]`}>
+      <div className={`${panel} pointer-events-auto max-h-[70dvh] w-full max-w-sm overflow-y-auto text-sm pointer-coarse:mb-[14rem]`}>
         {phase === "idle" && <ScenarioPicker onStart={onStart} />}
         {phase === "running" && <Instruction t={t} />}
         {phase === "done" && result && <Results result={result} room={room} schoolId={school?.id ?? null} />}

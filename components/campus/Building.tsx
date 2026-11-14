@@ -8,8 +8,7 @@ import { Instances, preloadModels } from "@/components/Model";
 import { BUILDINGS } from "@/lib/campus";
 import { PLAN, STOREY, WALL, type Door, type Furniture, type Part, type PartKind, type Spot } from "@/lib/floorplan";
 import { buildingAt } from "@/lib/nav";
-import { QUAKE_SHAKE_S } from "@/lib/sim";
-import { getState, player, useDrill } from "./drillStore";
+import { aftershockAt, drillTime, fallTilt, getState, player, run, shakingAt, useDrill } from "./drillStore";
 import { fadeTo, hides } from "./fade";
 
 const furniture = (m: Furniture) => `/models/furniture/${m}.glb`;
@@ -55,20 +54,40 @@ function Boxes({ parts, colorOf }: { parts: Part[]; colorOf: (p: Part) => Color 
   );
 }
 
+// Glass parts are made alongside PLAN.panes, in the same order, so a pane's index finds its part.
+const PANE_OF = new Map(PLAN.parts.filter((p) => p.kind === "glass").map((p, i) => [p, i]));
+
 function Glass({ parts }: { parts: Part[] }) {
   const ref = useRef<InstancedMesh>(null);
-  useLayoutEffect(() => {
-    const mesh = ref.current!;
-    const o = new Object3D();
-    parts.forEach((p, i) => {
-      o.position.set((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, (p.z0 + p.z1) / 2);
-      o.scale.set(p.x1 - p.x0, p.y1 - p.y0, p.z1 - p.z0);
-      o.updateMatrix();
-      mesh.setMatrixAt(i, o.matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [parts]);
+  const broken = useRef("");
+  const place = useCallback(
+    (gone: (p: Part) => boolean) => {
+      const mesh = ref.current!;
+      const o = new Object3D();
+      parts.forEach((p, i) => {
+        o.position.set((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, (p.z0 + p.z1) / 2);
+        o.scale.set(p.x1 - p.x0, gone(p) ? 0 : p.y1 - p.y0, p.z1 - p.z0);
+        o.updateMatrix();
+        mesh.setMatrixAt(i, o.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    },
+    [parts],
+  );
+  useLayoutEffect(() => place(() => false), [place]);
+  // A broken pane leaves an empty frame; the shards on the floor are drawn with the other quake effects.
+  useFrame(() => {
+    const t = getState().phase === "idle" ? -1 : drillTime();
+    const gone = (p: Part) => {
+      const at = run.breaks.get(PANE_OF.get(p)!);
+      return at !== undefined && t >= at;
+    };
+    const key = parts.map((p) => (gone(p) ? 1 : 0)).join("");
+    if (key === broken.current) return;
+    broken.current = key;
+    place(gone);
+  });
   return (
     <instancedMesh ref={ref} args={[UNIT, undefined, parts.length]} receiveShadow>
       <meshStandardMaterial color="#bcd9ea" transparent opacity={0.35} roughness={0.15} depthWrite={false} />
@@ -171,11 +190,21 @@ function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: 
   const { opaque, glass, items, doors, spots } = useMemo(() => {
     const parts = PLAN.parts.filter((p) => p.b === b && p.floor === floor && p.kind !== "under" && p.kind !== "roof");
     const items: Partial<Record<Furniture, typeof PLAN.items>> = {};
-    for (const it of PLAN.items) if (it.b === b && it.floor === floor) (items[it.model] ??= []).push(it);
+    const index: Partial<Record<Furniture, number[]>> = {};
+    PLAN.items.forEach((it, i) => {
+      if (it.b !== b || it.floor !== floor) return;
+      (items[it.model] ??= []).push(it);
+      (index[it.model] ??= []).push(i);
+    });
     return {
       opaque: parts.filter((p) => p.kind !== "glass"),
       glass: parts.filter((p) => p.kind === "glass"),
-      items: Object.entries(items) as [Furniture, typeof PLAN.items][],
+      items: (Object.entries(items) as [Furniture, typeof PLAN.items][]).map(([model, list]) => {
+        const ids = index[model]!;
+        // Only tall pieces can topple, so only they pay for a per-frame check.
+        const tilt = list.some((it) => it.size[1] >= 1.5) ? (k: number) => fallTilt(ids[k]) : undefined;
+        return [model, list, tilt] as const;
+      }),
       doors: PLAN.doors.filter((d) => d.b === b && d.floor === floor),
       spots: PLAN.spots.filter((s) => s.b === b && s.floor === floor),
     };
@@ -189,8 +218,8 @@ function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: 
       {opaque.length > 0 && <Boxes parts={opaque} colorOf={colorOf} />}
       {glass.length > 0 && <Glass parts={glass} />}
       <Suspense fallback={null}>
-        {items.map(([model, list]) => (
-          <Instances key={model} src={furniture(model)} items={list} turn={TURN[model] ?? 0} />
+        {items.map(([model, list, tilt]) => (
+          <Instances key={model} src={furniture(model)} items={list} turn={TURN[model] ?? 0} tilt={tilt} />
         ))}
       </Suspense>
       {doors.map((d) => (
@@ -265,12 +294,13 @@ function Building({ id, risk, showRisk, fade }: { id: string; risk: number; show
     const g = ref.current;
     if (!g) return;
     const s = getState();
-    const t = (Date.now() - s.startAt) / 1000;
-    const shaking = s.phase === "running" && s.scenario.kind === "gempa" && t >= 0 && t < QUAKE_SHAKE_S;
+    const t = drillTime();
+    const quake = s.phase === "running" && s.scenario.kind === "gempa";
+    const strength = quake && shakingAt(t) ? 0.5 : quake && aftershockAt(t) ? 0.2 : 0;
     // Weaker blocks visibly sway more: the risk model, shown rather than told.
-    const sway = shaking ? (0.002 + (risk / 100) * 0.012) * (s.scenario.intensity - 4) * 0.5 : 0;
-    g.rotation.z = Math.sin(t * 17 + fp.x0) * sway;
-    g.rotation.x = Math.cos(t * 13 + fp.z0) * sway * 0.6;
+    const sway = (0.002 + (risk / 100) * 0.012) * (s.scenario.intensity - 4) * strength;
+    g.rotation.z = strength ? Math.sin(t * 17 + fp.x0) * sway : 0;
+    g.rotation.x = strength ? Math.cos(t * 13 + fp.z0) * sway * 0.6 : 0;
     // Walking in cuts the building away above the player, like lifting the lid of a dollhouse.
     const inside = buildingAt(player.x, player.z) === id;
     storeys.current.forEach((sg, f) => {

@@ -1,7 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ASSEMBLY, GRID, SPAWN, W, WARDEN, isBlocked, tileAt } from "./campus.ts";
-import { bestRoute, campusRisks, hazardTiles, pathLength, safeAssembly, scoreDrill, type Scenario } from "./sim.ts";
+import {
+  bestRoute,
+  campusRisks,
+  grade,
+  hazardTiles,
+  pathLength,
+  safeAssembly,
+  scoreDrill,
+  shakeSeconds,
+  timeline,
+  type Scenario,
+  type Tracked,
+} from "./sim.ts";
 import { parseAssessment } from "./assessment.ts";
 
 const main = { floors: 2, material: "beton_bertulang" as const, built_year: 2000 };
@@ -46,10 +58,47 @@ test("route detours around hazards when a dry path exists", () => {
   assert.ok(pathLength(path) > 4);
 });
 
-test("scoring: no assembly point means zero, a clean run scores at least 1000", () => {
-  const base = { scenario: { kind: "gempa", intensity: 6 } as Scenario, timeS: 15, walked: 20, optimalLen: 20, hazardS: 0, hintUsed: false };
-  assert.equal(scoreDrill({ ...base, reached: false, coverS: 8 }), 0);
-  assert.ok(scoreDrill({ ...base, reached: true, coverS: 8 }) >= 1000);
+const model: Tracked = {
+  reached: true,
+  shakeS: 13.5,
+  coverS: 13.5,
+  deskS: 13.5,
+  shakeMoved: 0,
+  nearFallS: 0,
+  runIndoorS: 0,
+  reentered: false,
+  debrisS: 0,
+  aftershockS: 4,
+  aftershockCoverS: 4,
+  aftershockIndoorS: 0,
+  powerOff: true,
+  alarm: true,
+  deepWaterS: 0,
+};
+
+test("earthquake checklist: a model drill scores 1000+, ducking in the open scores less, not reporting scores 0", () => {
+  const base = { scenario: { kind: "gempa", intensity: 6.5 } as Scenario, timeS: 60, walked: 70, optimalLen: 70, leadS: 13.5, hintUsed: false };
+  const checks = grade("gempa", model);
+  assert.ok(checks.every((c) => c.ok));
+  assert.equal(checks.reduce((sum, c) => sum + c.max, 0), 1000);
+  assert.ok(scoreDrill({ ...base, reached: true, checks }) >= 1000);
+  const ducked = grade("gempa", { ...model, deskS: 0 });
+  assert.ok(scoreDrill({ ...base, reached: true, checks: ducked }) < scoreDrill({ ...base, reached: true, checks }));
+  assert.equal(scoreDrill({ ...base, reached: false, checks: grade("gempa", { ...model, reached: false }) }), 0);
+});
+
+test("flood checklist totals 1000 and marks power left on and deep wading", () => {
+  assert.equal(grade("banjir", model).reduce((sum, c) => sum + c.max, 0), 1000);
+  assert.equal(grade("banjir", { ...model, powerOff: false }).filter((c) => !c.ok).length, 1);
+  assert.equal(grade("banjir", { ...model, deepWaterS: 10 }).filter((c) => !c.ok).length, 1);
+});
+
+test("bigger quakes shake longer, and a seed gives every player the same aftershock", () => {
+  assert.ok(shakeSeconds(8) > shakeSeconds(6));
+  const quake = { kind: "gempa", intensity: 7 } as Scenario;
+  assert.deepEqual(timeline(quake, 42), timeline(quake, 42));
+  assert.ok(timeline(quake, 42).aftershock![0] > timeline(quake, 42).shake![1]);
+  assert.equal(timeline({ kind: "gempa", intensity: 5.5 }, 42).aftershock, null);
 });
 
 test("assessment parser rejects junk and clamps scores", () => {

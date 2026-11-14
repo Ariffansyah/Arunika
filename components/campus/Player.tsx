@@ -3,13 +3,25 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Vector3, type Group } from "three";
-import { TILE, idx } from "@/lib/campus";
 import { PLAN } from "@/lib/floorplan";
 import { buildingAt, free, groundY, layerAt, solidAt, type Solid } from "@/lib/nav";
-import { DRILL_LIMIT_S, QUAKE_SHAKE_S, RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
+import { RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
 import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
-import { finishDrill, getState, input, look, player, resetInput, run, setState, useDrill } from "./drillStore";
+import {
+  aftershockAt,
+  finishDrill,
+  getState,
+  input,
+  look,
+  player,
+  resetInput,
+  run,
+  setState,
+  shakingAt,
+  trackDrill,
+  useDrill,
+} from "./drillStore";
 import { closedDoors, findPrompt, interact } from "./interact";
 
 const KEYS: Record<string, keyof typeof input> = {
@@ -144,6 +156,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     let dx = -Math.sin(look.yaw) * ahead + Math.cos(look.yaw) * side;
     let dz = -Math.cos(look.yaw) * ahead - Math.sin(look.yaw) * side;
     const len = Math.hypot(dx, dz);
+    const [ox, oz] = [player.x, player.z];
     const frozen = s.chatOpen || s.mapOpen || (running && t < 0);
     player.crouch = input.crouch && !frozen;
     player.moving = len > 0 && !frozen && !player.crouch;
@@ -155,8 +168,6 @@ export default function Player({ look: character, name }: { look: Look; name: st
       dx /= len;
       dz /= len;
       const speed = (player.running ? RUN_SPEED : WALK_SPEED) * (depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1);
-      const ox = player.x;
-      const oz = player.z;
       // Small steps so a long frame can't carry the player through a wall corner.
       const steps = Math.ceil(dt / 0.04);
       const step = (speed * dt) / steps;
@@ -174,12 +185,8 @@ export default function Player({ look: character, name }: { look: Look; name: st
     }
 
     if (running && t >= 0) {
-      const shaking = s.scenario.kind === "gempa" && t < QUAKE_SHAKE_S;
-      if (shaking && (player.crouch || player.cover >= 0)) run.coverS += dt;
-      const inDebris =
-        s.scenario.kind === "gempa" && !shaking && run.hazards.has(idx(Math.floor(player.x / TILE), Math.floor(player.z / TILE)));
-      if (depth > 0.15 || inDebris) run.hazardS += dt;
-      if (t > DRILL_LIMIT_S) finishDrill(false);
+      trackDrill(dt, t, Math.hypot(player.x - ox, player.z - oz), depth);
+      if (t > run.timeline.limit) finishDrill(false);
     }
 
     // Eased, so a step onto a floor or a stair reads as a step; a teleport snaps.
@@ -201,10 +208,8 @@ export default function Player({ look: character, name }: { look: Look; name: st
       g.visible = !first;
     }
 
-    const shake =
-      running && s.scenario.kind === "gempa" && t >= 0 && t < QUAKE_SHAKE_S
-        ? (0.05 + (s.scenario.intensity - 5) * 0.04) * (reducedMotion.current ? 0.2 : 1)
-        : 0;
+    const strength = running && s.scenario.kind === "gempa" ? (shakingAt(t) ? 1 : aftershockAt(t) ? 0.45 : 0) : 0;
+    const shake = strength * (0.05 + (s.scenario.intensity - 5) * 0.04) * (reducedMotion.current ? 0.2 : 1);
     const jitter = () => (Math.random() - 0.5) * shake;
     const target = eye.current.set(player.x, player.y + (player.crouch ? 0.75 : player.seated ? 1.05 : 1.35), player.z);
 

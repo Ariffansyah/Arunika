@@ -28,7 +28,7 @@ import Html from "@/components/Html";
 import Model, { M } from "@/components/Model";
 import Avatar from "./Avatar";
 import { Buildings } from "./Building";
-import { Beacons, Classmates, FloodDebris, QuakeDebris } from "./Effects";
+import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, QuakeDebris } from "./Effects";
 import { fadeTo, hides } from "./fade";
 import { getState, player, predict, useDrill } from "./drillStore";
 import { interact, wardenSpot } from "./interact";
@@ -373,6 +373,8 @@ export default function World({
       <Buildings risks={risks} showRisk={showRisk} fade />
       <Classmates />
       <QuakeDebris />
+      <GlassShards />
+      <DoorRubble />
       <FloodDebris />
       <Beacons />
       <AssemblyPoints safe={goals} />
