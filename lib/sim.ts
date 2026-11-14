@@ -2,6 +2,7 @@ import {
   ASSEMBLY,
   BLOCKED_CHARS,
   BUILDINGS,
+  GRID,
   H,
   TILE,
   W,
@@ -9,6 +10,7 @@ import {
   idx,
   isBlocked,
   tileAt,
+  tileCenter,
   tileElevation,
   type Material,
   type Soil,
@@ -215,6 +217,41 @@ export function bestRoute(grid: string[], start: Tile, goals: Tile[], hazards: S
     }
   }
   return null;
+}
+
+export type EvacSign = { x: number; z: number; tile: Tile; ry: number; arrow: number };
+
+// Permanent signs from every building's entrance to the nearest assembly point, as a school would post them.
+// Each panel faces whoever walks up the route; "up" on it means straight on. `ry` turns the panel about y,
+// `arrow` turns the arrow on its face.
+export function evacuationSigns(): EvacSign[] {
+  const rects = buildingRects();
+  const out: EvacSign[] = [];
+  for (const [id, b] of Object.entries(BUILDINGS)) {
+    const r = rects[id];
+    const mx = Math.round((r.x0 + r.x1) / 2);
+    const mz = Math.round((r.z0 + r.z1) / 2);
+    const start: Tile = b.entrance === "S" ? [mx, r.z1 + 1] : b.entrance === "N" ? [mx, r.z0 - 1] : b.entrance === "E" ? [r.x1 + 1, mz] : [r.x0 - 1, mz];
+    if (isBlocked(...start)) continue;
+    const path = bestRoute(GRID, start, ASSEMBLY, new Set()) ?? [];
+    for (let i = 1; i + 2 < path.length; i += 5) {
+      const [px, pz] = path[i];
+      const unit = (x: number, z: number) => [x / Math.hypot(x, z), z / Math.hypot(x, z)];
+      const [ax, az] = unit(px - path[i - 1][0], pz - path[i - 1][1]);
+      const [nx, nz] = unit(path[i + 2][0] - px, path[i + 2][1] - pz);
+      // The walker's right hand; the post stands there, or on the left if that tile is built on.
+      const [rx, rz] = [-az, ax];
+      const [cx, cz] = tileCenter(px, pz);
+      const side = [1, -1].find((k) => !isBlocked(Math.floor((cx + k * rx * 1.3) / TILE), Math.floor((cz + k * rz * 1.3) / TILE)));
+      if (side === undefined) continue;
+      const [x, z] = [cx + side * rx * 1.3, cz + side * rz * 1.3];
+      if (out.some((o) => Math.hypot(o.x - x, o.z - z) < 7)) continue;
+      const right = nx * rx + nz * rz;
+      const ahead = nx * ax + nz * az;
+      out.push({ x, z, tile: [px, pz], ry: Math.atan2(-ax, -az), arrow: Math.atan2(ahead, right) });
+    }
+  }
+  return out;
 }
 
 export const pathLength = (path: Tile[]) =>

@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ASSEMBLY, GRID, SPAWN, W, WARDEN, isBlocked, tileAt } from "./campus.ts";
+import { ASSEMBLY, GRID, H, SPAWN, W, WARDEN, isBlocked, tileAt } from "./campus.ts";
 import {
   bestRoute,
   campusRisks,
+  evacuationSigns,
   grade,
   hazardTiles,
   inRunout,
@@ -150,4 +151,37 @@ test("a whirlwind has no open-air assembly point and crosses the campus on a see
   const mid = vortexAt(tl, (tl.wind![0] + tl.wind![1]) / 2)!;
   assert.ok(mid[0] > 0 && mid[0] < 120, "halfway through, it is over the campus");
   assert.ok(inRunout(103.5, 16.5) && !inRunout(64.5, 52.5));
+});
+
+test("evacuation signs point toward an assembly point", () => {
+  // Walking cost from every tile to the nearest assembly point, with the router's moves.
+  const dist = new Array(W * H).fill(Infinity);
+  const queue: [number, number, number][] = ASSEMBLY.map(([x, z]) => [x, z, 0]);
+  ASSEMBLY.forEach(([x, z]) => (dist[z * W + x] = 0));
+  while (queue.length) {
+    queue.sort((a, b) => a[2] - b[2]);
+    const [x, z, d] = queue.shift()!;
+    if (d > dist[z * W + x]) continue;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const [nx, nz] = [x + dx, z + dz];
+      if (isBlocked(nx, nz) || (dx && dz && (isBlocked(x + dx, z) || isBlocked(x, z + dz)))) continue;
+      const nd = d + Math.hypot(dx, dz);
+      if (nd < dist[nz * W + nx]) {
+        dist[nz * W + nx] = nd;
+        queue.push([nx, nz, nd]);
+      }
+    }
+  }
+  const signs = evacuationSigns();
+  assert.ok(signs.length >= 6, `${signs.length} signs`);
+  for (const s of signs) {
+    // Panel axes on the ground: x to the reader's right, "up" straight ahead for whoever reads the front.
+    const right = [Math.cos(s.ry), -Math.sin(s.ry)];
+    const ahead = [-Math.sin(s.ry), -Math.cos(s.ry)];
+    const front = [0, 1].map((i) => Math.cos(s.arrow) * right[i] + Math.sin(s.arrow) * ahead[i]);
+    const [px, pz] = s.tile;
+    const to = [px + Math.round(2 * front[0]), pz + Math.round(2 * front[1])];
+    assert.ok(dist[to[1] * W + to[0]] < dist[pz * W + px], `sign at ${px},${pz} points away from safety`);
+    assert.ok(!isBlocked(Math.floor(s.x / 3), Math.floor(s.z / 3)), "post stands on open ground");
+  }
 });

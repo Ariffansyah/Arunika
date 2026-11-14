@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { GRID, SPAWN, TILE, elevationAt, isBlocked, tileCenter } from "@/lib/campus";
-import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
+import { CanvasTexture, SRGBColorSpace, Shape, ShapeGeometry, Vector2 } from "three";
+import { elevationAt } from "@/lib/campus";
+import { evacuationSigns } from "@/lib/sim";
 
 const LINE = "#f3f1ea";
 const at = (x: number, z: number) => Math.max(0.03, elevationAt(x, z));
@@ -171,53 +172,67 @@ function WaterTower({ x, z }: { x: number; z: number }) {
   );
 }
 
-const FLOOD: Scenario = { kind: "banjir", intensity: 1 };
+const SIGNS = evacuationSigns();
 
-// Signs follow the route the planner computes, so they always point the right way.
+// White on green, as on Indonesian evacuation signs.
+function signLabel() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 48;
+  const g = canvas.getContext("2d")!;
+  g.fillStyle = "#108a4a";
+  g.fillRect(0, 0, 256, 48);
+  g.fillStyle = "#ffffff";
+  g.font = "bold 30px sans-serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText("JALUR EVAKUASI", 128, 26);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
+const HEAD = new ShapeGeometry(new Shape([new Vector2(0.18, 0), new Vector2(0.04, 0.12), new Vector2(0.04, -0.12)]));
+
+// A shaft along +x ending in a solid head, turned to `angle` on the panel.
+function Arrow({ angle, z }: { angle: number; z: number }) {
+  return (
+    <group position={[0, 0.06, z]} rotation-z={angle}>
+      <mesh position={[-0.05, 0, 0]}>
+        <planeGeometry args={[0.2, 0.07]} />
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.35} />
+      </mesh>
+      <mesh geometry={HEAD}>
+        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.35} />
+      </mesh>
+    </group>
+  );
+}
+
+// The back of a post sign is bare metal, as on real ones: the route is signed one way.
 function EvacuationSigns() {
-  const signs = useMemo(() => {
-    const hazards = hazardTiles(FLOOD, {});
-    const route = bestRoute(GRID, SPAWN, safeAssembly(FLOOD, hazards), hazards) ?? [];
-    const out: { x: number; z: number; angle: number }[] = [];
-    for (let i = 3; i + 1 < route.length; i += 7) {
-      const [ax, az] = route[i];
-      const [bx, bz] = route[i + 1];
-      const dx = bx - ax;
-      const dz = bz - az;
-      const len = Math.hypot(dx, dz);
-      const [cx, cz] = tileCenter(ax, az);
-      const sx = cx + (dz / len) * 2.4;
-      const sz = cz - (dx / len) * 2.4;
-      if (isBlocked(Math.floor(sx / TILE), Math.floor(sz / TILE))) continue;
-      // The panel faces the camera (south), so "up" on the sign means north.
-      out.push({ x: sx, z: sz, angle: Math.atan2(-dz, dx) });
-    }
-    return out;
-  }, []);
-
-  return signs.map((s, i) => (
-    <group key={i} position={[s.x, at(s.x, s.z), s.z]}>
-      <mesh position={[0, 1.1, 0]} castShadow>
-        <cylinderGeometry args={[0.04, 0.04, 2.2, 6]} />
+  const label = useMemo(() => signLabel(), []);
+  return SIGNS.map((s, i) => (
+    <group key={i} position={[s.x, at(s.x, s.z), s.z]} rotation-y={s.ry}>
+      <mesh position={[0, 1.2, -0.08]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 2.4, 6]} />
         <meshStandardMaterial color="#cfd6de" />
       </mesh>
-      <group position={[0, 2.1, 0.03]}>
-        <mesh castShadow>
-          <boxGeometry args={[0.62, 0.42, 0.04]} />
-          <meshStandardMaterial color="#108a4a" />
+      <group position={[0, 2.15, 0]}>
+        <mesh position={[0, 0, -0.025]} castShadow>
+          <boxGeometry args={[0.68, 0.52, 0.02]} />
+          <meshStandardMaterial color="#9aa3ad" metalness={0.5} roughness={0.5} />
         </mesh>
-        <group position={[0, 0, 0.03]} rotation-z={s.angle}>
-          <mesh>
-            <boxGeometry args={[0.32, 0.06, 0.01]} />
-            <meshStandardMaterial color="#ffffff" />
-          </mesh>
-          {[1, -1].map((side) => (
-            <mesh key={side} position={[0.11, side * 0.05, 0]} rotation-z={side * 0.8}>
-              <boxGeometry args={[0.16, 0.06, 0.01]} />
-              <meshStandardMaterial color="#ffffff" />
-            </mesh>
-          ))}
-        </group>
+        <mesh>
+          <boxGeometry args={[0.66, 0.5, 0.03]} />
+          {/* Sign faces are retroreflective, so they stay readable in shade. */}
+          <meshStandardMaterial color="#108a4a" emissive="#108a4a" emissiveIntensity={0.35} />
+        </mesh>
+        <Arrow angle={s.arrow} z={0.017} />
+        <mesh position={[0, -0.17, 0.017]}>
+          <planeGeometry args={[0.62, 0.116]} />
+          <meshStandardMaterial map={label} emissiveMap={label} emissive="#ffffff" emissiveIntensity={0.35} />
+        </mesh>
       </group>
     </group>
   ));
