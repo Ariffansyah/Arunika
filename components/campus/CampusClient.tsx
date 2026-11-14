@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import RequireAuth, { Notice, type Me } from "@/components/RequireAuth";
-import { SPAWN } from "@/lib/campus";
+import { SPAWN, tileCenter } from "@/lib/campus";
 import type { Scenario } from "@/lib/sim";
 import { avatarOf } from "@/lib/supabase";
 import { player, setState, startDrill } from "./drillStore";
@@ -24,7 +24,8 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
 
   // The store is module state, so a revisit would otherwise resume a stale drill.
   useEffect(() => {
-    Object.assign(player, { x: SPAWN[0] + 0.5, z: SPAWN[1] + 0.5, heading: 0, crouch: false, moving: false, wading: false });
+    const [x, z] = tileCenter(...SPAWN);
+    Object.assign(player, { x, z, heading: 0, crouch: false, moving: false, running: false, wading: false });
     setState({ phase: "idle", result: null, showRoute: false, chatOpen: false });
   }, [room]);
 

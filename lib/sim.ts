@@ -168,10 +168,12 @@ export function bestRoute(grid: string[], start: Tile, goals: Tile[], hazards: S
 export const pathLength = (path: Tile[]) =>
   path.slice(1).reduce((sum, [x, z], i) => sum + Math.hypot(x - path[i][0], z - path[i][1]), 0);
 
-export const PLAYER_SPEED = 4; // tiles per second
+// Metres per second: a brisk evacuation walk and a run.
+export const WALK_SPEED = 1.5;
+export const RUN_SPEED = 3.5;
 export const QUAKE_SHAKE_S = 8;
 export const FLOOD_RISE_S = 20;
-export const DRILL_LIMIT_S = 90;
+export const DRILL_LIMIT_S = 180;
 
 export type DrillStats = {
   scenario: Scenario;
@@ -186,11 +188,11 @@ export type DrillStats = {
 
 export function scoreDrill(d: DrillStats) {
   if (!d.reached) return 0;
-  const optimalTime = (d.scenario.kind === "gempa" ? QUAKE_SHAKE_S : 0) + d.optimalLen / PLAYER_SPEED;
+  const optimalTime = (d.scenario.kind === "gempa" ? QUAKE_SHAKE_S : 0) + d.optimalLen / WALK_SPEED;
   const score =
     1000 -
     Math.max(0, d.timeS - optimalTime) * 5 -
-    Math.max(0, d.walked - d.optimalLen) * 10 -
+    Math.max(0, d.walked - d.optimalLen) * 3 -
     d.hazardS * 20 -
     (d.hintUsed ? 150 : 0) +
     (d.scenario.kind === "gempa" ? (200 * Math.min(d.coverS, QUAKE_SHAKE_S)) / QUAKE_SHAKE_S : 0);

@@ -7,12 +7,12 @@ import type { Group, Mesh } from "three";
 import Character, { preloadCharacters, type Look } from "@/components/Character";
 import Scenery from "@/components/campus/Scenery";
 import { Backdrop, Buildings, Coast, Props, Terrain } from "@/components/campus/World";
-import { ASSEMBLY, GRID, H, SPAWN, W, elevationAt, tileElevation } from "@/lib/campus";
+import { ASSEMBLY, GRID, SITE_D, SITE_W, SPAWN, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
 import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
 
 const FLOOD: Scenario = { kind: "banjir", intensity: 1.1 };
 const LOOP_S = 18;
-const WALK_SPEED = 2.2;
+const RUN_SPEED = 6.6;
 
 type Clock = { current: number };
 type Pts = readonly (readonly [number, number])[];
@@ -21,7 +21,7 @@ function useRoute() {
   return useMemo(() => {
     const hazards = hazardTiles(FLOOD, {});
     const tiles = bestRoute(GRID, SPAWN, safeAssembly(FLOOD, hazards), hazards) ?? [SPAWN];
-    const pts: Pts = tiles.map(([x, z]) => [x + 0.5, z + 0.5] as const);
+    const pts: Pts = tiles.map(([x, z]) => tileCenter(x, z));
     const cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
     return { pts, cum };
@@ -51,8 +51,8 @@ function Camera({ clockRef }: { clockRef: Clock }) {
 
   useFrame(() => {
     const a = 1.2 + Math.sin(clockRef.current * 0.07) * 0.32;
-    camera.position.set(W / 2 + Math.cos(a) * 38 * k, 15 * k, H / 2 + Math.sin(a) * 38 * k);
-    camera.lookAt(W / 2, 2.5, H / 2 - 3);
+    camera.position.set(SITE_W / 2 + Math.cos(a) * 114 * k, 45 * k, SITE_D / 2 + Math.sin(a) * 114 * k);
+    camera.lookAt(SITE_W / 2, 7.5, SITE_D / 2 - 9);
   });
   return null;
 }
@@ -73,14 +73,14 @@ function Water({ clockRef }: { clockRef: Clock }) {
     baseRef.current ??= Float32Array.from(pos.array);
     const base = baseRef.current;
     for (let i = 0; i < pos.count; i++) {
-      pos.setZ(i, Math.sin(base[i * 3] * 0.45 + t * 1.3) * 0.06 + Math.sin(base[i * 3 + 1] * 0.6 - t * 0.9) * 0.05);
+      pos.setZ(i, Math.sin(base[i * 3] * 0.15 + t * 1.3) * 0.08 + Math.sin(base[i * 3 + 1] * 0.2 - t * 0.9) * 0.06);
     }
     pos.needsUpdate = true;
     m.geometry.computeVertexNormals();
   });
   return (
-    <mesh ref={ref} rotation-x={-Math.PI / 2} position={[W / 2, 0, H / 2]}>
-      <planeGeometry args={[W + 90, H + 90, 72, 56]} />
+    <mesh ref={ref} rotation-x={-Math.PI / 2} position={[SITE_W / 2, 0, SITE_D / 2]}>
+      <planeGeometry args={[SITE_W + 270, SITE_D + 270, 72, 56]} />
       <meshPhongMaterial color="#3a8fc6" specular="#ffe2c2" shininess={70} transparent opacity={0.7} />
     </mesh>
   );
@@ -88,12 +88,12 @@ function Water({ clockRef }: { clockRef: Clock }) {
 
 function Route({ clockRef, pts }: { clockRef: Clock; pts: Pts }) {
   const ref = useRef<ComponentRef<typeof Line>>(null);
-  const points = useMemo(() => pts.map(([x, z]) => [x, elevationAt(x, z) + 0.3, z] as [number, number, number]), [pts]);
+  const points = useMemo(() => pts.map(([x, z]) => [x, elevationAt(x, z) + 0.5, z] as [number, number, number]), [pts]);
   useFrame(() => {
-    if (ref.current) ref.current.material.dashOffset = -clockRef.current * 1.6;
+    if (ref.current) ref.current.material.dashOffset = -clockRef.current * 4.8;
   });
   if (points.length < 2) return null;
-  return <Line ref={ref} points={points} color="#ff8a3d" lineWidth={6} dashed dashSize={0.7} gapSize={0.4} />;
+  return <Line ref={ref} points={points} color="#ff8a3d" lineWidth={6} dashed dashSize={2.1} gapSize={1.2} />;
 }
 
 const STUDENTS: Look[] = ["female-c", "male-a", "female-b", "female-e", "male-f", "female-f", "male-a", "female-b"];
@@ -106,8 +106,8 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
     const g = ref.current;
     if (!g || pts.length < 2) return;
     const total = cum[cum.length - 1];
-    const stop = total - 0.4 - i * 0.55;
-    const d = Math.max(0, ((clockRef.current % LOOP_S) - delay) * WALK_SPEED);
+    const stop = total - 1.2 - i * 1.65;
+    const d = Math.max(0, ((clockRef.current % LOOP_S) - delay) * RUN_SPEED);
     const dist = Math.min(d, stop);
     walking.current = d > 0 && d < stop;
     let s = 1;
@@ -116,7 +116,7 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
     const dx = pts[s][0] - pts[s - 1][0];
     const dz = pts[s][1] - pts[s - 1][1];
     const len = Math.hypot(dx, dz) || 1;
-    const side = ((i % 3) - 1) * 0.35;
+    const side = ((i % 3) - 1) * 1.05;
     const x = pts[s - 1][0] + dx * f - (dz / len) * side;
     const z = pts[s - 1][1] + dz * f + (dx / len) * side;
     g.position.set(x, elevationAt(x, z), z);
@@ -124,26 +124,29 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
   });
   return (
     <group ref={ref}>
-      <Character look={STUDENTS[i]} height={1.55} speed={1.3} anim={() => (walking.current ? "walk" : "idle")} />
+      <Character look={STUDENTS[i]} speed={1.2} anim={() => (walking.current ? "sprint" : "idle")} />
     </group>
   );
 }
 
 function AssemblyRings() {
-  return ASSEMBLY.map(([x, z]) => (
-    <mesh key={`${x}-${z}`} rotation-x={-Math.PI / 2} position={[x + 0.5, tileElevation(x, z) + 0.05, z + 0.5]}>
-      <ringGeometry args={[1.3, 1.6, 32]} />
-      <meshStandardMaterial color="#34c47c" emissive="#34c47c" emissiveIntensity={0.4} />
-    </mesh>
-  ));
+  return ASSEMBLY.map(([x, z]) => {
+    const [cx, cz] = tileCenter(x, z);
+    return (
+      <mesh key={`${x}-${z}`} rotation-x={-Math.PI / 2} position={[cx, tileElevation(x, z) + 0.08, cz]}>
+        <ringGeometry args={[3.9, 4.8, 48]} />
+        <meshStandardMaterial color="#34c47c" emissive="#34c47c" emissiveIntensity={0.4} />
+      </mesh>
+    );
+  });
 }
 
 export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; startAt?: number }) {
   const clockRef = useRef(startAt);
   const { pts, cum } = useRoute();
   return (
-    <Canvas shadows dpr={[1, 1.75]} frameloop={paused ? "demand" : "always"} camera={{ fov: 36, near: 0.5, far: 600 }}>
-      <Backdrop sky={[-25, 4, -100]} light={[W / 2 + 32, 20, H / 2 - 26]} fog={[60, 260]} />
+    <Canvas shadows dpr={[1, 1.75]} frameloop={paused ? "demand" : "always"} camera={{ fov: 36, near: 0.5, far: 2000 }}>
+      <Backdrop sky={[-25, 4, -100]} light={[SITE_W / 2 + 96, 60, SITE_D / 2 - 78]} fog={[180, 780]} />
       <Scenery />
       <Terrain />
       <Coast />

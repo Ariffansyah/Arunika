@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
-import { H, W } from "@/lib/campus";
+import { H, TILE, W } from "@/lib/campus";
 import { INTENSITY, QUAKE_SHAKE_S, SCENARIO_LABEL, waterLevel, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { finishDrill, input, player, setState, showHint, useDrill, type DrillResult } from "./drillStore";
@@ -93,8 +93,8 @@ function Minimap() {
   useEffect(() => {
     let raf = 0;
     const tick = () => {
-      dot.current?.setAttribute("cx", String(player.x));
-      dot.current?.setAttribute("cy", String(player.z));
+      dot.current?.setAttribute("cx", String(player.x / TILE));
+      dot.current?.setAttribute("cy", String(player.z / TILE));
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -158,8 +158,8 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
         Mulai simulasi
       </button>
       <p className="leading-loose text-redup">
-        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Seret layar untuk melihat · Kamera <kbd>V</kbd> · Merunduk{" "}
-        <kbd>C</kbd> · Tanya petugas <kbd>E</kbd>
+        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Lari <kbd>Shift</kbd> · Seret layar untuk melihat · Kamera{" "}
+        <kbd>V</kbd> · Merunduk <kbd>C</kbd> · Tanya petugas <kbd>E</kbd>
       </p>
     </form>
   );
@@ -237,7 +237,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
     ["Skenario", SCENARIO_LABEL[result.scenario.kind]],
     ["Hasil", result.reached ? "Sampai di titik kumpul" : "Tidak sampai di titik kumpul aman"],
     ["Waktu", `${result.timeS.toFixed(1)} dtk`],
-    ["Jarak ditempuh", `${result.walked.toFixed(0)} petak (jalur optimal ${result.optimalLen.toFixed(0)})`],
+    ["Jarak ditempuh", `${result.walked.toFixed(0)} m (jalur optimal ${result.optimalLen.toFixed(0)} m)`],
     ["Di zona bahaya", `${result.hazardS.toFixed(1)} dtk`],
     ...(result.scenario.kind === "gempa"
       ? [["Berlindung saat guncangan", `${Math.min(result.coverS, QUAKE_SHAKE_S).toFixed(1)} / ${QUAKE_SHAKE_S} dtk`] as [string, string]]

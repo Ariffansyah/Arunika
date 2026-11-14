@@ -21,12 +21,12 @@ function Remote({ peer }: { peer: Peer }) {
     if (!target) return;
     const s = shown.current;
     // Snap on first sight or a big jump (drill restart) instead of sliding across the map.
-    if (Number.isNaN(s.x) || Math.hypot(target.x - s.x, target.z - s.z) > 4) Object.assign(s, { x: target.x, z: target.z });
+    if (Number.isNaN(s.x) || Math.hypot(target.x - s.x, target.z - s.z) > 12) Object.assign(s, { x: target.x, z: target.z });
     // Positions arrive at ~5 Hz; ease toward them so movement looks continuous.
     const k = Math.min(1, dt * 10);
     const nx = s.x + (target.x - s.x) * k;
     const nz = s.z + (target.z - s.z) * k;
-    s.moving = Math.hypot(nx - s.x, nz - s.z) > 0.01;
+    s.moving = Math.hypot(nx - s.x, nz - s.z) > 0.02;
     if (s.moving) g.rotation.y = Math.atan2(nx - s.x, nz - s.z);
     s.x = nx;
     s.z = nz;

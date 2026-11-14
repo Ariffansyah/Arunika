@@ -3,13 +3,14 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Vector3, type Group } from "three";
-import { BUILDINGS, WARDEN, elevationAt, idx, isBlocked, tileAt, tileElevation } from "@/lib/campus";
-import { DRILL_LIMIT_S, PLAYER_SPEED, QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
+import { BUILDINGS, TILE, WARDEN, elevationAt, idx, isBlocked, tileAt, tileCenter, tileElevation } from "@/lib/campus";
+import { DRILL_LIMIT_S, QUAKE_SHAKE_S, RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
 import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
 import { finishDrill, getState, input, look, openChat, player, resetInput, run, setState, useDrill } from "./drillStore";
 
 const RADIUS = 0.3;
+const STOREY = 4;
 const KEYS: Record<string, keyof typeof input> = {
   KeyW: "up",
   ArrowUp: "up",
@@ -20,32 +21,34 @@ const KEYS: Record<string, keyof typeof input> = {
   KeyD: "right",
   ArrowRight: "right",
   KeyC: "crouch",
+  ShiftLeft: "run",
+  ShiftRight: "run",
 };
-const CAM_DIST = 4.6;
+const CAM_DIST = 5;
 
 const free = (x: number, z: number) =>
-  [-RADIUS, RADIUS].every((ox) => [-RADIUS, RADIUS].every((oz) => !isBlocked(Math.floor(x + ox), Math.floor(z + oz))));
+  [-RADIUS, RADIUS].every((ox) => [-RADIUS, RADIUS].every((oz) => !isBlocked(Math.floor((x + ox) / TILE), Math.floor((z + oz) / TILE))));
 
 const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("input, textarea, select") !== null;
 
 function solid(x: number, y: number, z: number) {
-  const tx = Math.floor(x);
-  const tz = Math.floor(z);
+  const tx = Math.floor(x / TILE);
+  const tz = Math.floor(z / TILE);
   const c = tileAt(tx, tz);
   const ground = tileElevation(tx, tz);
-  if (BUILDINGS[c]) return y < ground + BUILDINGS[c].floors * 1.5 + 1.2;
-  if (c === "T") return y < ground + 2.8;
-  if (c === "=") return y < ground + 0.95;
-  // Roofs overhang by about half a tile: the space under the eaves is open, only the roof slab is solid.
+  if (BUILDINGS[c]) return y < ground + BUILDINGS[c].floors * STOREY + 2.2;
+  if (c === "T") return y < ground + 7.5;
+  if (c === "=") return y < ground + 1.9;
+  // Roofs overhang the walls: the space under the eaves is open, only the roof slab is solid.
   for (const [ox, oz] of [
-    [-0.45, 0],
-    [0.45, 0],
-    [0, -0.45],
-    [0, 0.45],
+    [-1.2, 0],
+    [1.2, 0],
+    [0, -1.2],
+    [0, 1.2],
   ]) {
-    const b = BUILDINGS[tileAt(Math.floor(x + ox), Math.floor(z + oz))];
-    const eave = ground + (b?.floors ?? 0) * 1.5;
-    if (b && y > eave && y < eave + 0.8) return true;
+    const b = BUILDINGS[tileAt(Math.floor((x + ox) / TILE), Math.floor((z + oz) / TILE))];
+    const eave = ground + (b?.floors ?? 0) * STOREY;
+    if (b && y > eave && y < eave + 1.2) return true;
   }
   return false;
 }
@@ -160,10 +163,11 @@ export default function Player({ look: character, name }: { look: Look; name: st
     player.crouch = input.crouch && !frozen;
     player.moving = len > 0 && !frozen && !player.crouch;
     player.wading = depth > 0.3;
+    player.running = player.moving && input.run && !player.wading;
     if (player.moving) {
       dx /= len;
       dz /= len;
-      const speed = PLAYER_SPEED * (depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1);
+      const speed = (player.running ? RUN_SPEED : WALK_SPEED) * (depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1);
       const ox = player.x;
       const oz = player.z;
       // Small steps so a long frame can't carry the player through a wall corner.
@@ -182,9 +186,13 @@ export default function Player({ look: character, name }: { look: Look; name: st
     if (running && t >= 0) {
       const shaking = s.scenario.kind === "gempa" && t < QUAKE_SHAKE_S;
       if (shaking && player.crouch) run.coverS += dt;
-      const inDebris = s.scenario.kind === "gempa" && !shaking && run.hazards.has(idx(Math.floor(player.x), Math.floor(player.z)));
+      const inDebris =
+        s.scenario.kind === "gempa" && !shaking && run.hazards.has(idx(Math.floor(player.x / TILE), Math.floor(player.z / TILE)));
       if (depth > 0.15 || inDebris) run.hazardS += dt;
-      const atGoal = run.goals.some(([gx, gz]) => Math.hypot(gx + 0.5 - player.x, gz + 0.5 - player.z) < 1.6);
+      const atGoal = run.goals.some((g) => {
+        const [gx, gz] = tileCenter(...g);
+        return Math.hypot(gx - player.x, gz - player.z) < 4.8;
+      });
       if (atGoal && !shaking) finishDrill(true);
       else if (t > DRILL_LIMIT_S) finishDrill(false);
     }
@@ -202,7 +210,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
         ? (0.05 + (s.scenario.intensity - 5) * 0.04) * (reducedMotion.current ? 0.2 : 1)
         : 0;
     const jitter = () => (Math.random() - 0.5) * shake;
-    const target = eye.current.set(player.x, ground + (player.crouch ? 0.55 : 1.05), player.z);
+    const target = eye.current.set(player.x, ground + (player.crouch ? 0.75 : 1.35), player.z);
 
     if (first) {
       camera.position.set(target.x + jitter(), target.y + jitter(), target.z + jitter());
@@ -218,17 +226,18 @@ export default function Player({ look: character, name }: { look: Look; name: st
       while (lift < 0.45 && clearReach(target, look.yaw, look.camPitch + lift, CAM_DIST) < CAM_DIST) lift += 0.05;
       camLift.current += (lift - camLift.current) * (1 - Math.exp(-dt * 6));
       const pitch = look.camPitch + camLift.current;
-      const reach = Math.max(2.4, clearReach(target, look.yaw, pitch, CAM_DIST) - 0.3);
+      const reach = Math.max(1.2, clearReach(target, look.yaw, pitch, CAM_DIST) - 0.3);
       camDist.current = reach < camDist.current ? reach : camDist.current + (reach - camDist.current) * (1 - Math.exp(-dt * 4));
       const d = camDist.current;
       const bx = Math.sin(look.yaw) * Math.cos(pitch);
       const bz = Math.cos(look.yaw) * Math.cos(pitch);
       const by = Math.sin(pitch);
-      camera.position.set(target.x + bx * d + jitter(), target.y + 0.35 + by * d + jitter(), target.z + bz * d + jitter());
-      camera.lookAt(target.x, target.y + 0.2, target.z);
+      camera.position.set(target.x + bx * d + jitter(), target.y + 0.4 + by * d + jitter(), target.z + bz * d + jitter());
+      camera.lookAt(target.x, target.y + 0.25, target.z);
     }
 
-    const near = Math.hypot(WARDEN[0] + 0.5 - player.x, WARDEN[1] + 0.5 - player.z) < 3;
+    const [wx, wz] = tileCenter(...WARDEN);
+    const near = Math.hypot(wx - player.x, wz - player.z) < 4;
     if (near !== s.nearWarden) setState({ nearWarden: near });
   });
 
@@ -239,7 +248,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
         name={name}
         self
         label={view === "third"}
-        anim={() => (player.crouch ? "crouch" : player.moving ? (player.wading ? "walk" : "sprint") : "idle")}
+        anim={() => (player.crouch ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : "idle")}
       />
     </group>
   );

@@ -5,7 +5,7 @@ import { Suspense, useRef } from "react";
 import type { Group } from "three";
 import Model, { M, preloadModels } from "@/components/Model";
 import Decor from "./Decor";
-import { ASSEMBLY, H, W, elevationAt } from "@/lib/campus";
+import { ASSEMBLY, SITE_D, SITE_W, TILE, elevationAt, tileCenter } from "@/lib/campus";
 
 preloadModels([...M.palms, ...M.trees, ...M.bushes, ...M.flowers, ...M.houses, M.tent, M.tentFrame, M.sign, M.crate, M.barrel, M.ambulance, M.police, M.cone]);
 
@@ -17,43 +17,50 @@ const rand = (i: number) => {
 
 type Spot = { src: string; x: number; z: number; ry: number; size: number };
 
+// Layout in grid tiles (scaled to metres below); sizes in metres.
 const HOUSES: Spot[] = [
   ...Array.from({ length: 11 }, (_, i) => ({ x: -5 + i * 4.6, z: -5, ry: 0 })),
   ...Array.from({ length: 8 }, (_, i) => ({ x: -3 + i * 6.3, z: -12, ry: Math.PI })),
   ...Array.from({ length: 6 }, (_, i) => ({ x: -6, z: 1 + i * 4.4, ry: Math.PI / 2 })),
-  ...Array.from({ length: 6 }, (_, i) => ({ x: W + 6, z: 1 + i * 4.4, ry: -Math.PI / 2 })),
-].map((p, i) => ({ ...p, x: p.x + (rand(i) - 0.5), src: M.houses[i % M.houses.length], size: 2.5 + rand(i + 40) * 0.6 }));
+  ...Array.from({ length: 6 }, (_, i) => ({ x: SITE_W / TILE + 6, z: 1 + i * 4.4, ry: -Math.PI / 2 })),
+].map((p, i) => ({
+  ...p,
+  x: (p.x + (rand(i) - 0.5)) * TILE,
+  z: p.z * TILE,
+  src: M.houses[i % M.houses.length],
+  size: 7.5 + rand(i + 40) * 1.8,
+}));
 
 const VILLAGE_TREES: Spot[] = Array.from({ length: 12 }, (_, i) => {
   const side = i % 3;
   return {
     src: M.trees[i % M.trees.length],
-    x: side === 0 ? -9.5 : side === 1 ? -4 + rand(i) * (W + 8) : W + 9.5,
-    z: side === 1 ? -8.5 : 2 + rand(i + 9) * (H - 4),
+    x: side === 0 ? -28.5 : side === 1 ? -12 + rand(i) * (SITE_W + 24) : SITE_W + 28.5,
+    z: side === 1 ? -25.5 : 6 + rand(i + 9) * (SITE_D - 12),
     ry: rand(i + 3) * Math.PI * 2,
-    size: 2.6 + rand(i + 5) * 1.4,
+    size: 7.8 + rand(i + 5) * 4.2,
   };
 });
 
 const PALMS: Spot[] = Array.from({ length: 18 }, (_, i) => ({
   src: M.palms[i % M.palms.length],
-  x: -10 + (i / 17) * (W + 20) + (rand(i + 70) - 0.5) * 1.6,
-  z: H + 3.3 + rand(i + 90) * 2.6,
+  x: -30 + (i / 17) * (SITE_W + 60) + (rand(i + 70) - 0.5) * 4.8,
+  z: SITE_D + 9.9 + rand(i + 90) * 7.8,
   ry: rand(i + 60) * Math.PI * 2,
-  size: 3 + rand(i + 30) * 1.6,
+  size: 9 + rand(i + 30) * 4.8,
 }));
 
 const BUSHES: Spot[] = [
-  ...[2.5, 5, 7.5, 10.5, 13, 15.5, 24.5, 27.5, 30.5, 33, 36].map((x) => ({ x, z: 26.3 })),
-  ...[15.5, 18, 20.5, 23, 25.5].map((z) => ({ x: 1.6, z })),
-].map((p, i) => ({ ...p, src: M.bushes[i % M.bushes.length], ry: rand(i + 11) * Math.PI * 2, size: 0.8 + rand(i + 13) * 0.5 }));
+  ...[2.5, 5, 7.5, 10.5, 13, 15.5, 24.5, 27.5, 30.5, 33, 36].map((x) => ({ x: x * TILE, z: 26.3 * TILE })),
+  ...[15.5, 18, 20.5, 23, 25.5].map((z) => ({ x: 1.6 * TILE, z: z * TILE })),
+].map((p, i) => ({ ...p, src: M.bushes[i % M.bushes.length], ry: rand(i + 11) * Math.PI * 2, size: 1 + rand(i + 13) * 0.6 }));
 
 const FLOWERS: Spot[] = [
   [19.2, 23.6],
   [21.8, 23.7],
   [19.4, 25.3],
   [21.6, 25.4],
-].map(([x, z], i) => ({ x, z, src: M.flowers[i % 2], ry: rand(i) * 6, size: 0.45 }));
+].map(([x, z], i) => ({ x: x * TILE, z: z * TILE, src: M.flowers[i % 2], ry: rand(i) * 6, size: 0.5 }));
 
 const at = (s: Spot, lift = 0) => [s.x, Math.max(0.03, elevationAt(s.x, s.z)) + lift] as const;
 
@@ -66,14 +73,14 @@ function Spots({ spots, by }: { spots: Spot[]; by: "height" | "width" }) {
 
 function Road() {
   return (
-    <group position={[W / 2, 0.05, H + 1.35]}>
+    <group position={[SITE_W / 2, 0.05, SITE_D + 4]}>
       <mesh rotation-x={-Math.PI / 2} receiveShadow>
-        <planeGeometry args={[W + 80, 2.2]} />
+        <planeGeometry args={[SITE_W + 240, 6.6]} />
         <meshStandardMaterial color="#555a63" roughness={0.9} />
       </mesh>
-      {Array.from({ length: 22 }, (_, i) => (
-        <mesh key={i} rotation-x={-Math.PI / 2} position={[-40 + i * 4, 0.01, 0]}>
-          <planeGeometry args={[1.6, 0.12]} />
+      {Array.from({ length: 30 }, (_, i) => (
+        <mesh key={i} rotation-x={-Math.PI / 2} position={[-180 + i * 12, 0.01, 0]}>
+          <planeGeometry args={[3, 0.15]} />
           <meshStandardMaterial color="#e9e3d3" />
         </mesh>
       ))}
@@ -84,10 +91,10 @@ function Road() {
 function Responders() {
   return (
     <>
-      <Model src={M.ambulance} fit={{ width: 2.7 }} position={[15.6, 0.05, H + 1.35]} rotation-y={Math.PI / 2} />
-      <Model src={M.police} fit={{ width: 2.6 }} position={[25.2, 0.05, H + 1.35]} rotation-y={-Math.PI / 2} />
-      {[18.4, 21.6].map((x) => (
-        <Model key={x} src={M.cone} fit={{ height: 0.55 }} position={[x, 0.05, H + 0.55]} />
+      <Model src={M.ambulance} fit={{ width: 5.5 }} position={[46.8, 0.05, SITE_D + 4]} rotation-y={Math.PI / 2} />
+      <Model src={M.police} fit={{ width: 4.8 }} position={[75.6, 0.05, SITE_D + 4]} rotation-y={-Math.PI / 2} />
+      {[55.2, 64.8].map((x) => (
+        <Model key={x} src={M.cone} fit={{ height: 0.7 }} position={[x, 0.05, SITE_D + 1.65]} />
       ))}
     </>
   );
@@ -95,12 +102,12 @@ function Responders() {
 
 function Camp() {
   const items: { src: string; x: number; z: number; ry: number; h: number }[] = [
-    { src: M.tent, x: 34.6, z: 2.4, ry: 0, h: 1.5 },
-    { src: M.tent, x: 37.5, z: 5.2, ry: -Math.PI / 2, h: 1.5 },
-    { src: M.tentFrame, x: 31.4, z: 2.6, ry: 0.4, h: 1.3 },
-    { src: M.crate, x: 36.9, z: 2.3, ry: 0.3, h: 0.5 },
-    { src: M.crate, x: 37.5, z: 2.9, ry: -0.2, h: 0.45 },
-    { src: M.barrel, x: 32.7, z: 2.2, ry: 0, h: 0.6 },
+    { src: M.tent, x: 103.8, z: 7.2, ry: 0, h: 2.2 },
+    { src: M.tent, x: 112.5, z: 15.6, ry: -Math.PI / 2, h: 2.2 },
+    { src: M.tentFrame, x: 94.2, z: 7.8, ry: 0.4, h: 2.4 },
+    { src: M.crate, x: 110.7, z: 6.9, ry: 0.3, h: 0.6 },
+    { src: M.crate, x: 112.5, z: 8.7, ry: -0.2, h: 0.55 },
+    { src: M.barrel, x: 98.1, z: 6.6, ry: 0, h: 0.9 },
   ];
   return items.map((it, i) => (
     <Model key={i} src={it.src} fit={{ height: it.h }} position={[it.x, elevationAt(it.x, it.z), it.z]} rotation-y={it.ry} />
@@ -108,14 +115,10 @@ function Camp() {
 }
 
 function Signs() {
-  return ASSEMBLY.map(([x, z]) => (
-    <Model
-      key={`${x}-${z}`}
-      src={M.sign}
-      fit={{ height: 1.7 }}
-      position={[x + 0.5, elevationAt(x + 0.5, z - 1.2), z - 1.2]}
-    />
-  ));
+  return ASSEMBLY.map(([x, z]) => {
+    const [cx, cz] = tileCenter(x, z);
+    return <Model key={`${x}-${z}`} src={M.sign} fit={{ height: 2.2 }} position={[cx, elevationAt(cx, cz - 5.1), cz - 5.1]} />;
+  });
 }
 
 function Flag() {
@@ -123,20 +126,20 @@ function Flag() {
   useFrame(({ clock }) => {
     if (flag.current) flag.current.rotation.y = Math.sin(clock.elapsedTime * 2.1) * 0.18;
   });
-  const [x, z] = [20.5, 24.5];
+  const [x, z] = [61.5, 73.5];
   return (
     <group position={[x, elevationAt(x, z), z]}>
-      <mesh position={[0, 2.6, 0]} castShadow>
-        <cylinderGeometry args={[0.05, 0.07, 5.2, 8]} />
+      <mesh position={[0, 4, 0]} castShadow>
+        <cylinderGeometry args={[0.06, 0.09, 8, 8]} />
         <meshStandardMaterial color="#d8dde3" metalness={0.4} roughness={0.4} />
       </mesh>
-      <group ref={flag} position={[0.05, 4.6, 0]}>
-        <mesh position={[0.6, 0.2, 0]}>
-          <planeGeometry args={[1.2, 0.4]} />
+      <group ref={flag} position={[0.06, 7.2, 0]}>
+        <mesh position={[0.9, 0.3, 0]}>
+          <planeGeometry args={[1.8, 0.6]} />
           <meshStandardMaterial color="#d7261e" side={2} />
         </mesh>
-        <mesh position={[0.6, -0.2, 0]}>
-          <planeGeometry args={[1.2, 0.4]} />
+        <mesh position={[0.9, -0.3, 0]}>
+          <planeGeometry args={[1.8, 0.6]} />
           <meshStandardMaterial color="#f7f7f2" side={2} />
         </mesh>
       </group>
@@ -147,20 +150,20 @@ function Flag() {
 function Horizon() {
   return (
     <>
-      <mesh rotation-x={-Math.PI / 2} position={[W / 2, 0.03, (H - 160) / 2]} receiveShadow>
-        <planeGeometry args={[320, 160 + H]} />
+      <mesh rotation-x={-Math.PI / 2} position={[SITE_W / 2, 0.03, (SITE_D - 480) / 2]} receiveShadow>
+        <planeGeometry args={[960, 480 + SITE_D]} />
         <meshStandardMaterial color="#6f8f4c" />
       </mesh>
-      <mesh position={[W / 2 - 40, 24, -190]}>
-        <cylinderGeometry args={[5, 70, 48, 14]} />
+      <mesh position={[SITE_W / 2 - 120, 72, -570]}>
+        <cylinderGeometry args={[15, 210, 144, 14]} />
         <meshStandardMaterial color="#7d8794" flatShading />
       </mesh>
-      <mesh position={[W / 2 + 60, 12, -170]}>
-        <coneGeometry args={[60, 24, 12]} />
+      <mesh position={[SITE_W / 2 + 180, 36, -510]}>
+        <coneGeometry args={[180, 72, 12]} />
         <meshStandardMaterial color="#7a8a86" flatShading />
       </mesh>
-      <mesh position={[W / 2 - 120, 10, -150]}>
-        <coneGeometry args={[55, 20, 12]} />
+      <mesh position={[SITE_W / 2 - 360, 30, -450]}>
+        <coneGeometry args={[165, 60, 12]} />
         <meshStandardMaterial color="#7a8a86" flatShading />
       </mesh>
     </>

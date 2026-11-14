@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { GRID, SPAWN, type Tile } from "@/lib/campus";
+import { GRID, SPAWN, TILE, tileCenter, type Tile } from "@/lib/campus";
 import {
   bestRoute,
   campusRisks,
@@ -57,8 +57,9 @@ export const useDrill = <T,>(select: (s: State) => T) =>
   useSyncExternalStore(subscribe, () => select(state), () => select(state));
 
 // Per-frame values live outside React so 60 fps updates never re-render the HUD.
-export const player = { x: SPAWN[0] + 0.5, z: SPAWN[1] + 0.5, heading: 0, crouch: false, moving: false, wading: false };
-export const input = { up: false, down: false, left: false, right: false, crouch: false };
+const [SPAWN_X, SPAWN_Z] = tileCenter(...SPAWN);
+export const player = { x: SPAWN_X, z: SPAWN_Z, heading: 0, crouch: false, moving: false, running: false, wading: false };
+export const input = { up: false, down: false, left: false, right: false, crouch: false, run: false };
 // yaw 0 puts the camera south of the player, looking north.
 export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05 };
 export const remotes = new Map<string, { x: number; z: number; crouch: boolean; at: number }>();
@@ -100,16 +101,17 @@ export function predict(s: Scenario, school: School | null, year?: number) {
   return { risks, hazards, goals: safeAssembly(s, hazards) };
 }
 
-export const playerTile = (): Tile => [Math.floor(player.x), Math.floor(player.z)];
+export const playerTile = (): Tile => [Math.floor(player.x / TILE), Math.floor(player.z / TILE)];
 
 export function startDrill(scenario: Scenario, school: School | null, delayMs = 1500) {
   // Everyone starts in the corridor by the classrooms; starting where you stand would let a drill begin at a safe point.
   Object.assign(player, {
-    x: SPAWN[0] + 0.5 + (Math.random() * 3 - 1.5),
-    z: SPAWN[1] + 0.5 + (Math.random() * 1.6 - 0.8),
+    x: SPAWN_X + (Math.random() * 3 - 1.5) * TILE,
+    z: SPAWN_Z + (Math.random() * 1.6 - 0.8) * TILE,
     heading: 0,
     crouch: false,
     moving: false,
+    running: false,
     wading: false,
   });
   const { hazards, goals } = predict(scenario, school);
@@ -121,7 +123,7 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     hazardS: 0,
     coverS: 0,
     hintUsed: false,
-    optimalLen: route ? pathLength(route) : 0,
+    optimalLen: route ? pathLength(route) * TILE : 0,
     optimalRoute: route,
   });
   setState({ phase: "running", scenario, startAt: Date.now() + delayMs, route, showRoute: false, result: null, chatOpen: false });

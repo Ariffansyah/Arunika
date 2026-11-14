@@ -1,4 +1,4 @@
-// North (row 0) is the hill side, south (row 27) faces the coast.
+// North (row 0) is the hill side, south (row 27) faces the coast. Each character is a TILE-metre square.
 //   = fence   . yard   h hill   g field   T tree   1-4 classroom blocks   5 canteen   6 musholla
 //   A/B assembly points   S spawn   W warden NPC   G gate
 export const GRID = [
@@ -35,6 +35,11 @@ export const GRID = [
 export const W = GRID[0].length;
 export const H = GRID.length;
 
+// The world is built in metres; the grid stays the site plan.
+export const TILE = 3;
+export const SITE_W = W * TILE;
+export const SITE_D = H * TILE;
+
 export type Tile = [x: number, z: number];
 export type Material = "beton_bertulang" | "bata_tanpa_tulangan" | "kayu" | "baja_ringan";
 export type Soil = "keras" | "sedang" | "lunak";
@@ -67,13 +72,18 @@ export const tileAt = (x: number, z: number) => GRID[z]?.[x] ?? "=";
 export const isBlocked = (x: number, z: number) => BLOCKED_CHARS.includes(tileAt(x, z));
 export const idx = (x: number, z: number) => z * W + x;
 
+export const tileCenter = (x: number, z: number): [number, number] => [(x + 0.5) * TILE, (z + 0.5) * TILE];
+
+// x and z in metres. The hill is tall enough to stay dry in the worst flood and steep enough to slide.
 export function elevationAt(x: number, z: number) {
-  const slope = 0.1 + (H - 1 - z) * 0.02;
-  const hill = 3 * Math.exp(-((x - 34.5) ** 2 + (z - 5.5) ** 2) / 30);
+  const tx = x / TILE;
+  const tz = z / TILE;
+  const slope = 0.1 + (H - 1 - tz) * 0.02;
+  const hill = 8 * Math.exp(-((tx - 34.5) ** 2 + (tz - 5.5) ** 2) / 18);
   return slope + hill;
 }
 
-export const tileElevation = (x: number, z: number) => elevationAt(x + 0.5, z + 0.5);
+export const tileElevation = (x: number, z: number) => elevationAt(...tileCenter(x, z));
 
 // Paint only: collision and routing ignore surfaces.
 export function surfaceAt(x: number, z: number): "paving" | "court" | null {

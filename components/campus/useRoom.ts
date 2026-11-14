@@ -2,7 +2,7 @@
 
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
-import { H, W } from "@/lib/campus";
+import { SITE_D, SITE_W } from "@/lib/campus";
 import { INTENSITY, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { player, remotes, startDrill } from "./drillStore";
@@ -51,8 +51,8 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
       setPeers(list);
     })
       .on("broadcast", { event: "pos" }, ({ payload }) => {
-        const x = num(payload?.x, 0, W);
-        const z = num(payload?.z, 0, H);
+        const x = num(payload?.x, 0, SITE_W);
+        const z = num(payload?.z, 0, SITE_D);
         if (typeof payload?.id === "string" && x !== null && z !== null) {
           remotes.set(payload.id, { x, z, crouch: payload.c === true, at: Date.now() });
         }

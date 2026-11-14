@@ -17,7 +17,7 @@ const url = (look: Look) => `/characters/character-${look}.glb`;
 export default function Character({
   look,
   anim,
-  height = 1.3,
+  height = 1.6,
   speed = 1,
 }: {
   look: Look;
