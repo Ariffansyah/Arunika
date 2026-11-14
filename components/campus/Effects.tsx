@@ -10,6 +10,7 @@ import { PLAN, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
 import { QUAKE_SHAKE_S, waterLevel } from "@/lib/sim";
 import { CLASSMATE_SEATS, getState, roomSeats, run } from "./drillStore";
+import { closedDoors, openDoorsNear } from "./interact";
 
 const drillTime = () => {
   const s = getState();
@@ -79,8 +80,9 @@ function Classmate({ i }: { i: number }) {
         const step = Math.min(len, speed * dt * (depth > 1 ? 0.25 : depth > 0.3 ? 0.6 : 1));
         const nx = st.x + (mx / ml) * step;
         const nz = st.z + (mz / ml) * step;
+        openDoorsNear(st.x, st.z, groundY(st.x, st.z, st.layer));
         // The field only routes through open cells, so when the nudge apart hits furniture the plain step is safe.
-        const ok = free(nx, nz, layerAt(nx, nz, st.layer), 0.18);
+        const ok = free(nx, nz, layerAt(nx, nz, st.layer), 0.18, closedDoors);
         st.x = ok ? nx : st.x + (tx / len) * step;
         st.z = ok ? nz : st.z + (tz / len) * step;
         st.layer = layerAt(st.x, st.z, st.layer);

@@ -6,7 +6,8 @@ import { SITE_D, SITE_W } from "@/lib/campus";
 import { classrooms } from "@/lib/floorplan";
 import { INTENSITY, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
-import { player, remotes, startDrill } from "./drillStore";
+import { net, player, remotes, startDrill } from "./drillStore";
+import { isDoor, raiseAlarm, setDoor } from "./interact";
 
 export type Peer = { id: string; name: string; avatar: number };
 type Status = "connecting" | "online" | "offline";
@@ -59,6 +60,10 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
           remotes.set(payload.id, { x, z, layer, crouch: payload.c === true, at: Date.now() });
         }
       })
+      .on("broadcast", { event: "door" }, ({ payload }) => {
+        if (typeof payload?.id === "string" && isDoor(payload.id)) setDoor(payload.id, payload.open === true, false);
+      })
+      .on("broadcast", { event: "alarm" }, () => raiseAlarm(false))
       .on("broadcast", { event: "drill" }, ({ payload }) => {
         const s = parseScenario(payload?.scenario);
         const room = classrooms().find((r) => r.id === payload?.room)?.id;
@@ -67,10 +72,12 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
       .subscribe(async (st) => {
         if (st === "SUBSCRIBED") {
           joined = true;
+          net.send = (event, payload) => void ch.send({ type: "broadcast", event, payload });
           setStatus("online");
           await ch.track({ name: me.name, avatar: me.avatar });
         } else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
           joined = false;
+          net.send = null;
           setStatus("offline");
         }
       });
@@ -89,6 +96,7 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
 
     return () => {
       clearInterval(timer);
+      net.send = null;
       channel.current = null;
       remotes.clear();
       sb.removeChannel(ch);

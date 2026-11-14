@@ -3,12 +3,14 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { Vector3, type Group } from "three";
-import { TILE, WARDEN, idx, tileCenter } from "@/lib/campus";
+import { TILE, idx } from "@/lib/campus";
+import { PLAN } from "@/lib/floorplan";
 import { buildingAt, free, groundY, layerAt, solidAt, type Solid } from "@/lib/nav";
 import { DRILL_LIMIT_S, QUAKE_SHAKE_S, RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
 import type { Look } from "@/components/Character";
 import Avatar from "./Avatar";
-import { finishDrill, getState, input, look, openChat, player, resetInput, run, setState, useDrill } from "./drillStore";
+import { finishDrill, getState, input, look, player, resetInput, run, setState, useDrill } from "./drillStore";
+import { closedDoors, findPrompt, interact } from "./interact";
 
 const KEYS: Record<string, keyof typeof input> = {
   KeyW: "up",
@@ -60,9 +62,14 @@ export default function Player({ look: character, name }: { look: Look; name: st
       if (k) {
         input[k] = true;
         e.preventDefault();
-      } else if (e.code === "KeyE" && getState().nearWarden && !getState().chatOpen) {
-        openChat();
+      } else if (e.code === "KeyE" && !e.repeat) {
+        interact();
         e.preventDefault();
+      } else if (e.code === "KeyM" && !e.repeat && !getState().chatOpen) {
+        resetInput();
+        setState({ mapOpen: !getState().mapOpen });
+      } else if (e.code === "Escape" && getState().mapOpen) {
+        setState({ mapOpen: false });
       } else if (e.code === "KeyV" && !e.repeat) {
         setState({ view: getState().view === "third" ? "first" : "third" });
       }
@@ -137,10 +144,11 @@ export default function Player({ look: character, name }: { look: Look; name: st
     let dx = -Math.sin(look.yaw) * ahead + Math.cos(look.yaw) * side;
     let dz = -Math.cos(look.yaw) * ahead - Math.sin(look.yaw) * side;
     const len = Math.hypot(dx, dz);
-    const frozen = s.chatOpen || (running && t < 0);
+    const frozen = s.chatOpen || s.mapOpen || (running && t < 0);
     player.crouch = input.crouch && !frozen;
     player.moving = len > 0 && !frozen && !player.crouch;
     if (player.moving || player.crouch) player.seated = false;
+    if (player.moving) player.cover = -1;
     player.wading = depth > 0.3;
     player.running = player.moving && input.run && !player.wading;
     if (player.moving) {
@@ -154,9 +162,9 @@ export default function Player({ look: character, name }: { look: Look; name: st
       const step = (speed * dt) / steps;
       for (let i = 0; i < steps; i++) {
         const nx = player.x + dx * step;
-        if (free(nx, player.z, layerAt(nx, player.z, player.layer))) player.x = nx;
+        if (free(nx, player.z, layerAt(nx, player.z, player.layer), undefined, closedDoors)) player.x = nx;
         const nz = player.z + dz * step;
-        if (free(player.x, nz, layerAt(player.x, nz, player.layer))) player.z = nz;
+        if (free(player.x, nz, layerAt(player.x, nz, player.layer), undefined, closedDoors)) player.z = nz;
         player.layer = layerAt(player.x, player.z, player.layer);
       }
       player.heading = Math.atan2(dx, dz);
@@ -167,18 +175,11 @@ export default function Player({ look: character, name }: { look: Look; name: st
 
     if (running && t >= 0) {
       const shaking = s.scenario.kind === "gempa" && t < QUAKE_SHAKE_S;
-      if (shaking && player.crouch) run.coverS += dt;
+      if (shaking && (player.crouch || player.cover >= 0)) run.coverS += dt;
       const inDebris =
         s.scenario.kind === "gempa" && !shaking && run.hazards.has(idx(Math.floor(player.x / TILE), Math.floor(player.z / TILE)));
       if (depth > 0.15 || inDebris) run.hazardS += dt;
-      const atGoal =
-        player.layer === 0 &&
-        run.goals.some((g) => {
-          const [gx, gz] = tileCenter(...g);
-          return Math.hypot(gx - player.x, gz - player.z) < 4.8;
-        });
-      if (atGoal && !shaking) finishDrill(true);
-      else if (t > DRILL_LIMIT_S) finishDrill(false);
+      if (t > DRILL_LIMIT_S) finishDrill(false);
     }
 
     // Eased, so a step onto a floor or a stair reads as a step; a teleport snaps.
@@ -188,6 +189,14 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const g = ref.current;
     if (g) {
       g.position.set(player.x, player.y, player.z);
+      // Under a desk the body tucks beneath it; the player stays where they stood, which is clear of the desk.
+      const desk = PLAN.items[player.cover];
+      if (desk) {
+        const d = Math.hypot(desk.x - player.x, desk.z - player.z) || 1;
+        const k = Math.min(0.45, d * 0.6) / d;
+        g.position.x += (desk.x - player.x) * k;
+        g.position.z += (desk.z - player.z) * k;
+      }
       g.rotation.y = player.heading;
       g.visible = !first;
     }
@@ -225,9 +234,8 @@ export default function Player({ look: character, name }: { look: Look; name: st
       camera.lookAt(target.x, target.y + 0.25, target.z);
     }
 
-    const [wx, wz] = tileCenter(...WARDEN);
-    const near = Math.hypot(wx - player.x, wz - player.z) < 4;
-    if (near !== s.nearWarden) setState({ nearWarden: near });
+    const prompt = findPrompt();
+    if (prompt?.id !== s.prompt?.id || prompt?.label !== s.prompt?.label) setState({ prompt });
   });
 
   return (
@@ -237,7 +245,9 @@ export default function Player({ look: character, name }: { look: Look; name: st
         name={name}
         self
         label={view === "third"}
-        anim={() => (player.crouch ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : player.seated ? "sit" : "idle")}
+        anim={() =>
+          player.crouch || player.cover >= 0 ? "crouch" : player.running ? "sprint" : player.moving ? "walk" : player.seated ? "sit" : "idle"
+        }
       />
     </group>
   );

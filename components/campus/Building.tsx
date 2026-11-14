@@ -9,7 +9,7 @@ import { BUILDINGS } from "@/lib/campus";
 import { PLAN, STOREY, WALL, type Door, type Furniture, type Part, type PartKind, type Spot } from "@/lib/floorplan";
 import { buildingAt } from "@/lib/nav";
 import { QUAKE_SHAKE_S } from "@/lib/sim";
-import { getState, player } from "./drillStore";
+import { getState, player, useDrill } from "./drillStore";
 import { fadeTo, hides } from "./fade";
 
 const furniture = (m: Furniture) => `/models/furniture/${m}.glb`;
@@ -76,13 +76,25 @@ function Glass({ parts }: { parts: Part[] }) {
   );
 }
 
-// Hinged at one jamb; open leaves fold back against the wall on the side they open towards.
+// Hinged at one jamb on the outer face; opening swings the leaf out and back flat against the wall.
 function DoorLeaf({ d }: { d: Door }) {
+  const closed = useDrill((s) => s.closedDoors.includes(d.id));
+  const ref = useRef<Group>(null);
+  const t = useRef(1);
   const [ax, az] = d.along === "x" ? [1, 0] : [0, 1];
   const hx = d.x - (ax * d.w) / 2 + d.out[0] * (WALL / 2 + 0.03);
   const hz = d.z - (az * d.w) / 2 + d.out[1] * (WALL / 2 + 0.03);
+  const shut = Math.atan2(-az, ax);
+  const swing = d.along === "x" ? -d.out[1] : d.out[0];
+  useFrame((_, dt) => {
+    const g = ref.current;
+    const target = closed ? 0 : 1;
+    if (!g || Math.abs(t.current - target) < 0.001) return;
+    t.current += (target - t.current) * (1 - Math.exp(-dt * 8));
+    g.rotation.y = shut + swing * Math.PI * t.current;
+  });
   return (
-    <group position={[hx, d.y, hz]} rotation-y={Math.atan2(az, -ax)}>
+    <group ref={ref} position={[hx, d.y, hz]} rotation-y={shut + swing * Math.PI}>
       <mesh position={[(d.w - 0.04) / 2, 1.03, 0]} castShadow>
         <boxGeometry args={[d.w - 0.04, 2.05, 0.04]} />
         <meshStandardMaterial color="#7a4a2b" />
@@ -92,6 +104,7 @@ function DoorLeaf({ d }: { d: Door }) {
 }
 
 function SpotMesh({ s }: { s: Spot }) {
+  const on = useDrill((st) => (s.kind === "mcb" ? st.power : s.kind === "gas" ? st.gas : true));
   return (
     <group position={[s.x, s.y, s.z]} rotation-y={s.ry}>
       {s.kind === "peta" && (
@@ -112,9 +125,9 @@ function SpotMesh({ s }: { s: Spot }) {
             <boxGeometry args={[0.36, 0.5, 0.12]} />
             <meshStandardMaterial color="#8d949c" metalness={0.3} roughness={0.5} />
           </mesh>
-          <mesh position={[0, 0.06, 0.125]}>
-            <boxGeometry args={[0.2, 0.06, 0.02]} />
-            <meshStandardMaterial color="#1d2229" />
+          <mesh position={[0, on ? 0.08 : -0.08, 0.13]}>
+            <boxGeometry args={[0.2, 0.06, 0.03]} />
+            <meshStandardMaterial color={on ? "#1d2229" : "#d9483b"} />
           </mesh>
         </>
       )}
@@ -143,6 +156,10 @@ function SpotMesh({ s }: { s: Spot }) {
           <mesh position={[0, 0.44, 0]}>
             <cylinderGeometry args={[0.04, 0.05, 0.08, 8]} />
             <meshStandardMaterial color="#c9c9c9" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, 0.5, 0]} rotation-y={on ? 0 : Math.PI / 2}>
+            <boxGeometry args={[0.14, 0.025, 0.03]} />
+            <meshStandardMaterial color={on ? "#d9483b" : "#2f9e5b"} />
           </mesh>
         </>
       )}

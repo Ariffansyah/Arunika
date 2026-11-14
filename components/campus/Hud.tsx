@@ -9,6 +9,8 @@ import { H, TILE, W } from "@/lib/campus";
 import { INTENSITY, QUAKE_SHAKE_S, SCENARIO_LABEL, waterLevel, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { finishDrill, input, player, setState, showHint, useDrill, type DrillResult } from "./drillStore";
+import { interact } from "./interact";
+import { rumble, siren } from "./sound";
 import type { Peer } from "./useRoom";
 
 const panel = "rounded-lg border border-malam-3 bg-malam/92 p-4 shadow-lg";
@@ -18,57 +20,6 @@ const primary = `${btn} bg-fajar text-malam hover:bg-fajar-tua`;
 const ghost = `${btn} border border-malam-3 text-pasir hover:border-redup`;
 
 export const ROOM_PATTERN = /^[a-z0-9-]{3,40}$/i;
-
-// Two-tone siren from an oscillator: no audio file to ship or license.
-function siren(seconds = 3) {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sawtooth";
-    gain.gain.value = 0.06;
-    for (let t = 0; t < seconds; t += 0.5) osc.frequency.setValueAtTime(t % 1 ? 640 : 880, ctx.currentTime + t);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + seconds);
-    osc.onended = () => ctx.close();
-    // A drill started by someone else arrives without a click here, so the context may begin suspended.
-    void ctx.resume();
-  } catch {
-    // Audio is a cue, not a requirement; the on-screen instruction carries the same message.
-  }
-}
-
-function rumble(seconds: number) {
-  try {
-    const ctx = new AudioContext();
-    const n = Math.floor(ctx.sampleRate * seconds);
-    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < n; i++) {
-      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
-      data[i] = last * 3.5;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const low = ctx.createBiquadFilter();
-    low.type = "lowpass";
-    low.frequency.value = 140;
-    const gain = ctx.createGain();
-    const now = ctx.currentTime;
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.55, now + 0.4);
-    gain.gain.setValueAtTime(0.55, now + seconds - 1);
-    gain.gain.linearRampToValueAtTime(0, now + seconds);
-    src.connect(low).connect(gain).connect(ctx.destination);
-    src.start();
-    src.onended = () => ctx.close();
-    void ctx.resume();
-  } catch {
-    // Sound is a cue only; the shaking camera and the instruction carry the same message.
-  }
-}
 
 function useDrillClock() {
   const phase = useDrill((s) => s.phase);
@@ -88,7 +39,8 @@ function useDrillClock() {
   return phase === "running" ? t : 0;
 }
 
-function Minimap() {
+// The player's spot on a plan, moved every frame without re-rendering.
+function useYouDot() {
   const dot = useRef<SVGCircleElement>(null);
   useEffect(() => {
     let raf = 0;
@@ -100,6 +52,36 @@ function Minimap() {
     tick();
     return () => cancelAnimationFrame(raf);
   }, []);
+  return dot;
+}
+
+function MapOverlay() {
+  const dot = useYouDot();
+  return (
+    <div
+      role="dialog"
+      aria-label="Peta evakuasi"
+      className="pointer-events-auto absolute inset-0 z-40 flex items-center justify-center bg-malam/70 p-4"
+      onClick={() => setState({ mapOpen: false })}
+    >
+      <div className={`${panel} w-full max-w-2xl space-y-3`} onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold">Peta evakuasi</h2>
+        <div className="overflow-hidden rounded-md border border-malam-3">
+          <CampusPlan label="Peta evakuasi kampus dengan titik kumpul dan posisi kamu">
+            <circle ref={dot} r={0.9} fill="#ff8a3d" stroke="#0d1828" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
+          </CampusPlan>
+        </div>
+        <p className="text-redup">Hijau titik kumpul, jingga posisi kamu.</p>
+        <button type="button" className={`${primary} w-full`} onClick={() => setState({ mapOpen: false })}>
+          Tutup peta
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Minimap() {
+  const dot = useYouDot();
   const route = useDrill((s) => (s.showRoute ? s.route : null));
   return (
     <div className="w-28 overflow-hidden rounded-md border border-malam-3 sm:w-52">
@@ -158,8 +140,8 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
         Mulai simulasi
       </button>
       <p className="leading-loose text-redup">
-        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Lari <kbd>Shift</kbd> · Seret layar untuk melihat · Kamera{" "}
-        <kbd>V</kbd> · Merunduk <kbd>C</kbd> · Tanya petugas <kbd>E</kbd>
+        Gerak <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> · Lari <kbd>Shift</kbd> · Aksi <kbd>E</kbd> · Merunduk <kbd>C</kbd> · Peta{" "}
+        <kbd>M</kbd> · Kamera <kbd>V</kbd> · Seret layar untuk melihat
       </p>
     </form>
   );
@@ -168,6 +150,7 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
 function Instruction({ t }: { t: number }) {
   const scenario = useDrill((s) => s.scenario);
   const hint = useDrill((s) => s.showRoute);
+  const report = useDrill((s) => s.prompt?.id === "lapor");
   if (t < 0) return <p className="text-2xl font-extrabold">Bersiap… {Math.ceil(-t)}</p>;
   const shaking = scenario.kind === "gempa" && t < QUAKE_SHAKE_S;
   return (
@@ -176,8 +159,12 @@ function Instruction({ t }: { t: number }) {
         {scenario.kind === "gempa"
           ? shaking
             ? "Gempa! Merunduk, lindungi kepala, bertahan. Tahan C atau tombol Merunduk."
-            : "Guncangan berhenti. Jauhi gedung dan menuju titik kumpul yang aman."
-          : "Air laut naik. Segera menuju tempat yang lebih tinggi."}
+            : report
+              ? "Sudah di titik kumpul. Lapor ke petugas (E)."
+              : "Guncangan berhenti. Jauhi gedung dan menuju titik kumpul yang aman."
+          : report
+            ? "Sudah di tempat aman. Lapor ke petugas (E)."
+            : "Air laut naik. Segera menuju tempat yang lebih tinggi."}
       </p>
       <p className="tabular-nums text-redup">
         Waktu {t.toFixed(1)} dtk
@@ -230,7 +217,9 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
         .limit(5);
       if (error) throw error;
       setBoard(rows as Row[]);
-    })().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    })()
+      // Supabase throws plain objects that carry a message, not Error instances.
+      .catch((e) => setError(typeof e?.message === "string" ? e.message : String(e)));
   }, [result, room, schoolId, startAt]);
 
   const lines: [string, string][] = [
@@ -295,6 +284,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
 }
 
 function TouchPad() {
+  const prompt = useDrill((s) => s.prompt);
   const hold = (k: keyof typeof input) => ({
     onPointerDown: (e: React.PointerEvent) => {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -307,7 +297,17 @@ function TouchPad() {
   const pad = "flex size-12 items-center justify-center rounded-md bg-malam/85 text-pasir active:bg-malam-3 touch-none select-none";
   return (
     <div className="pointer-events-auto absolute right-3 bottom-3 hidden grid-cols-[3rem_auto_3rem] justify-items-center gap-1 pointer-coarse:grid">
-      <span />
+      <button
+        type="button"
+        onClick={interact}
+        disabled={!prompt}
+        className={`${pad} col-span-3 w-full px-3 text-sm font-bold disabled:opacity-50`}
+      >
+        {prompt?.label ?? "Aksi"}
+      </button>
+      <button type="button" className={`${pad} text-xs font-bold`} {...hold("run")}>
+        Lari
+      </button>
       <button type="button" aria-label="Maju" className={pad} {...hold("up")}>
         <ChevronUp aria-hidden="true" />
       </button>
@@ -348,6 +348,7 @@ export default function Hud({
   const result = useDrill((s) => s.result);
   const showRisk = useDrill((s) => s.showRisk);
   const view = useDrill((s) => s.view);
+  const mapOpen = useDrill((s) => s.mapOpen);
   const t = useDrillClock();
   const router = useRouter();
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
@@ -441,12 +442,13 @@ export default function Hud({
         </div>
       </div>
 
-      <div className={`${panel} pointer-events-auto w-full max-w-sm text-sm pointer-coarse:mb-[10.5rem]`}>
+      <div className={`${panel} pointer-events-auto w-full max-w-sm text-sm pointer-coarse:mb-[14rem]`}>
         {phase === "idle" && <ScenarioPicker onStart={onStart} />}
         {phase === "running" && <Instruction t={t} />}
         {phase === "done" && result && <Results result={result} room={room} schoolId={school?.id ?? null} />}
       </div>
       <TouchPad />
+      {mapOpen && <MapOverlay />}
     </div>
   );
 }

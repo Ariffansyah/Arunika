@@ -12,7 +12,6 @@ import {
   SITE_W,
   TILE,
   W,
-  WARDEN,
   elevationAt,
   findTiles,
   surfaceAt,
@@ -31,7 +30,8 @@ import Avatar from "./Avatar";
 import { Buildings } from "./Building";
 import { Beacons, Classmates, FloodDebris, QuakeDebris } from "./Effects";
 import { fadeTo, hides } from "./fade";
-import { getState, openChat, player, predict, useDrill } from "./drillStore";
+import { getState, player, predict, useDrill } from "./drillStore";
+import { interact, wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
 import RemotePlayers from "./RemotePlayers";
@@ -179,33 +179,43 @@ function AssemblyPoints({ safe }: { safe: Tile[] }) {
 }
 
 function Warden() {
-  const near = useDrill((s) => s.nearWarden && !s.chatOpen && s.phase !== "running");
+  const outer = useRef<Group>(null);
   const ref = useRef<Group>(null);
-  const [x, z] = tileCenter(...WARDEN);
   useFrame((_, dt) => {
     const g = ref.current;
-    if (!g) return;
-    const target = getState().nearWarden ? Math.atan2(player.x - x, player.z - z) : Math.PI / 4;
+    const o = outer.current;
+    if (!g || !o) return;
+    const [x, z] = wardenSpot();
+    o.position.set(x, elevationAt(x, z), z);
+    const id = getState().prompt?.id;
+    const target = id === "warden" || id === "lapor" ? Math.atan2(player.x - x, player.z - z) : Math.PI / 4;
     const d = Math.atan2(Math.sin(target - g.rotation.y), Math.cos(target - g.rotation.y));
     g.rotation.y += d * (1 - Math.exp(-dt * 7));
   });
   return (
-    <group position={[x, elevationAt(x, z), z]}>
+    <group ref={outer}>
       <group ref={ref} rotation-y={Math.PI / 4}>
         <Avatar look="worker" name="Petugas Keselamatan" height={1.7} anim={() => (getState().chatOpen ? "emote-yes" : "idle")} />
       </group>
-      {near && (
-        <Html position={[0, 2.5, 0]} center zIndexRange={[30, 0]}>
-          <button
-            type="button"
-            onClick={openChat}
-            className="min-h-11 whitespace-nowrap rounded-md bg-pasir px-3 text-sm font-semibold text-malam hover:bg-white active:translate-y-px"
-          >
-            Tanya petugas (E)
-          </button>
-        </Html>
-      )}
     </group>
+  );
+}
+
+// The action E would take, next to the thing it acts on; clicking it does the same.
+function PromptLabel() {
+  const prompt = useDrill((s) => s.prompt);
+  if (!prompt) return null;
+  return (
+    <Html position={[prompt.x, prompt.y, prompt.z]} center zIndexRange={[30, 0]}>
+      <button
+        type="button"
+        onClick={interact}
+        className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-md bg-pasir px-3 text-sm font-semibold text-malam hover:bg-white active:translate-y-px"
+      >
+        <kbd className="rounded border border-malam/30 px-1.5 text-xs">E</kbd>
+        {prompt.label}
+      </button>
+    </Html>
   );
 }
 
@@ -367,6 +377,7 @@ export default function World({
       <Beacons />
       <AssemblyPoints safe={goals} />
       <Warden />
+      <PromptLabel />
       {showRisk && <HazardOverlay hazards={hazards} />}
       <Route />
       <Water />

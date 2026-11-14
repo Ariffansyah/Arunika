@@ -15,6 +15,8 @@ import {
 import type { School } from "@/lib/supabase";
 
 export type DrillResult = DrillStats & { score: number };
+// What E (or the Aksi button) would do right now, shown next to the thing it acts on.
+export type Prompt = { id: string; label: string; x: number; y: number; z: number };
 // Metres, with height so the route can be drawn up and down stairs.
 export type Route = [x: number, y: number, z: number][];
 
@@ -28,9 +30,13 @@ type State = {
   showRoute: boolean;
   showRisk: boolean;
   result: DrillResult | null;
-  nearWarden: boolean;
   chatOpen: boolean;
   view: "third" | "first";
+  prompt: Prompt | null;
+  closedDoors: string[];
+  power: boolean;
+  gas: boolean;
+  mapOpen: boolean;
 };
 
 let state: State = {
@@ -42,9 +48,13 @@ let state: State = {
   showRoute: false,
   showRisk: false,
   result: null,
-  nearWarden: false,
   chatOpen: false,
   view: "third",
+  prompt: null,
+  closedDoors: [],
+  power: true,
+  gas: true,
+  mapOpen: false,
 };
 
 const listeners = new Set<() => void>();
@@ -75,8 +85,12 @@ export const player = {
   running: false,
   wading: false,
   seated: false,
+  // Taking cover under this desk, as an index into PLAN.items.
+  cover: -1,
 };
 export const input = { up: false, down: false, left: false, right: false, crouch: false, run: false };
+// Set by the room connection; actions here use it to tell the other players.
+export const net = { send: null as ((event: string, payload: Record<string, unknown>) => void) | null };
 // yaw 0 puts the camera south of the player, looking north.
 export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05 };
 export const remotes = new Map<string, { x: number; z: number; layer: number; crouch: boolean; at: number }>();
@@ -156,6 +170,7 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     running: false,
     wading: false,
     seated: true,
+    cover: -1,
   });
   look.yaw = seat.ry + Math.PI;
   const { hazards, goals } = predict(scenario, school);
@@ -172,7 +187,20 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     optimalRoute: route,
     field,
   });
-  setState({ phase: "running", scenario, room, startAt: Date.now() + delayMs, route, showRoute: false, result: null, chatOpen: false });
+  setState({
+    phase: "running",
+    scenario,
+    room,
+    startAt: Date.now() + delayMs,
+    route,
+    showRoute: false,
+    result: null,
+    chatOpen: false,
+    mapOpen: false,
+    closedDoors: [],
+    power: true,
+    gas: true,
+  });
 }
 
 export function showHint() {
