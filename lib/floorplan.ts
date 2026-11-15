@@ -182,12 +182,14 @@ class Storey {
     this.plan.spots.push({ kind, b: this.b, floor: this.floor, x, y: this.y0 + lift, z, ry: yaw(this.F, du, dv) });
   }
 
+  // Returns where along u each column stands.
   columns(L: number, v0: number, v1: number, every = 4.5) {
     const n = Math.max(2, Math.round(L / every));
-    for (let i = 0; i <= n; i++) {
+    return Array.from({ length: n + 1 }, (_, i) => {
       const u = WALL + ((L - 2 * WALL) * i) / n;
       this.box("column", u - 0.15, u + 0.15, v0, v1, this.y0, this.y1);
-    }
+      return u;
+    });
   }
 }
 
@@ -292,7 +294,7 @@ function kantor(plan: Plan, F: Frame, b: string, y00: number) {
   const vIn = CORRIDOR + WALL;
   const s = new Storey(plan, F, b, 0, y00, y00 + CEILING);
   s.room("selasar", "Selasar", 0, L, 0, CORRIDOR);
-  s.columns(L, 0, 0.3);
+  const posts = s.columns(L, 0, 0.3);
   s.wall("u", 0, L, D - WALL, D, [win(2), win(6), win(10), win(15), win(21)]);
   s.wall("v", CORRIDOR, D - WALL, 0, WALL);
   s.wall("v", CORRIDOR, D - WALL, L - WALL, L);
@@ -327,8 +329,9 @@ function kantor(plan: Plan, F: Frame, b: string, y00: number) {
   s.item("bookcaseClosedDoors", 22.6, D - WALL - 0.25, 0, -1, [1.1, 1.9, 0.45]);
   s.item("pottedPlant", 23.3, 3.2, 0, 1, [0.5, 1.1, 0.5], false);
 
-  // At the end of the corridor away from the hill, out of a landslide's reach.
-  s.spot("kentongan", 6, 1.1, 0, 1, 1.2);
+  // Hung on the yard side of a corridor column, at the end away from the hill and out of a landslide's reach:
+  // seen from the yard, and rung from there or from the corridor.
+  s.spot("kentongan", posts[1], -0.17, 0, -1, 0.85);
 }
 
 function perpustakaan(plan: Plan, F: Frame, b: string, y00: number) {

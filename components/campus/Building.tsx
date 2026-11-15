@@ -225,6 +225,10 @@ function SpotMesh({ s }: { s: Spot }) {
       )}
       {s.kind === "kentongan" && (
         <>
+          <mesh position={[0, 1.47, -0.085]}>
+            <boxGeometry args={[0.05, 0.05, 0.2]} />
+            <meshStandardMaterial color="#4b3a2a" />
+          </mesh>
           <mesh position={[0, 1.2, 0]}>
             <cylinderGeometry args={[0.012, 0.012, 0.5, 4]} />
             <meshStandardMaterial color="#4b3a2a" />
