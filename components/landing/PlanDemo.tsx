@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { type CSSProperties, useMemo, useState, useSyncExternalStore } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import { predict } from "@/components/campus/drillStore";
 import { ASSEMBLY_NAMES, GRID, SPAWN, tileAt } from "@/lib/campus";
@@ -26,7 +26,7 @@ export default function PlanDemo() {
 
   return (
     <section aria-labelledby="coba" className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,24rem)_1fr] lg:gap-14 lg:py-28">
-      <div className="space-y-8">
+      <div className="reveal space-y-8">
         <h2 id="coba" className="text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">
           Geser, lihat jalurnya berubah.
         </h2>
@@ -75,7 +75,7 @@ export default function PlanDemo() {
           )}
         </p>
       </div>
-      <figure className="self-start overflow-hidden rounded-lg border border-malam-3">
+      <figure style={{ "--delay": "15%" } as CSSProperties} className="reveal self-start overflow-hidden rounded-lg border border-malam-3">
         <CampusPlan
           route={route ?? undefined}
           hazards={hazards}

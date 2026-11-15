@@ -27,7 +27,7 @@ export default function Hero() {
   return (
     // The gradient matches the dawn sky, so nothing flashes while the 3D chunk loads.
     <section className="relative isolate flex h-[100svh] min-h-[600px] items-end overflow-hidden bg-[linear-gradient(180deg,#1d2c4b_0%,#4a4a66_55%,#b86f50_100%)] lg:items-center">
-      <div className="absolute inset-0 -z-10">
+      <div className="parallax-back absolute inset-0 -z-10">
         <HeroScene paused={paused} startAt={6} onLevel={onLevel} />
       </div>
       <div
@@ -38,7 +38,7 @@ export default function Hero() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[62%] bg-[linear-gradient(0deg,#0d1828_10%,rgb(13_24_40/0.8)_45%,transparent)] lg:inset-y-0 lg:left-0 lg:h-auto lg:w-[62%] lg:bg-[linear-gradient(90deg,#0d1828_0%,rgb(13_24_40/0.86)_40%,rgb(13_24_40/0.4)_70%,transparent)]"
       />
-      <div className="mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 sm:pb-24 lg:pb-0">
+      <div className="parallax-fore mx-auto w-full max-w-6xl px-4 pb-20 sm:px-6 sm:pb-24 lg:pb-0">
         <h1 className="max-w-[11ch] animate-rise text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl lg:text-[5.75rem]">
           Hafal jalan selamat <span className="text-fajar">sebelum</span> bencana datang.
         </h1>
