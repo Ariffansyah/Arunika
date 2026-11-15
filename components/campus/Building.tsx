@@ -6,9 +6,12 @@ import {
   BoxGeometry,
   CanvasTexture,
   Color,
+  ExtrudeGeometry,
   Object3D,
   RepeatWrapping,
   SRGBColorSpace,
+  Shape,
+  Vector2,
   type Group,
   type InstancedMesh,
   type MeshStandardMaterial,
@@ -41,6 +44,10 @@ const COLOR: Partial<Record<PartKind, string>> = {
 const BAND_COLOR = "#7f8f78";
 const BAND = 0.9;
 const riskColor = (r: number) => new Color(WALL_COLOR).lerp(new Color("#e0473c"), r / 100);
+// Each piece is drawn a little larger than it is, so pieces overlap instead of meeting edge to edge and wall faces
+// stand clear of the ceiling panels' edges, which flickered as a dashed line along the top of every wall. Slabs
+// grow half as far sideways so their edges never share a plane with the walls' faces.
+const SEAM = 0.01;
 const UNIT = new BoxGeometry();
 
 function Plain({ boxes, children, shadow = false }: { boxes: Box[]; children: React.ReactNode; shadow?: boolean }) {
@@ -101,8 +108,9 @@ function Boxes({ parts, colorOf }: { parts: Part[]; colorOf: (p: Part) => Color 
     const o = new Object3D();
     const c = new Color();
     parts.forEach((p, i) => {
+      const grow = p.kind === "floor" ? SEAM / 2 : SEAM;
       o.position.set((p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, (p.z0 + p.z1) / 2);
-      o.scale.set(p.x1 - p.x0, p.y1 - p.y0, p.z1 - p.z0);
+      o.scale.set(p.x1 - p.x0 + grow, p.y1 - p.y0 + SEAM, p.z1 - p.z0 + grow);
       o.updateMatrix();
       mesh.setMatrixAt(i, o.matrix);
       mesh.setColorAt(i, c.set(colorOf(p)));
@@ -360,18 +368,7 @@ function Roof({ b }: { b: string }) {
     t.repeat.set((2 * (w + d + 3.2)) / 2.4, Math.hypot(2.2, Math.min(w, d) / 2 + 0.8) / 1.32);
     return t;
   }, [w, d]);
-  if (info.kind === "kantin") {
-    // Light zinc sheets on a low gable: the roof a whirlwind strips first.
-    const eave = PLAN.floorY[b] + 3.2;
-    const run = d / 2 + 0.6;
-    const slope = Math.atan2(1.2, run);
-    return [-1, 1].map((side) => (
-      <mesh key={side} position={[cx, eave + 0.6, cz + (side * run) / 2]} rotation-x={side * slope} castShadow receiveShadow>
-        <boxGeometry args={[w + 1, 0.06, Math.hypot(run, 1.2)]} />
-        <meshStandardMaterial color="#8d9ba6" metalness={0.35} roughness={0.55} />
-      </mesh>
-    ));
-  }
+  if (info.kind === "kantin") return <ZincRoof x0={fp.x0} x1={fp.x1} cz={cz} d={d} eave={PLAN.floorY[b] + 3.2} />;
   if (info.kind === "musholla") {
     return (
       <group position={[cx, top, cz]}>
@@ -379,6 +376,7 @@ function Roof({ b }: { b: string }) {
           <boxGeometry args={[w + 0.4, 0.4, d + 0.4]} />
           <meshStandardMaterial color="#e6dcc6" />
         </mesh>
+        <Soffit w={w + 0.4} d={d + 0.4} />
         <mesh position={[0, 0.4, 0]} castShadow>
           <sphereGeometry args={[2.4, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
           <meshStandardMaterial color="#2c8a5a" />
@@ -392,12 +390,60 @@ function Roof({ b }: { b: string }) {
   }
   // A 4-sided cone turned 45° is a hip roof; the outer scale stretches it to the footprint.
   return (
-    <group position={[cx, top + 1.1, cz]} scale={[(w + 1.6) / Math.SQRT2, 1, (d + 1.6) / Math.SQRT2]}>
-      <mesh rotation-y={Math.PI / 4} castShadow>
-        <coneGeometry args={[1, 2.2, 4]} />
-        <meshStandardMaterial map={map} flatShading />
-      </mesh>
-    </group>
+    <>
+      <group position={[cx, top + 1.1, cz]} scale={[(w + 1.6) / Math.SQRT2, 1, (d + 1.6) / Math.SQRT2]}>
+        <mesh rotation-y={Math.PI / 4} castShadow>
+          <coneGeometry args={[1, 2.2, 4]} />
+          <meshStandardMaterial map={map} flatShading />
+        </mesh>
+      </group>
+      <group position={[cx, top, cz]}>
+        <Soffit w={w + 1.6} d={d + 1.6} />
+      </group>
+    </>
+  );
+}
+
+// Light zinc sheets on a low gable: the roof a whirlwind strips first. The gable ends are closed with plastered
+// triangles, which were open and showed as black holes under the roof.
+function ZincRoof({ x0, x1, cz, d, eave }: { x0: number; x1: number; cz: number; d: number; eave: number }) {
+  const run = d / 2 + 0.6;
+  const slope = Math.atan2(1.2, run);
+  const gable = useMemo(() => {
+    const rise = (z: number) => 1.2 * (1 - Math.abs(z) / run) - 0.04;
+    const shape = new Shape([new Vector2(-d / 2, 0), new Vector2(d / 2, 0), new Vector2(d / 2, rise(d / 2)), new Vector2(0, rise(0)), new Vector2(-d / 2, rise(d / 2))]);
+    return new ExtrudeGeometry(shape, { depth: WALL, bevelEnabled: false });
+  }, [d, run]);
+  return (
+    <>
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[(x0 + x1) / 2, eave + 0.6, cz + (side * run) / 2]} rotation-x={side * slope} castShadow receiveShadow>
+          <boxGeometry args={[x1 - x0 + 1, 0.06, Math.hypot(run, 1.2)]} />
+          <meshStandardMaterial color="#8d9ba6" metalness={0.35} roughness={0.55} />
+          <mesh position-y={-0.031} rotation-x={Math.PI / 2}>
+            <planeGeometry args={[x1 - x0 + 1, Math.hypot(run, 1.2)]} />
+            <meshBasicMaterial color="#6f7a83" />
+          </mesh>
+        </mesh>
+      ))}
+      {/* Turned a quarter so the shape's width runs along z; each end is a wall's thickness inside the footprint. */}
+      {[x0, x1 - WALL].map((x) => (
+        <mesh key={x} geometry={gable} position={[x, eave, cz]} rotation-y={Math.PI / 2} castShadow receiveShadow>
+          <meshStandardMaterial color={WALL_COLOR} />
+        </mesh>
+      ))}
+    </>
+  );
+}
+
+// The underside of the eaves. Facing the ground it gets no sun and drew as a black band that looked like a gap
+// under the roof, so like the ceilings it is drawn evenly lit.
+function Soffit({ w, d }: { w: number; d: number }) {
+  return (
+    <mesh position-y={-0.01} rotation-x={Math.PI / 2}>
+      <planeGeometry args={[w, d]} />
+      <meshBasicMaterial color="#bdb4a5" />
+    </mesh>
   );
 }
 
