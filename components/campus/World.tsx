@@ -39,6 +39,7 @@ import { random, vortexAt, waterLevel } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import type { Look } from "@/components/Character";
 import Html from "@/components/Html";
+import "@/components/threeConsole";
 import Model, { M } from "@/components/Model";
 import Avatar from "./Avatar";
 import { Buildings } from "./Building";

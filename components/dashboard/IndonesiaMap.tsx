@@ -5,6 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { useEffect, useMemo, useState } from "react";
 import { ExtrudeGeometry, Shape, Vector2 } from "three";
 import Html from "@/components/Html";
+import "@/components/threeConsole";
 
 export type MapSchool = { id: string; name: string; lat: number; lon: number; exposure: number; color: string };
 

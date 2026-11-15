@@ -6,6 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, type ComponentRef } from "react";
 import type { Group, Mesh } from "three";
 import Character, { preloadCharacters, type Look } from "@/components/Character";
 import Html from "@/components/Html";
+import "@/components/threeConsole";
 import Scenery from "@/components/campus/Scenery";
 import { Buildings } from "@/components/campus/Building";
 import { Backdrop, Coast, Props, Terrain } from "@/components/campus/World";
