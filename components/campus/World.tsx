@@ -45,7 +45,7 @@ import { Buildings } from "./Building";
 import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, Landslide, QuakeDebris, Rain, Vortex } from "./Effects";
 import { fadeTo, hides } from "./fade";
 import { drillTime, fallenAt, getState, player, predict, run, useDrill } from "./drillStore";
-import { interact, wardenSpot } from "./interact";
+import { wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
 import { setAmbience } from "./sound";
@@ -479,35 +479,21 @@ function Warden() {
   );
 }
 
-// The action E would take, next to the thing it acts on; clicking it does the same.
-function PromptLabel() {
-  const prompt = useDrill((s) => s.prompt);
-  if (!prompt) return null;
+// A marker bobbing over whatever E acts on, the words being on the HUD; walls hide it like anything else.
+// Within arm's length it would fill the view, and isn't needed.
+function PromptMarker() {
+  const ref = useRef<Mesh>(null);
+  useFrame(({ camera }) => {
+    const m = ref.current;
+    const p = getState().prompt;
+    if (!m) return;
+    m.visible = !!p && camera.position.distanceTo(m.position.set(p.x, p.y - 0.3 + Math.sin(Date.now() / 260) * 0.08, p.z)) > 2.5;
+  });
   return (
-    <Html position={[prompt.x, prompt.y, prompt.z]} center zIndexRange={[30, 0]}>
-      <button
-        type="button"
-        onClick={interact}
-        className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-md bg-pasir px-3 text-sm font-semibold text-malam hover:bg-white active:translate-y-px"
-      >
-        <kbd className="rounded border border-malam/30 px-1.5 text-xs">E</kbd>
-        {prompt.label}
-      </button>
-    </Html>
-  );
-}
-
-// Shown over a low obstacle while a jump over it is possible.
-function VaultLabel() {
-  const at = useDrill((s) => s.vaultAt);
-  if (!at) return null;
-  return (
-    <Html position={[at.x, at.y, at.z]} center zIndexRange={[25, 0]} style={{ pointerEvents: "none" }}>
-      <span className="flex items-center gap-1.5 whitespace-nowrap rounded-md bg-pasir/90 px-2 py-1 text-xs font-semibold text-malam">
-        <kbd className="rounded border border-malam/30 px-1 pointer-coarse:hidden">Spasi</kbd>
-        Lompati
-      </span>
-    </Html>
+    <mesh ref={ref} rotation-x={Math.PI} visible={false}>
+      <coneGeometry args={[0.14, 0.3, 4]} />
+      <meshBasicMaterial color="#ff8a3d" />
+    </mesh>
   );
 }
 
@@ -685,8 +671,7 @@ export default function World({
       </Suspense>
       <FallenPole />
       <Warden />
-      <PromptLabel />
-      <VaultLabel />
+      <PromptMarker />
       {showRisk && <HazardOverlay hazards={hazards} />}
       <Route />
       <Water />

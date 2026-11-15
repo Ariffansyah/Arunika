@@ -412,7 +412,7 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     seated: seats.length > 0,
     cover: -1,
   });
-  look.yaw = ry + Math.PI;
+  Object.assign(look, { yaw: ry + Math.PI, eyePitch: -0.05 });
   const { hazards, goals: safe, risks } = predict(scenario, school);
   // A fallen power pole closes one assembly point, as long as another one stays open.
   const closedGoal = sit.closedGoal && safe.length > 1 && safe.some(([x, z]) => x === sit.closedGoal![0] && z === sit.closedGoal![1]) ? sit.closedGoal : null;

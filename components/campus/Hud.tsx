@@ -414,6 +414,38 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
   );
 }
 
+// What E (or a click) does right now and whether Space jumps, under the middle of the screen as in any game;
+// touch screens show the same on the pad. The crosshair marks the middle in first person.
+function ActionPrompt() {
+  const prompt = useDrill((s) => s.prompt);
+  const canJump = useDrill((s) => s.vaultAt !== null);
+  const first = useDrill((s) => s.view === "first");
+  const key = "rounded border border-malam/30 px-1.5 text-xs";
+  return (
+    <div className="contents pointer-coarse:hidden">
+      {first && <div aria-hidden="true" className="absolute top-1/2 left-1/2 size-1.5 -translate-1/2 rounded-full bg-pasir ring-1 ring-malam/60 portrait:top-[30%]" />}
+      <div className="absolute top-[58%] left-1/2 flex -translate-x-1/2 flex-col items-center gap-2 portrait:top-[38%]">
+        {prompt && (
+          <button
+            type="button"
+            onClick={interact}
+            className="pointer-events-auto flex min-h-11 items-center gap-2 whitespace-nowrap rounded-md bg-pasir px-3 text-sm font-semibold text-malam shadow-lg hover:bg-white active:translate-y-px"
+          >
+            <kbd className={key}>E</kbd>
+            {prompt.label}
+          </button>
+        )}
+        {canJump && (
+          <span className="flex items-center gap-1.5 whitespace-nowrap rounded-md bg-pasir/90 px-2 py-1 text-xs font-semibold text-malam">
+            <kbd className={key}>Spasi</kbd>
+            Lompati
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TouchPad() {
   const prompt = useDrill((s) => s.prompt);
   const canJump = useDrill((s) => s.vaultAt !== null);
@@ -653,6 +685,7 @@ export default function Hud({
         {phase === "running" && <Instruction t={t} />}
         {phase === "done" && result && (result.guided ? <GuidedResults result={result} onStart={() => onStart(result.scenario)} /> : <Results result={result} room={room} schoolId={school?.id ?? null} />)}
       </div>
+      <ActionPrompt />
       <TouchPad />
       {mapOpen && <MapOverlay />}
     </div>

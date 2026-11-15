@@ -66,8 +66,8 @@ const KEYBOARD: [string[], string][] = [
   [["Spasi"], "Lompati rintangan saat tanda lompat muncul"],
   [["M"], "Buka atau tutup peta evakuasi"],
   [["V"], "Ganti kamera orang pertama atau ketiga"],
-  [["Esc"], "Tutup peta atau jendela yang terbuka"],
-  [["Seret mouse"], "Melihat ke sekeliling"],
+  [["Klik layar"], "Kunci mouse, lalu gerakkan untuk melihat ke sekeliling"],
+  [["Esc"], "Lepaskan mouse, tutup peta atau jendela yang terbuka"],
 ];
 
 const TOUCH: [string[], string][] = [

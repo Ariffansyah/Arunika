@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { Vector3, type Group } from "three";
 import { PLAN } from "@/lib/floorplan";
 import { buildingAt, free, groundY, layerAt, solidAt, vaultTarget } from "@/lib/nav";
-import { CROUCH_SPEED, RUN_SPEED, WALK_SPEED, waterLevel } from "@/lib/sim";
+import { CROUCH_SPEED, RUN_SPEED, SLIDE_S, WALK_SPEED, laneDistance, waterLevel } from "@/lib/sim";
 import type { Anim, Look } from "@/components/Character";
 import Avatar from "./Avatar";
 import {
@@ -24,7 +24,7 @@ import {
 } from "./drillStore";
 import { closedDoors, findPrompt, interact } from "./interact";
 import { play, splash } from "./sound";
-import { TILE, surfaceAt } from "@/lib/campus";
+import { MAP, TILE, surfaceAt } from "@/lib/campus";
 
 const KEYS: Record<string, keyof typeof input> = {
   KeyW: "up",
@@ -45,6 +45,7 @@ const VAULT_S = 0.8;
 const PACE: Partial<Record<Anim, number>> = { walk: WALK_SPEED, sprint: RUN_SPEED, crouchWalk: CROUCH_SPEED };
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && e.target.closest("input, textarea, select") !== null;
 
@@ -77,6 +78,10 @@ export default function Player({ look: character, name }: { look: Look; name: st
   const vault = useRef<{ x0: number; z0: number; y0: number; x1: number; z1: number; y1: number; arc: number; t: number } | null>(null);
   const pace = useRef(1);
   const stride = useRef(0);
+  const bob = useRef(0);
+  const bobAmp = useRef(0);
+  const wasFirst = useRef(view === "first");
+  const needsCursor = useDrill((s) => s.chatOpen || s.mapOpen || s.phase === "done");
 
   useEffect(() => {
     reducedMotion.current = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -123,35 +128,51 @@ export default function Player({ look: character, name }: { look: Look; name: st
     return () => camera.clearViewOffset();
   }, [camera, size]);
 
+  // A dialog, the map or the results need the cursor back.
+  useEffect(() => {
+    if (needsCursor && document.pointerLockElement === canvas) document.exitPointerLock();
+  }, [needsCursor, canvas]);
+
   useEffect(() => {
     let drag: { id: number; x: number; y: number } | null = null;
+    const locked = () => document.pointerLockElement === canvas;
+    // Only the pitch of the view in use moves, so the other one is never left tilted for the next switch.
+    const turn = (dx: number, dy: number, k: number) => {
+      look.yaw -= dx * k;
+      if (getState().view === "first") look.eyePitch = clamp(look.eyePitch - dy * k, -1.3, 1.2);
+      else look.camPitch = clamp(look.camPitch + dy * k * 0.7, 0.08, 1.15);
+    };
     const down = (e: PointerEvent) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || locked()) return;
+      // A mouse is taken over as in any game: hidden, turning the view, given back with Esc. Dragging stays
+      // for touch, and for a mouse wherever the lock is refused.
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
       canvas.setPointerCapture(e.pointerId);
+      if (e.pointerType === "mouse") Promise.resolve(canvas.requestPointerLock()).catch(() => {});
     };
     const move = (e: PointerEvent) => {
-      if (!drag || e.pointerId !== drag.id) return;
-      const dx = e.clientX - drag.x;
-      const dy = e.clientY - drag.y;
+      if (!drag || e.pointerId !== drag.id || locked()) return;
+      turn(e.clientX - drag.x, e.clientY - drag.y, 0.006);
       drag.x = e.clientX;
       drag.y = e.clientY;
-      look.yaw -= dx * 0.006;
-      look.camPitch = Math.min(1.15, Math.max(0.08, look.camPitch + dy * 0.004));
-      look.eyePitch = Math.min(0.8, Math.max(-0.8, look.eyePitch - dy * 0.004));
     };
     const up = (e: PointerEvent) => {
       if (drag?.id === e.pointerId) drag = null;
     };
+    // Chrome can report one huge jump as the lock starts; no hand moves a mouse that far in one event.
+    const mouse = (e: MouseEvent) => locked() && Math.abs(e.movementX) < 300 && Math.abs(e.movementY) < 300 && turn(e.movementX, e.movementY, 0.0028);
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointermove", move);
     canvas.addEventListener("pointerup", up);
     canvas.addEventListener("pointercancel", up);
+    document.addEventListener("mousemove", mouse);
     return () => {
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointercancel", up);
+      document.removeEventListener("mousemove", mouse);
+      if (locked()) document.exitPointerLock();
     };
   }, [canvas]);
 
@@ -164,6 +185,9 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const water = s.phase === "idle" ? 0 : waterLevel(s.scenario, running ? t : Infinity, run.timeline.rise);
     const depth = water - groundY(player.x, player.z, player.layer);
     const first = s.view === "first";
+    // Into first person the eyes start level, whatever the camera was doing before.
+    if (first && !wasFirst.current) look.eyePitch = -0.05;
+    wasFirst.current = first;
 
     const ahead = Number(input.up) - Number(input.down);
     const side = Number(input.right) - Number(input.left);
@@ -229,6 +253,10 @@ export default function Player({ look: character, name }: { look: Look; name: st
     if (!label !== !shown || (label && shown && Math.hypot(label.x - shown.x, label.z - shown.z) > 0.3)) setState({ vaultAt: label });
     const moved = Math.hypot(player.x - ox, player.z - oz);
     if (running && t >= 0) run.walked += moved;
+    // The eyes dip once per footfall in first person, gently, and not at all for reduced motion.
+    bob.current += (moved * Math.PI) / (player.running ? 1.15 : player.crouch ? 0.55 : 0.75);
+    const amp = first && player.moving && !reducedMotion.current ? (player.running ? 0.045 : 0.022) : 0;
+    bobAmp.current += (amp - bobAmp.current) * (1 - Math.exp(-dt * 8));
     // A footfall every stride, sounding like what is underfoot.
     stride.current = player.moving ? stride.current + moved : 0;
     if (stride.current >= (player.running ? 1.15 : player.crouch ? 0.55 : 0.75)) {
@@ -279,13 +307,26 @@ export default function Player({ look: character, name }: { look: Look; name: st
       g.visible = !first;
     }
 
-    const strength = running && s.scenario.kind === "gempa" ? (shakingAt(t) ? 1 : aftershockAt(t) ? 0.45 : 0) : 0;
+    // The ground trembles under a slide too, more the closer it runs.
+    const lane = MAP.runouts[run.lane];
+    const slide = run.timeline.slide;
+    const sliding = running && s.scenario.kind === "longsor" && lane && slide !== null && t >= slide && t < slide + SLIDE_S + 1;
+    const strength =
+      running && s.scenario.kind === "gempa"
+        ? shakingAt(t)
+          ? 1
+          : aftershockAt(t)
+            ? 0.45
+            : 0
+        : sliding
+          ? 0.6 * Math.exp(-Math.max(0, laneDistance(lane, player.x, player.z) - lane.r) / 25)
+          : 0;
     const shake = strength * (0.05 + (s.scenario.intensity - 5) * 0.04) * (reducedMotion.current ? 0.2 : 1);
     const jitter = () => (Math.random() - 0.5) * shake;
     // Eased like the body's own crossfade, so ducking or standing up doesn't jolt the view.
     const eyeTo = player.cover >= 0 ? 0.5 : player.crouch ? 0.75 : player.seated ? 1.05 : 1.35;
     eyeHeight.current += (eyeTo - eyeHeight.current) * (1 - Math.exp(-dt * 10));
-    const target = eye.current.set(player.x, player.y + eyeHeight.current, player.z);
+    const target = eye.current.set(player.x, player.y + eyeHeight.current - Math.abs(Math.sin(bob.current)) * bobAmp.current, player.z);
 
     if (first) {
       camera.position.set(target.x + jitter(), target.y + jitter(), target.z + jitter());
