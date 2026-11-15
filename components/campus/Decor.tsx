@@ -82,32 +82,40 @@ function BasketballCourt({ court }: { court: Rect }) {
   const cx = (x0 + x1) / 2;
   const cz = (z0 + z1) / 2;
   const t = 0.1;
+  // The hoops stand at the ends of the longer side; each turns to face into the court.
+  const alongX = x1 - x0 > z1 - z0;
+  const hoops: [number, number, number][] = alongX
+    ? [
+        [x0 + 0.45, cz, Math.PI / 2],
+        [x1 - 0.45, cz, -Math.PI / 2],
+      ]
+    : [
+        [cx, z0 + 0.45, 0],
+        [cx, z1 - 0.45, Math.PI],
+      ];
   return (
     <>
       <Strip x={cx} z={z0} w={x1 - x0} d={t} />
       <Strip x={cx} z={z1} w={x1 - x0} d={t} />
       <Strip x={x0} z={cz} w={t} d={z1 - z0} />
       <Strip x={x1} z={cz} w={t} d={z1 - z0} />
-      <Strip x={cx} z={cz} w={x1 - x0} d={t} />
-      {[z0 + 0.45, z1 - 0.45].map((hz, i) => {
-        const dir = i === 0 ? 1 : -1;
-        return (
-          <group key={hz} position={[cx, at(cx, hz), hz]}>
-            <mesh position={[0, 1.8, 0]} castShadow>
-              <cylinderGeometry args={[0.08, 0.08, 3.6, 8]} />
-              <meshStandardMaterial color="#55606e" />
-            </mesh>
-            <mesh position={[0, 3.4, dir * 0.25]} castShadow>
-              <boxGeometry args={[1.8, 1.05, 0.05]} />
-              <meshStandardMaterial color="#f7f7f2" />
-            </mesh>
-            <mesh position={[0, 3.05, dir * 0.63]} rotation-x={Math.PI / 2}>
-              <torusGeometry args={[0.23, 0.02, 6, 24]} />
-              <meshStandardMaterial color="#e2622a" />
-            </mesh>
-          </group>
-        );
-      })}
+      {alongX ? <Strip x={cx} z={cz} w={t} d={z1 - z0} /> : <Strip x={cx} z={cz} w={x1 - x0} d={t} />}
+      {hoops.map(([hx, hz, ry]) => (
+        <group key={`${hx}-${hz}`} position={[hx, at(hx, hz), hz]} rotation-y={ry}>
+          <mesh position={[0, 1.8, 0]} castShadow>
+            <cylinderGeometry args={[0.08, 0.08, 3.6, 8]} />
+            <meshStandardMaterial color="#55606e" />
+          </mesh>
+          <mesh position={[0, 3.4, 0.25]} castShadow>
+            <boxGeometry args={[1.8, 1.05, 0.05]} />
+            <meshStandardMaterial color="#f7f7f2" />
+          </mesh>
+          <mesh position={[0, 3.05, 0.63]} rotation-x={Math.PI / 2}>
+            <torusGeometry args={[0.23, 0.02, 6, 24]} />
+            <meshStandardMaterial color="#e2622a" />
+          </mesh>
+        </group>
+      ))}
     </>
   );
 }

@@ -101,7 +101,8 @@ const pesisir: CampusMap = {
     [29, 21, 33, 21],
     [29, 22, 29, 22],
   ],
-  court: [24, 1, 28, 6],
+  // Between the office and the hill, so it runs east to west on ground cut level.
+  court: [24, 1, 28, 4],
   // A worn track climbs from the courtyard to the hilltop assembly point.
   trail: [
     [28, 8, 35, 8],

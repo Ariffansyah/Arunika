@@ -32,8 +32,19 @@ export const idx = (x: number, z: number) => z * W + x;
 
 export const tileCenter = (x: number, z: number): [number, number] => [(x + 0.5) * TILE, (z + 0.5) * TILE];
 
-// x and z in metres.
-export const elevationAt = (x: number, z: number) => MAP.elevation(x / TILE, z / TILE);
+const court = MAP.court;
+const COURT_LEVEL = court ? MAP.elevation((court[0] + court[2] + 1) / 2, (court[1] + court[3] + 1) / 2) : 0;
+
+// x and z in metres. A court is cut level into whatever slope it sits on, and the ground blends back to its own
+// height over the tile round it.
+export function elevationAt(x: number, z: number) {
+  const [tx, tz] = [x / TILE, z / TILE];
+  const ground = MAP.elevation(tx, tz);
+  if (!court) return ground;
+  const d = Math.hypot(Math.max(court[0] - tx, 0, tx - court[2] - 1), Math.max(court[1] - tz, 0, tz - court[3] - 1));
+  if (d >= 1) return ground;
+  return COURT_LEVEL + (ground - COURT_LEVEL) * d * d * (3 - 2 * d);
+}
 
 export const tileElevation = (x: number, z: number) => elevationAt(...tileCenter(x, z));
 
