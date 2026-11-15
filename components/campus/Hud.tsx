@@ -11,6 +11,7 @@ import { MAPS } from "@/lib/maps";
 import { INTENSITY, SCENARIO_LABEL, waterLevel, within, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { aftershockAt, fallenAt, finishDrill, input, liveChecks, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
+import SimControls from "./Controls";
 import { interact } from "./interact";
 import Learn from "./Learn";
 import { KindPicker, NpcPicker, btn, ghost, panel, primary, radio } from "./ui";
@@ -572,6 +573,7 @@ export default function Hud({
           </form>
         </div>
         <div className="pointer-events-auto flex flex-col items-end gap-2">
+          <SimControls />
           <Minimap />
           <button
             type="button"

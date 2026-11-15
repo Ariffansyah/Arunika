@@ -5,10 +5,11 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, type ComponentRef } from "react";
 import type { Group, Mesh } from "three";
 import Character, { preloadCharacters, type Look } from "@/components/Character";
+import Html from "@/components/Html";
 import Scenery from "@/components/campus/Scenery";
 import { Buildings } from "@/components/campus/Building";
 import { Backdrop, Coast, Props, Terrain } from "@/components/campus/World";
-import { ASSEMBLY, GRID, MAP, SITE_D, SITE_W, SPAWN, elevationAt, tileCenter, tileElevation } from "@/lib/campus";
+import { ASSEMBLY, ASSEMBLY_NAMES, GRID, MAP, SITE_D, SITE_W, SPAWN, elevationAt, tileAt, tileCenter, tileElevation } from "@/lib/campus";
 import { bestRoute, hazardTiles, safeAssembly, type Scenario } from "@/lib/sim";
 
 const FLOOD: Scenario = { kind: "banjir", intensity: 1.1 };
@@ -25,7 +26,7 @@ function useRoute() {
     const pts: Pts = tiles.map(([x, z]) => tileCenter(x, z));
     const cum = [0];
     for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
-    return { pts, cum };
+    return { pts, cum, goal: tiles[tiles.length - 1] };
   }, []);
 }
 
@@ -39,6 +40,16 @@ function Tick({ clockRef, paused }: { clockRef: Clock; paused: boolean }) {
 // Sways instead of circling so the sunrise and the framing stay put.
 function Camera({ clockRef }: { clockRef: Clock }) {
   const camera = useThree((s) => s.camera);
+  // Pointer parallax: the window listener keeps working while the cursor is over the headline above the canvas.
+  const aim = useRef({ x: 0, y: 0, tx: 0, ty: 0 });
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      aim.current.tx = (e.clientX / innerWidth) * 2 - 1;
+      aim.current.ty = (e.clientY / innerHeight) * 2 - 1;
+    };
+    addEventListener("pointermove", onMove);
+    return () => removeEventListener("pointermove", onMove);
+  }, []);
   const size = useThree((s) => s.size);
   const aspect = size.width / size.height;
   const k = Math.min(2.2, Math.max(1, 1.2 / aspect));
@@ -50,21 +61,26 @@ function Camera({ clockRef }: { clockRef: Clock }) {
     return () => camera.clearViewOffset();
   }, [camera, size, aspect]);
 
-  useFrame(() => {
-    const a = 1.2 + Math.sin(clockRef.current * 0.07) * 0.32;
-    camera.position.set(SITE_W / 2 + Math.cos(a) * 114 * k, 45 * k, SITE_D / 2 + Math.sin(a) * 114 * k);
+  useFrame((_, dt) => {
+    const m = aim.current;
+    const ease = Math.min(1, dt * 2.5);
+    m.x += (m.tx - m.x) * ease;
+    m.y += (m.ty - m.y) * ease;
+    const a = 1.2 + Math.sin(clockRef.current * 0.07) * 0.32 - m.x * 0.1;
+    camera.position.set(SITE_W / 2 + Math.cos(a) * 114 * k, (45 + m.y * 6) * k, SITE_D / 2 + Math.sin(a) * 114 * k);
     camera.lookAt(SITE_W / 2, 7.5, SITE_D / 2 - 9);
   });
   return null;
 }
 
-function Water({ clockRef }: { clockRef: Clock }) {
+function Water({ clockRef, onLevel }: { clockRef: Clock; onLevel?: (metres: number) => void }) {
   const ref = useRef<Mesh>(null);
   const baseRef = useRef<Float32Array | null>(null);
   useFrame(() => {
     const t = clockRef.current;
     const p = (t % LOOP_S) / LOOP_S;
     const level = p < 0.5 ? (p / 0.5) * FLOOD.intensity : p < 0.85 ? FLOOD.intensity : ((1 - p) / 0.15) * FLOOD.intensity;
+    onLevel?.(level);
     const m = ref.current;
     if (!m) return;
     m.position.y = level;
@@ -131,25 +147,42 @@ function Student({ clockRef, pts, cum, delay, i }: { clockRef: Clock; pts: Pts; 
   );
 }
 
-function AssemblyRings() {
+function AssemblyRings({ goal }: { goal: readonly [number, number] }) {
   return ASSEMBLY.map(([x, z]) => {
     const [cx, cz] = tileCenter(x, z);
     return (
-      <mesh key={`${x}-${z}`} rotation-x={-Math.PI / 2} position={[cx, tileElevation(x, z) + 0.08, cz]}>
-        <ringGeometry args={[3.9, 4.8, 48]} />
-        <meshStandardMaterial color="#34c47c" emissive="#34c47c" emissiveIntensity={0.4} />
-      </mesh>
+      <group key={`${x}-${z}`} position={[cx, tileElevation(x, z), cz]}>
+        <mesh rotation-x={-Math.PI / 2} position={[0, 0.08, 0]}>
+          <ringGeometry args={[3.9, 4.8, 48]} />
+          <meshStandardMaterial color="#34c47c" emissive="#34c47c" emissiveIntensity={0.4} />
+        </mesh>
+        {x === goal[0] && z === goal[1] && (
+          <Html position={[0, 4.5, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
+            <div className="whitespace-nowrap rounded-md bg-aman px-2.5 py-1 text-xs font-bold text-malam shadow-lg">
+              Titik kumpul · {ASSEMBLY_NAMES[tileAt(x, z)]}
+            </div>
+          </Html>
+        )}
+      </group>
     );
   });
 }
 
-export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; startAt?: number }) {
+export default function HeroScene({
+  paused,
+  startAt = 0,
+  onLevel,
+}: {
+  paused: boolean;
+  startAt?: number;
+  onLevel?: (metres: number) => void;
+}) {
   // The campus modules load once per page; after a drill on another map they still hold that map.
   useEffect(() => {
     if (MAP.id !== "pesisir") location.reload();
   }, []);
   const clockRef = useRef(startAt);
-  const { pts, cum } = useRoute();
+  const { pts, cum, goal } = useRoute();
   return (
     <Canvas shadows="percentage" dpr={[1, 1.75]} frameloop={paused ? "demand" : "always"} camera={{ fov: 36, near: 0.5, far: 2000 }}>
       <Backdrop sky={[-25, 4, -100]} light={[SITE_W / 2 + 96, 60, SITE_D / 2 - 78]} fog={[180, 780]} />
@@ -158,14 +191,14 @@ export default function HeroScene({ paused, startAt = 0 }: { paused: boolean; st
       <Coast />
       <Props />
       <Buildings risks={{}} showRisk={false} />
-      <AssemblyRings />
+      <AssemblyRings goal={goal} />
       <Route clockRef={clockRef} pts={pts} />
       <Suspense fallback={null}>
         {STUDENTS.map((s, i) => (
           <Student key={i} i={i} clockRef={clockRef} pts={pts} cum={cum} delay={i * 0.35} />
         ))}
       </Suspense>
-      <Water clockRef={clockRef} />
+      <Water clockRef={clockRef} onLevel={onLevel} />
       <Camera clockRef={clockRef} />
       <Tick clockRef={clockRef} paused={paused} />
     </Canvas>
