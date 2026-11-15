@@ -2,13 +2,13 @@
 
 import { useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
-import { Color, DoubleSide, Object3D, PlaneGeometry, type Group, type InstancedMesh, type Mesh } from "three";
+import { BufferAttribute, Color, DoubleSide, Object3D, PlaneGeometry, Vector3, type Group, type InstancedMesh, type Mesh } from "three";
 import Character, { type Anim, type Look } from "@/components/Character";
 import Model, { M } from "@/components/Model";
 import { ASSEMBLY, MAP, TILE, W, elevationAt, findTiles, surfaceAt, tileCenter, tileElevation } from "@/lib/campus";
 import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
-import { WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
+import { SLIDE_S, WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
 import { CLASSMATE_SEATS, aftershockAt, drillTime, getState, landslideSigns, roomSeats, run, shakingAt, useDrill } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
 
@@ -487,8 +487,13 @@ export function Vortex() {
   );
 }
 
-const SLIDE_S = 6;
-const ROCKS = 36;
+const ROCKS = 40;
+const LOGS = 6;
+const FRONT_PUFFS = 14;
+const UP = new Vector3(0, 1, 0);
+const normal = new Vector3();
+const MUD_WET = new Color("#3e2918");
+const MUD_DRY = new Color("#74502f");
 
 // Every lane a slope could slide down, so one plane can take the shape of whichever gives way.
 const BOUNDS = MAP.runouts.reduce(
@@ -496,21 +501,54 @@ const BOUNDS = MAP.runouts.reduce(
   [Infinity, -Infinity, Infinity, -Infinity],
 );
 
+// How far down its lane the front of the earth has run, as a share of the lane, `p` of the way through the slide.
+const frontAt = (p: number) => p * 1.15;
+
+// Depth of earth at a point of the lane (`along` it from 0 at the top, `across` it from 0 in the middle to 1 at
+// the edge). While it runs it is an even flow behind a bulging front; as it settles it drains from the torn
+// scar near the top and piles up thick at the toe.
+function earthDepth(along: number, across: number, x: number, z: number, p: number) {
+  const front = frontAt(p);
+  if (across >= 1 || along < -0.12 || along > Math.min(front, 1.08)) return 0;
+  const lumps = 0.8 + 0.2 * Math.sin(x * 1.7 + z * 0.6) * Math.sin(z * 1.3 - x * 0.5) + 0.12 * Math.sin(x * 4.1) * Math.sin(z * 3.7);
+  const settled = 0.12 + 1.9 * Math.min(1, Math.max(0, (along - 0.3) / 0.5)) * Math.min(1, (1.08 - along) / 0.12);
+  const flowing = 1.1 + 0.8 * Math.exp(-(((front - along) * 9) ** 2));
+  return (flowing + (settled - flowing) * p * p) * (1 - across * across) * lumps * Math.min(1, (front - along) * 14 + 0.25);
+}
+
+// Turns a sign to lie on the slope under it instead of cutting into it.
+function onSlope(g: Object3D, x: number, z: number) {
+  normal.set(elevationAt(x - 0.5, z) - elevationAt(x + 0.5, z), 1, elevationAt(x, z - 0.5) - elevationAt(x, z + 0.5)).normalize();
+  g.position.set(x, elevationAt(x, z), z);
+  g.quaternion.setFromUnitVectors(UP, normal);
+}
+
 // Warning signs on the slope, then the slope giving way down the drill's lane.
 export function Landslide() {
   const signs = useRef<(Group | null)[]>([]);
   const lean = useRef<Group>(null);
+  const crack = useRef<InstancedMesh>(null);
+  const stream = useRef<Group>(null);
   const mass = useRef<Mesh>(null);
   const rocks = useRef<InstancedMesh>(null);
+  const logs = useRef<InstancedMesh>(null);
+  const puffs = useRef<InstancedMesh>(null);
   const shaped = useRef("");
   const o = useMemo(() => new Object3D(), []);
+  const tint = useMemo(() => new Color(), []);
   const geometry = useMemo(() => {
     if (!MAP.runouts.length) return null;
     const [x0, x1, z0, z1] = BOUNDS;
-    const geo = new PlaneGeometry(x1 - x0, z1 - z0, 72, 48);
+    const geo = new PlaneGeometry(x1 - x0, z1 - z0, 96, 64);
     geo.rotateX(-Math.PI / 2);
     geo.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+    geo.setAttribute("color", new BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
     return geo;
+  }, []);
+  // Where each rock and log ends up in the heap, and how big it is; the same every drill.
+  const debris = useMemo(() => {
+    const rnd = random(5);
+    return Array.from({ length: ROCKS + LOGS }, () => ({ end: 0.4 + 0.65 * rnd(), side: (rnd() - 0.5) * 1.5, size: 0.35 + rnd() * 0.9, spin: rnd() * 6 }));
   }, []);
 
   useFrame(() => {
@@ -522,63 +560,119 @@ export function Landslide() {
     const { ax, az, bx, bz, r } = lane;
     const len = Math.hypot(bx - ax, bz - az);
     const [dx, dz] = [(bx - ax) / len, (bz - az) / len];
-    landslideSigns().forEach((sign, i) => {
+    const heading = Math.atan2(dx, dz);
+    const { signs: shown, slide } = run.timeline;
+    const marks = landslideSigns();
+    // The crack is laid piece by piece in world space; the tree stands upright; the trickle lies on the slope.
+    marks.forEach((sign, i) => {
       const g = signs.current[i];
       if (!g) return;
-      g.visible = t >= run.timeline.signs[i];
-      g.position.set(sign.x, elevationAt(sign.x, sign.z), sign.z);
+      g.visible = t >= shown[i];
+      if (i === 2) onSlope(g, sign.x, sign.z);
+      else if (i === 1) g.position.set(sign.x, elevationAt(sign.x, sign.z), sign.z);
+      if (i > 0) g.children[0].rotation.y = heading;
     });
-    // The second sign is a tree leaning further downhill as the ground creeps.
-    if (lean.current) {
-      lean.current.parent!.rotation.y = Math.atan2(dx, dz);
-      lean.current.rotation.x = Math.min(0.4, Math.max(0, t - run.timeline.signs[1]) * 0.012);
+    // The crack opens across the slope and gapes wider until the slope lets go.
+    const cm = crack.current;
+    if (cm && marks[0] && t >= shown[0]) {
+      const [sx, sz] = [marks[0].x, marks[0].z];
+      const open = Math.min(1, (t - shown[0]) / Math.max(1, (slide ?? t) - shown[0]));
+      for (let k = 0; k < 9; k++) {
+        const u = (k - 4) * 0.9;
+        const jag = (k % 2 ? 0.35 : -0.35) + (k % 3) * 0.1;
+        const [x, z] = [sx - dz * u + dx * jag, sz + dx * u + dz * jag];
+        o.position.set(x, elevationAt(x, z) + 0.02, z);
+        o.rotation.set(0, heading + Math.PI / 2 + (k % 2 ? 0.5 : -0.5), 0);
+        o.scale.set(0.08 + 0.4 * open, 0.05, 1.15);
+        o.updateMatrix();
+        cm.setMatrixAt(k, o.matrix);
+      }
+      cm.instanceMatrix.needsUpdate = true;
     }
-    const slide = run.timeline.slide;
+    // The second sign is a tree leaning further downhill as the ground creeps; the third a muddy trickle that grows.
+    if (lean.current) lean.current.rotation.x = Math.min(0.45, Math.max(0, t - shown[1]) * 0.014);
+    if (stream.current) stream.current.scale.setScalar(Math.min(1, 0.4 + Math.max(0, t - shown[2]) * 0.03));
+
     const p = on && slide !== null ? Math.min(1, Math.max(0, (t - slide) / SLIDE_S)) : 0;
     const m = mass.current;
     const rk = rocks.current;
-    if (!m || !rk) return;
-    m.visible = rk.visible = p > 0;
+    const lg = logs.current;
+    const pf = puffs.current;
+    if (!m || !rk || !lg || !pf) return;
+    m.visible = rk.visible = lg.visible = p > 0;
+    // The dust thrown up at the front drifts on and thins out after the earth stops.
+    const after = on && slide !== null ? t - slide - SLIDE_S : -1;
+    pf.visible = p > 0 && after < 6;
+    if (pf.visible) {
+      const front = Math.min(1.05, frontAt(p));
+      (pf.material as { opacity: number }).opacity = 0.45 * Math.min(1, 1 - after / 6);
+      for (let k = 0; k < FRONT_PUFFS; k++) {
+        const u = (k / (FRONT_PUFFS - 1) - 0.5) * 1.6 * r;
+        const back = (k % 3) * 2.5;
+        const [x, z] = [ax + dx * (front * len - back) - dz * u, az + dz * (front * len - back) + dx * u];
+        o.position.set(x, elevationAt(x, z) + 1.5 + (k % 4) * 0.6 + Math.max(0, after) * 0.5, z);
+        o.rotation.set(0, 0, 0);
+        o.scale.setScalar(1.6 + (k % 3) * 0.6 + p * 1.5 + Math.max(0, after) * 0.6);
+        o.updateMatrix();
+        pf.setMatrixAt(k, o.matrix);
+      }
+      pf.instanceMatrix.needsUpdate = true;
+    }
     const key = `${run.lane}:${p}`;
     if (p === 0 || shaped.current === key) return;
     shaped.current = key;
-    // Earth runs from above the slope down the lane: thickest along its middle, arriving front first.
     const pos = m.geometry.attributes.position;
+    const col = m.geometry.attributes.color;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
       const along = ((x - ax) * dx + (z - az) * dz) / len;
       const across = Math.abs((x - ax) * -dz + (z - az) * dx) / r;
-      const depth = across < 1 && along >= -0.15 && along <= 1.05 ? 1.6 * (1 - across * across) * Math.min(1, Math.max(0, (p * 1.15 - along) * 4)) : 0;
-      pos.setY(i, elevationAt(x, z) + (depth > 0.05 ? depth : -1));
+      const depth = earthDepth(along, across, x, z, p);
+      pos.setY(i, elevationAt(x, z) + (depth > 0.04 ? depth : -1));
+      // Wet and dark where it runs thick, drier and paler on the scar and the lumps.
+      tint.copy(MUD_WET).lerp(MUD_DRY, Math.min(1, Math.max(0, 0.75 - depth * 0.35 + 0.25 * Math.sin(x * 2.3 + z * 1.9))));
+      col.setXYZ(i, tint.r, tint.g, tint.b);
     }
     pos.needsUpdate = true;
+    col.needsUpdate = true;
     m.geometry.computeVertexNormals();
-    for (let k = 0; k < ROCKS; k++) {
-      const along = ((k * 0.618) % 1) * p * len;
-      const side = (((k * 0.37) % 1) - 0.5) * r * 1.4;
-      const x = ax + dx * along - dz * side;
-      const z = az + dz * along + dx * side;
-      const size = 0.4 + ((k * 0.73) % 1) * 0.8;
-      o.position.set(x, elevationAt(x, z) + 1 + size / 2, z);
-      o.rotation.set(p * 9 + k, p * 7 + k, k);
-      o.scale.setScalar(size);
-      o.updateMatrix();
-      rk.setMatrixAt(k, o.matrix);
-    }
+    // Rocks and uprooted trunks ride the front, tumbling, and come to rest in the heap at the toe.
+    const ride = 1 - (1 - p) ** 2;
+    debris.forEach((d, k) => {
+      const along = Math.min(d.end * ride, frontAt(p) - 0.02);
+      const [x, z] = [ax + dx * along * len - dz * d.side * r, az + dz * along * len + dx * d.side * r];
+      const depth = earthDepth(along, Math.abs(d.side), x, z, p);
+      const rolled = (along * len) / d.size;
+      const bounce = Math.abs(Math.sin(rolled * 0.7 + d.spin)) * 0.6 * (1 - p);
+      if (k < ROCKS) {
+        o.position.set(x, elevationAt(x, z) + depth * 0.7 + d.size * 0.4 + bounce, z);
+        o.rotation.set(rolled + d.spin, d.spin, rolled * 0.3);
+        o.scale.setScalar(d.size);
+        o.updateMatrix();
+        rk.setMatrixAt(k, o.matrix);
+      } else {
+        o.position.set(x, elevationAt(x, z) + depth * 0.8 + 0.25 + bounce, z);
+        o.rotation.set(0, heading + (d.spin - 3) * 0.15, 0);
+        o.rotateX(rolled);
+        o.rotateZ(Math.PI / 2);
+        o.scale.set(1, 3.5 + d.size * 2, 1);
+        o.updateMatrix();
+        lg.setMatrixAt(k - ROCKS, o.matrix);
+      }
+    });
     rk.instanceMatrix.needsUpdate = true;
+    lg.instanceMatrix.needsUpdate = true;
   });
 
   if (!geometry) return null;
   return (
     <>
       <group ref={(g) => void (signs.current[0] = g)} visible={false}>
-        {[0, 1, 2].map((k) => (
-          <mesh key={k} position={[k * 0.9 - 0.9, 0.03, k * 0.6 - 0.6]} rotation-y={0.5 + k * 0.35}>
-            <boxGeometry args={[0.14, 0.06, 4.5 - k]} />
-            <meshStandardMaterial color="#2c1f15" />
-          </mesh>
-        ))}
+        <instancedMesh ref={crack} args={[undefined, undefined, 9]} frustumCulled={false}>
+          <boxGeometry />
+          <meshStandardMaterial color="#1b120b" roughness={1} />
+        </instancedMesh>
       </group>
       <group ref={(g) => void (signs.current[1] = g)} visible={false}>
         <group>
@@ -590,21 +684,33 @@ export function Landslide() {
         </group>
       </group>
       <group ref={(g) => void (signs.current[2] = g)} visible={false}>
-        <mesh rotation-x={-Math.PI / 2} position={[0, 0.04, 0]}>
-          <circleGeometry args={[1.4, 24]} />
-          <meshStandardMaterial color="#7a5a3c" transparent opacity={0.85} />
-        </mesh>
-        <mesh rotation-x={-Math.PI / 2} position={[-2.6, 0.05, 0]}>
-          <planeGeometry args={[4.4, 0.7]} />
-          <meshStandardMaterial color="#7a5a3c" transparent opacity={0.75} />
-        </mesh>
+        <group>
+          <group ref={stream}>
+            <mesh rotation-x={-Math.PI / 2} position={[0, 0.05, 0]}>
+              <circleGeometry args={[1.2, 24]} />
+              <meshStandardMaterial color="#6d4f33" roughness={0.25} transparent opacity={0.9} />
+            </mesh>
+            <mesh rotation-x={-Math.PI / 2} position={[0, 0.06, 2.6]}>
+              <planeGeometry args={[0.6, 4.4]} />
+              <meshStandardMaterial color="#6d4f33" roughness={0.25} transparent opacity={0.8} />
+            </mesh>
+          </group>
+        </group>
       </group>
       <mesh ref={mass} geometry={geometry} visible={false} castShadow receiveShadow>
-        <meshStandardMaterial color="#6b4a2f" roughness={1} flatShading />
+        <meshStandardMaterial vertexColors roughness={0.85} flatShading />
       </mesh>
       <instancedMesh ref={rocks} args={[undefined, undefined, ROCKS]} visible={false} castShadow frustumCulled={false}>
         <dodecahedronGeometry args={[0.5, 0]} />
         <meshStandardMaterial color="#5b5148" flatShading />
+      </instancedMesh>
+      <instancedMesh ref={logs} args={[undefined, undefined, LOGS]} visible={false} castShadow frustumCulled={false}>
+        <cylinderGeometry args={[0.2, 0.26, 1, 8]} />
+        <meshStandardMaterial color="#4a3426" roughness={1} />
+      </instancedMesh>
+      <instancedMesh ref={puffs} args={[undefined, undefined, FRONT_PUFFS]} visible={false} frustumCulled={false}>
+        <sphereGeometry args={[1, 12, 8]} />
+        <meshStandardMaterial color="#8a7563" transparent opacity={0.45} depthWrite={false} roughness={1} />
       </instancedMesh>
     </>
   );

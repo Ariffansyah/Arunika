@@ -107,7 +107,8 @@ const pesisir: CampusMap = {
     [28, 8, 35, 8],
     [35, 6, 35, 7],
   ],
-  runouts: [{ ax: 110, az: 15, bx: 74, bz: 15, r: 14, signs: [[88, 9], [92, 22], [84, 16]] }],
+  // It breaks away just below the hilltop; the signs sit on the west face, seen from the yard below the railing.
+  runouts: [{ ax: 102, az: 15, bx: 74, bz: 15, r: 14, signs: [[98, 10], [96, 19.5], [91.5, 14]] }],
   disasters: ["gempa", "banjir", "angin", "longsor"],
   floodLabel: "Banjir Rob",
   decor: {

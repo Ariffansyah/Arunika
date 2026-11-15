@@ -33,10 +33,16 @@ export const INTENSITY = {
   longsor: { range: [50, 300] as [number, number], step: 10, label: "Curah hujan", unit: "mm/hari", start: 200 },
 };
 
-export function inLane({ ax, az, bx, bz, r }: Runout, x: number, z: number) {
+// Metres from the line a slope slides down; within the lane's `r` is in its path.
+export function laneDistance({ ax, az, bx, bz }: Runout, x: number, z: number) {
   const t = Math.min(1, Math.max(0, ((x - ax) * (bx - ax) + (z - az) * (bz - az)) / ((bx - ax) ** 2 + (bz - az) ** 2)));
-  return Math.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t)) < r;
+  return Math.hypot(x - (ax + (bx - ax) * t), z - (az + (bz - az) * t));
 }
+
+export const inLane = (lane: Runout, x: number, z: number) => laneDistance(lane, x, z) < lane.r;
+
+// Seconds for a slide to run from the top of its lane to the bottom.
+export const SLIDE_S = 6;
 
 // Nobody can tell beforehand which part of a slope gives way, so every lane it could slide down counts as danger.
 export const inRunout = (x: number, z: number) => MAP.runouts.some((lane) => inLane(lane, x, z));
