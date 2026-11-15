@@ -18,7 +18,8 @@ import { Instances, preloadModels } from "@/components/Model";
 import { BUILDINGS } from "@/lib/campus";
 import { CEILING, PLAN, STOREY, WALL, type Box, type Door, type Furniture, type Part, type PartKind, type Spot } from "@/lib/floorplan";
 import { buildingAt } from "@/lib/nav";
-import { aftershockAt, drillTime, fallTilt, getState, player, run, shakingAt, useDrill } from "./drillStore";
+import { random } from "@/lib/sim";
+import { aftershockAt, collapsed, drillTime, fallTilt, getState, player, run, shakingAt, useDrill } from "./drillStore";
 import { fadeTo, hides } from "./fade";
 
 const furniture = (m: Furniture) => `/models/furniture/${m}.glb`;
@@ -400,8 +401,168 @@ function Roof({ b }: { b: string }) {
   );
 }
 
+const ROOF_OF: Record<string, string> = { kantin: "#8d9ba6", musholla: "#2c8a5a" };
+const FALL_S = 3;
+const PUFFS = 16;
+
+// A building coming down: every wall, column and slab drops and topples into a heap on its own footprint
+// (shoved downhill by a slide), the roof caves in on top, and a cloud of dust rolls out and settles.
+function Collapse({ b }: { b: string }) {
+  const group = useRef<Group>(null);
+  const pieces = useRef<InstancedMesh>(null);
+  const heap = useRef<Group>(null);
+  const dust = useRef<InstancedMesh>(null);
+  const settled = useRef("");
+  const o = useMemo(() => new Object3D(), []);
+  const { list, lumps, ground, fp, high } = useMemo(() => {
+    const fp = PLAN.footprint[b];
+    const floors = BUILDINGS[b].floors;
+    const ground = PLAN.floorY[b];
+    const [cx, cz, hw, hd] = [(fp.x0 + fp.x1) / 2, (fp.z0 + fp.z1) / 2, (fp.x1 - fp.x0) / 2, (fp.z1 - fp.z0) / 2];
+    const high = 0.7 + 0.8 * floors;
+    const rnd = random(b.charCodeAt(0) * 7919);
+    // Long walls and slabs break into pieces of at most 2.5 m, a storey's wall into a lower and an upper half.
+    const boxes: (Box & { color: string })[] = PLAN.parts
+      .filter((p) => p.b === b && p.kind !== "glass" && p.kind !== "roof" && p.kind !== "under")
+      .flatMap((p) => {
+        const color = p.color ?? COLOR[p.kind] ?? WALL_COLOR;
+        const alongX = p.x1 - p.x0 >= p.z1 - p.z0;
+        const [a0, a1] = alongX ? [p.x0, p.x1] : [p.z0, p.z1];
+        const n = Math.ceil((a1 - a0) / 2.5);
+        const rows = p.y1 - p.y0 > 2 ? 2 : 1;
+        return Array.from({ length: n * rows }, (_, k) => {
+          const [s0, s1] = [a0 + ((a1 - a0) * (k % n)) / n, a0 + ((a1 - a0) * ((k % n) + 1)) / n];
+          const [y0, y1] = [p.y0 + ((p.y1 - p.y0) * Math.floor(k / n)) / rows, p.y0 + ((p.y1 - p.y0) * (Math.floor(k / n) + 1)) / rows];
+          return alongX ? { ...p, x0: s0, x1: s1, y0, y1, color } : { ...p, z0: s0, z1: s1, y0, y1, color };
+        });
+      });
+    // The roof breaks into slabs of tile, zinc or dome scattered over the top of the heap.
+    const top = ground + floors * STOREY;
+    for (let k = 0; k < 24; k++) {
+      const [x, z] = [fp.x0 + rnd() * (fp.x1 - fp.x0), fp.z0 + rnd() * (fp.z1 - fp.z0)];
+      const w = 1.2 + rnd() * 1.6;
+      boxes.push({ x0: x - w, x1: x + w, z0: z - w * 0.7, z1: z + w * 0.7, y0: top + 0.6, y1: top + 0.75, color: ROOF_OF[BUILDINGS[b].kind] ?? "#b4532a" });
+    }
+    const list = boxes.map((p) => {
+      const [x, y, z] = [(p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, (p.z0 + p.z1) / 2];
+      const [sx, sy, sz] = [p.x1 - p.x0, p.y1 - p.y0, p.z1 - p.z0];
+      const u = Math.min(1, Math.max(Math.abs(x - cx) / hw, Math.abs(z - cz) / hd));
+      const pile = high * (1 - 0.7 * u * u) * (0.35 + 0.65 * rnd());
+      const rest = Math.min(y, ground + pile + Math.min(sx, sy, sz) / 2);
+      const side = rnd() < 0.5 ? -1 : 1;
+      // Upright pieces fall flat across their own length; slabs and roof only tilt.
+      const flat = (Math.PI / 2) * (0.85 + 0.15 * rnd()) * side;
+      const turn: [number, number, number] =
+        sy > Math.max(sx, sz) ? (sx >= sz ? [flat, 0, 0] : [0, 0, flat]) : [(rnd() - 0.5) * 0.7, 0, (rnd() - 0.5) * 0.7];
+      turn[1] = (rnd() - 0.5) * 0.6;
+      return {
+        x,
+        y,
+        z,
+        sx,
+        sy,
+        sz,
+        rest,
+        turn,
+        color: p.color,
+        // Upper parts start falling a moment later, so it reads as giving way from the bottom up.
+        delay: rnd() * 0.35 + ((y - ground) / (floors * STOREY + 1)) * 0.3,
+        fall: Math.max(0.25, Math.sqrt((2 * (y - rest)) / 9.8)),
+        spread: [(x - cx) * 0.12 * rnd(), (z - cz) * 0.12 * rnd()] as [number, number],
+        shove: 3 + 5 * rnd(),
+      };
+    });
+    // Lumps of broken masonry under it all, bigger toward the middle.
+    const lumps = Array.from({ length: 14 }, (_, k) => {
+      const u = k === 0 ? 0 : 0.25 + 0.6 * rnd();
+      const a = rnd() * Math.PI * 2;
+      const size = high * (k === 0 ? 0.7 : 0.35 + 0.35 * rnd()) * (1 - 0.4 * u);
+      return { x: cx + Math.cos(a) * hw * u, z: cz + Math.sin(a) * hd * u, s: [size * (1.4 + rnd()), size, size * (1.4 + rnd())] as const, ry: rnd() * Math.PI };
+    });
+    return { list, lumps, ground, fp, high };
+  }, [b]);
+
+  useLayoutEffect(() => {
+    const mesh = pieces.current!;
+    const c = new Color();
+    list.forEach((p, i) => mesh.setColorAt(i, c.set(p.color)));
+    mesh.instanceColor!.needsUpdate = true;
+  }, [list]);
+
+  useFrame(() => {
+    const g = group.current;
+    const mesh = pieces.current;
+    const m = heap.current;
+    const d = dust.current;
+    const c = run.collapses.get(b);
+    if (!g || !mesh || !m || !d) return;
+    g.visible = !!c && collapsed(b);
+    if (!g.visible || !c) return;
+    const t = drillTime() - c.at;
+    // Once everything has landed the heap stays as it is; only the dust still moves.
+    const key = `${getState().startAt}`;
+    if (t < FALL_S + 0.5 || settled.current !== key) {
+      if (t >= FALL_S + 0.5) settled.current = key;
+      const push = c.push ?? [0, 0];
+      list.forEach((p, i) => {
+        const f = Math.min(1, Math.max(0, (t - p.delay) / p.fall));
+        const k = f * f * (3 - 2 * f);
+        o.position.set(
+          p.x + (p.spread[0] + push[0] * p.shove) * f,
+          p.y - (p.y - p.rest) * f * f,
+          p.z + (p.spread[1] + push[1] * p.shove) * f,
+        );
+        o.rotation.set(p.turn[0] * k, p.turn[1] * k, p.turn[2] * k);
+        o.scale.set(p.sx, p.sy, p.sz);
+        o.updateMatrix();
+        mesh.setMatrixAt(i, o.matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      const rise = Math.min(1, Math.max(0, (t - 0.3) / 1.4));
+      m.position.y = ground - high * (1 - rise);
+    }
+    const age = t / 8;
+    d.visible = age < 1;
+    if (!d.visible) return;
+    (d.material as MeshStandardMaterial).opacity = 0.55 * (1 - age) ** 1.5;
+    const [cx, cz] = [(fp.x0 + fp.x1) / 2, (fp.z0 + fp.z1) / 2];
+    for (let k = 0; k < PUFFS; k++) {
+      const a = (k / PUFFS) * Math.PI * 2;
+      const out = 0.4 + 0.9 * Math.sqrt(age);
+      o.position.set(cx + Math.cos(a) * (fp.x1 - fp.x0) * 0.5 * out, ground + 1 + age * 4 + (k % 3), cz + Math.sin(a) * (fp.z1 - fp.z0) * 0.5 * out);
+      o.rotation.set(0, 0, 0);
+      o.scale.setScalar(2 + age * 4 + (k % 4) * 0.5);
+      o.updateMatrix();
+      d.setMatrixAt(k, o.matrix);
+    }
+    d.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <group ref={group} visible={false}>
+      <instancedMesh ref={pieces} args={[UNIT, undefined, list.length]} castShadow receiveShadow frustumCulled={false}>
+        <meshStandardMaterial roughness={0.9} />
+      </instancedMesh>
+      <group ref={heap}>
+        {lumps.map((l, k) => (
+          <mesh key={k} position={[l.x, 0, l.z]} scale={l.s} rotation-y={l.ry} castShadow receiveShadow>
+            <dodecahedronGeometry args={[1, 0]} />
+            <meshStandardMaterial color={k % 3 ? "#7d766c" : "#9a8f80"} roughness={1} flatShading />
+          </mesh>
+        ))}
+      </group>
+      <instancedMesh ref={dust} args={[undefined, undefined, PUFFS]} frustumCulled={false}>
+        <sphereGeometry args={[1, 12, 8]} />
+        <meshStandardMaterial color="#b5a893" transparent depthWrite={false} roughness={1} />
+      </instancedMesh>
+    </group>
+  );
+}
+
 function Building({ id, risk, showRisk, fade }: { id: string; risk: number; showRisk: boolean; fade: boolean }) {
   const ref = useRef<Group>(null);
+  const standing = useRef<Group>(null);
   const opacity = useRef(1);
   const info = BUILDINGS[id];
   const fp = PLAN.footprint[id];
@@ -412,7 +573,8 @@ function Building({ id, risk, showRisk, fade }: { id: string; risk: number; show
 
   useFrame((_, dt) => {
     const g = ref.current;
-    if (!g) return;
+    if (!g || !standing.current) return;
+    standing.current.visible = !collapsed(id);
     const s = getState();
     const t = drillTime();
     const quake = s.phase === "running" && s.scenario.kind === "gempa";
@@ -430,25 +592,28 @@ function Building({ id, risk, showRisk, fade }: { id: string; risk: number; show
   });
 
   return (
-    <group ref={ref} position={[cx, base, cz]}>
-      <group position={[-cx, -base, -cz]}>
-        {Array.from({ length: info.floors + 1 }, (_, f) => (
-          <Storey key={f} b={id} floor={f} risk={risk} showRisk={showRisk} />
-        ))}
-        <Ceilings b={id} />
-        <Roof b={id} />
-      </group>
-      {showRisk && (
-        <Html position={[0, top - base + 1, 0]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
-          <div className="whitespace-nowrap rounded bg-malam/90 px-2 py-1 text-center text-xs text-pasir">
-            <div className="font-semibold">{info.name}</div>
-            <div>
-              Risiko rusak <strong className={risk >= 60 ? "text-bahaya" : "text-fajar"}>{risk}%</strong>
+    <>
+      <Collapse b={id} />
+      <group ref={ref} position={[cx, base, cz]}>
+        <group ref={standing} position={[-cx, -base, -cz]}>
+          {Array.from({ length: info.floors + 1 }, (_, f) => (
+            <Storey key={f} b={id} floor={f} risk={risk} showRisk={showRisk} />
+          ))}
+          <Ceilings b={id} />
+          <Roof b={id} />
+        </group>
+        {showRisk && (
+          <Html position={[0, top - base + 1, 0]} center zIndexRange={[15, 0]} style={{ pointerEvents: "none" }}>
+            <div className="whitespace-nowrap rounded bg-malam/90 px-2 py-1 text-center text-xs text-pasir">
+              <div className="font-semibold">{info.name}</div>
+              <div>
+                Risiko rusak <strong className={risk >= 60 ? "text-bahaya" : "text-fajar"}>{risk}%</strong>
+              </div>
             </div>
-          </div>
-        </Html>
-      )}
-    </group>
+          </Html>
+        )}
+      </group>
+    </>
   );
 }
 

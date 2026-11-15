@@ -3,6 +3,7 @@ import { fallenBox } from "@/lib/situation";
 import { PLAN, WALL } from "@/lib/floorplan";
 import { groundY, type Extra } from "@/lib/nav";
 import {
+  collapsed,
   drillTime,
   fallenAt,
   finishDrill,
@@ -10,6 +11,7 @@ import {
   inShelter,
   isUpstairs,
   landslideSigns,
+  look,
   net,
   openChat,
   player,
@@ -51,8 +53,12 @@ export function raiseAlarm(tell = true) {
 }
 
 // A closed door, or one buried in rubble, fills its opening like the wall around it, up to the door's height.
-// A tree down across a path does the same once it has fallen, up to its trunk.
+// A tree down across a path does the same once it has fallen, up to its trunk, and a fallen building its whole footprint.
 export const closedDoors: Extra = (x0, z0, x1, z1, lo, hi) => {
+  for (const b of run.collapses.keys()) {
+    const fp = PLAN.footprint[b];
+    if (fp.x0 < x1 && fp.x1 > x0 && fp.z0 < z1 && fp.z1 > z0 && collapsed(b)) return true;
+  }
   const f = run.situation?.fallen;
   if (f && getState().phase !== "idle" && drillTime() >= fallenAt()) {
     const b = fallenBox(f);
@@ -105,7 +111,7 @@ export function findPrompt(): Prompt | null {
     const [x, z] = wardenSpot();
     return { id: "lapor", label: "Lapor ke petugas", x, y: groundY(x, z, 0) + 2.3, z };
   }
-  if (s.chatOpen || s.mapOpen || (running && t < 0)) return null;
+  if (s.chatOpen || s.mapOpen || s.phase === "done" || (running && t < 0)) return null;
   let best: Prompt | null = null;
   let bestD = REACH;
   const consider = (id: string, label: string, x: number, z: number, floorY: number, lift: number, reach = REACH) => {
@@ -124,8 +130,17 @@ export function findPrompt(): Prompt | null {
     if (!run.blocked.includes(d.id)) consider(d.id, jammed(d.id) ? "Pintu macet" : s.closedDoors.includes(d.id) ? "Buka pintu" : "Tutup pintu", d.x, d.z, d.y, 1.7);
   }
   PLAN.spots.forEach((sp, i) => consider(`${sp.kind}-${i}`, SPOT_LABEL[sp.kind](), sp.x, sp.z, groundY(sp.x, sp.z, sp.floor), 1.9));
-  // Landslide signs are read from a few metres away, from the edge of the slope.
-  if (running) landslideSigns().forEach((g, i) => t >= run.timeline.signs[i] && consider(`tanda-${i}`, g.label, g.x, g.z, elevationAt(g.x, g.z), 2, 5));
+  // Landslide signs are read from afar, off the slope: the one looked at most directly, up to 16 m away.
+  if (running && !best) {
+    let aim = 0.35;
+    landslideSigns().forEach((g, i) => {
+      const turn = Math.atan2(g.x - player.x, g.z - player.z) - look.yaw - Math.PI;
+      const off = Math.abs(Math.atan2(Math.sin(turn), Math.cos(turn)));
+      if (t < run.timeline.signs[i] || off >= aim || Math.hypot(g.x - player.x, g.z - player.z) > 16) return;
+      aim = off;
+      best = { id: `tanda-${i}`, label: g.label, x: g.x, y: elevationAt(g.x, g.z) + 2, z: g.z };
+    });
+  }
   if (!best && !running) {
     const [x, z] = wardenSpot();
     if (Math.hypot(x - player.x, z - player.z) < 4) best = { id: "warden", label: "Tanya petugas", x, y: groundY(x, z, 0) + 2.3, z };

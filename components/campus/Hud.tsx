@@ -242,11 +242,23 @@ function Instruction({ t }: { t: number }) {
   );
 }
 
+// Why a drill ended early, first in the checklist.
+function Caught({ result }: { result: DrillResult }) {
+  if (!result.caught) return null;
+  return (
+    <li className="flex items-start gap-2 font-semibold text-bahaya">
+      <X aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      {result.scenario.kind === "longsor" ? "Tertimbun longsor" : "Tertimpa gedung yang runtuh"}
+    </li>
+  );
+}
+
 function GuidedResults({ result, onStart }: { result: DrillResult; onStart: () => void }) {
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-extrabold">Latihan selesai</h2>
       <ul className="space-y-1">
+        <Caught result={result} />
         {result.checks.map((c) => (
           <li key={c.label} className="flex items-start gap-2">
             {c.ok ? <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-aman" /> : <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-bahaya" />}
@@ -324,6 +336,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
         Skor <span className="tabular-nums text-fajar">{result.score}</span> poin
       </p>
       <ul className="space-y-1">
+        <Caught result={result} />
         {result.checks.map((c) => (
           <li key={c.label} className="flex items-start justify-between gap-3">
             <span className="flex items-start gap-2">
@@ -508,6 +521,11 @@ export default function Hud({
     if (f && Number.isFinite(fallenAt())) ids.push(setTimeout(() => play("crash", from(f.x, f.z)), at(fallenAt() + 1.2)));
     const lane = MAP.runouts[run.lane];
     if (slide !== null && lane) for (let k = 0; k < 8; k++) ids.push(setTimeout(() => play("rock", from(lane.bx, lane.bz)), at(slide + 0.6 * k)));
+    run.collapses.forEach(({ at: when }, b) => {
+      const fp = PLAN.footprint[b];
+      const [x, z] = [(fp.x0 + fp.x1) / 2, (fp.z0 + fp.z1) / 2];
+      for (let k = 0; k < 4; k++) ids.push(setTimeout(() => play("crash", from(x, z) * (1 - k * 0.2)), at(when + k * 0.45)));
+    });
     // Three ticks before the start.
     for (let k = 1; k <= 3; k++) ids.push(setTimeout(() => play("tick", 0.5), Math.max(0, startAt - k * 1000 - Date.now())));
     return () => ids.forEach(clearTimeout);

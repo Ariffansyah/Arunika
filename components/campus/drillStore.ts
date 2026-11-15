@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from "react";
-import { BUILDINGS, MAP, SPAWN, TILE, idx, tileAt, tileCenter, type Tile } from "@/lib/campus";
+import { BUILDINGS, MAP, SPAWN, TILE, buildingRects, idx, tileAt, tileCenter, type Tile } from "@/lib/campus";
 import { PLAN, classrooms, type Room } from "@/lib/floorplan";
 import { buildingAt, cellCenter, flowField, groundY, routeFrom, routeLength, upperFloorAt } from "@/lib/nav";
 import {
   NONE,
+  SLIDE_S,
   campusRisks,
   grade,
   hazardTiles,
@@ -25,8 +26,9 @@ import type { School } from "@/lib/supabase";
 import type { Anim } from "@/components/Character";
 
 // The trail and the best route are in plan units (tiles), ready to draw on the campus plan.
-export type DrillResult = DrillStats & { score: number; guided: boolean; trail: [number, number][]; route: [number, number][] };
-// What E (or the Aksi button) would do right now, shown next to the thing it acts on.
+// `caught` is a drill cut short by the disaster itself: buried by the slide or under a building that fell.
+export type DrillResult = DrillStats & { score: number; guided: boolean; caught: boolean; trail: [number, number][]; route: [number, number][] };
+// What E (or the Aksi button) would do right now, named on the HUD and marked over the thing it acts on.
 export type Prompt = { id: string; label: string; x: number; y: number; z: number };
 // Metres, with height so the route can be drawn up and down stairs.
 export type Route = [x: number, y: number, z: number][];
@@ -197,6 +199,14 @@ export const run = {
   // Where the player went, every half second, to compare with the best route afterwards.
   trail: [] as [number, number][],
   trailAt: 0,
+  // Buildings that come down in this drill: when, and the way a slide pushes the wreck (null falls in place).
+  collapses: new Map<string, { at: number; push: [number, number] | null }>(),
+};
+
+// Whether the building has come down by now, for drawing and for walking.
+export const collapsed = (b: string) => {
+  const c = run.collapses.get(b);
+  return !!c && getState().phase !== "idle" && drillTime() >= c.at;
 };
 
 // When the tree in the situation comes down: late in the shaking, or as the whirlwind leaves.
@@ -302,6 +312,12 @@ export function trackDrill(dt: number, t: number, moved: number, depth: number) 
       tr.caught = true;
       finishDrill(false);
     }
+  }
+  const b = buildingAt(player.x, player.z);
+  const fall = b ? run.collapses.get(b) : undefined;
+  if (fall && t >= fall.at && t < fall.at + 1) {
+    tr.caught = true;
+    finishDrill(false);
   }
 }
 
@@ -423,6 +439,31 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     if (scenario.intensity >= 6.5) for (const i of TALL) if (rnd() < 0.6) falls.set(i, end * (0.25 + 0.5 * rnd()));
     if (scenario.intensity >= 6) PLAN.panes.forEach((_, i) => rnd() < 0.5 && breaks.set(i, end * (0.15 + 0.6 * rnd())));
   }
+  const collapses = new Map<string, { at: number; push: [number, number] | null }>();
+  // The weakest blocks come down with the aftershock, but never within half a minute of the main shaking:
+  // time enough to walk out, so staying inside is what gets anyone caught.
+  if (quake && plan.shake && plan.aftershock) {
+    for (const [b, r] of Object.entries(risks)) if (r >= 70) collapses.set(b, { at: Math.max(plan.aftershock[0] + 1 + rnd(), plan.shake[1] + 30), push: null });
+  }
+  // A slide flattens whatever stands where its earth comes to rest (the strip drawn in the scene, which stops a
+  // little past the lane's end), each building as the front reaches it.
+  const lane = MAP.runouts[sit.lane];
+  if (scenario.kind === "longsor" && lane && plan.slide !== null) {
+    const len = Math.hypot(lane.bx - lane.ax, lane.bz - lane.az);
+    const dir: [number, number] = [(lane.bx - lane.ax) / len, (lane.bz - lane.az) / len];
+    for (const [b, r] of Object.entries(buildingRects())) {
+      const hit: number[] = [];
+      for (let z = r.z0; z <= r.z1; z++) {
+        for (let x = r.x0; x <= r.x1; x++) {
+          const [cx, cz] = tileCenter(x, z);
+          const along = ((cx - lane.ax) * dir[0] + (cz - lane.az) * dir[1]) / len;
+          const across = Math.abs((cx - lane.ax) * -dir[1] + (cz - lane.az) * dir[0]) / lane.r;
+          if (along >= 0 && along <= 1.08 && across < 1) hit.push(along);
+        }
+      }
+      if (hit.length >= 0.25 * (r.x1 - r.x0 + 1) * (r.z1 - r.z0 + 1)) collapses.set(b, { at: plan.slide + (SLIDE_S * Math.max(0, Math.min(...hit))) / 1.15, push: dir });
+    }
+  }
   Object.assign(run, {
     hazards,
     goals,
@@ -448,6 +489,7 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     closedGoal,
     trail: [],
     trailAt: 0,
+    collapses,
   });
   setState({
     phase: "running",
@@ -497,6 +539,7 @@ export function finishDrill(reached: boolean) {
     ...stats,
     score: scoreDrill(stats),
     guided: s.guided,
+    caught: run.track.caught,
     trail: [...run.trail, [player.x, player.z]].map(([x, z]) => [x / TILE, z / TILE] as [number, number]),
     route: (run.optimalRoute ?? []).map(([x, , z]) => [x / TILE, z / TILE] as [number, number]),
   };
