@@ -13,8 +13,10 @@ export default function SiteHeader({ overlay = false }: { overlay?: boolean }) {
         aria-label="Navigasi utama"
         className="mx-auto flex max-w-6xl items-center gap-x-5 px-4 py-2 sm:gap-x-7 sm:px-6"
       >
-        <Link href="/" className="mr-auto text-lg font-extrabold tracking-tight text-pasir">
-          Arunika<span className="text-fajar">.</span>
+        <Link href="/" className="mr-auto flex min-h-11 items-center gap-2.5 text-lg font-extrabold tracking-wider text-pasir uppercase">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, nothing to optimise */}
+          <img src="/arunika-mark.svg" alt="" width={24} height={27} className="h-7 w-auto" />
+          Arunika
         </Link>
         {LINKS.map((l) => (
           <Link
