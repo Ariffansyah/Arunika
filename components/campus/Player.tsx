@@ -140,7 +140,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     const turn = (dx: number, dy: number, k: number) => {
       look.yaw -= dx * k;
       if (getState().view === "first") look.eyePitch = clamp(look.eyePitch - dy * k, -1.3, 1.2);
-      else look.camPitch = clamp(look.camPitch + dy * k * 0.7, 0.08, 1.15);
+      else look.camPitch = clamp(look.camPitch + dy * k * 0.7, -0.75, 1.15);
     };
     const down = (e: PointerEvent) => {
       if (e.button !== 0 || locked()) return;
@@ -293,16 +293,16 @@ export default function Player({ look: character, name }: { look: Look; name: st
               : player.seated
                 ? "sit"
                 : "idle";
+    // Curled up, the body slides right under the desk; the player stays where they stood, which is clear of it.
+    // The camera follows the body, so the first-person eye ends up under the desk too, not inside a chair.
+    const desk = PLAN.items[player.cover];
+    if (desk) deskAt.current = [desk.x, desk.z];
+    tuck.current += ((desk ? 1 : 0) - tuck.current) * (1 - Math.exp(-dt * 10));
+    const bodyX = player.x + (deskAt.current[0] - player.x) * tuck.current;
+    const bodyZ = player.z + (deskAt.current[1] - player.z) * tuck.current;
     const g = ref.current;
     if (g) {
-      g.position.set(player.x, player.y, player.z);
-      // Curled up, the body slides right under the desk; the player stays where they stood, which is clear of it.
-      const desk = PLAN.items[player.cover];
-      if (desk) deskAt.current = [desk.x, desk.z];
-      tuck.current += ((desk ? 1 : 0) - tuck.current) * (1 - Math.exp(-dt * 10));
-      const [ux, uz] = deskAt.current;
-      g.position.x += (ux - player.x) * tuck.current;
-      g.position.z += (uz - player.z) * tuck.current;
+      g.position.set(bodyX, player.y, bodyZ);
       g.rotation.y = shownHeading.current;
       g.visible = !first;
     }
@@ -326,7 +326,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     // Eased like the body's own crossfade, so ducking or standing up doesn't jolt the view.
     const eyeTo = player.cover >= 0 ? 0.5 : player.crouch ? 0.75 : player.seated ? 1.05 : 1.35;
     eyeHeight.current += (eyeTo - eyeHeight.current) * (1 - Math.exp(-dt * 10));
-    const target = eye.current.set(player.x, player.y + eyeHeight.current - Math.abs(Math.sin(bob.current)) * bobAmp.current, player.z);
+    const target = eye.current.set(bodyX, player.y + eyeHeight.current - Math.abs(Math.sin(bob.current)) * bobAmp.current, bodyZ);
 
     if (first) {
       camera.position.set(target.x + jitter(), target.y + jitter(), target.z + jitter());
@@ -338,9 +338,10 @@ export default function Player({ look: character, name }: { look: Look; name: st
       );
     } else {
       // Something between camera and player: swing up a little first, then pull in; whatever still blocks the view fades.
-      // Indoors the ceiling leaves no room to swing up, so the camera only pulls in.
+      // Indoors the ceiling leaves no room to swing up, so the camera only pulls in. Looking up, the camera sinks
+      // toward the ground behind the player, and the ground it meets only pulls it in, as in most third-person games.
       const pivot = pivotAt.current.set(target.x, target.y + 0.4, target.z);
-      const maxLift = buildingAt(player.x, player.z) ? 0 : 0.45;
+      const maxLift = buildingAt(player.x, player.z) || look.camPitch < 0.1 ? 0 : 0.45;
       let lift = 0;
       while (lift < maxLift && clearReach(pivot, look.yaw, Math.min(1.45, look.camPitch + lift), CAM_DIST) < CAM_DIST) lift += 0.05;
       camLift.current += (lift - camLift.current) * (1 - Math.exp(-dt * 6));
@@ -352,7 +353,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
       const bz = Math.cos(look.yaw) * Math.cos(pitch);
       const by = Math.sin(pitch);
       camera.position.set(pivot.x + bx * d + jitter(), pivot.y + by * d + jitter(), pivot.z + bz * d + jitter());
-      camera.lookAt(target.x, target.y + 0.25, target.z);
+      camera.lookAt(pivot);
     }
 
     const prompt = findPrompt();
