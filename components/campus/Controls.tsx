@@ -1,10 +1,10 @@
 "use client";
 
-import { Keyboard, LogOut } from "lucide-react";
+import { Eye, Keyboard, Layers, LogOut, Map as MapIcon, Volume2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { resetInput, setState, useDrill } from "./drillStore";
-import { btn, ghost, panel, primary } from "./ui";
+import { ToolButton, ghost, panel, primary } from "./ui";
 
 const SEEN = "arunika:controls-seen";
 
@@ -40,14 +40,14 @@ const K = ({ children }: { children: ReactNode }) => (
   <kbd className="inline-flex min-w-8 items-center justify-center bg-malam-2 px-1.5 py-0.5 text-pasir">{children}</kbd>
 );
 
-function Rows({ rows }: { rows: [string[], string][] }) {
+function Rows({ rows }: { rows: [ReactNode[], string][] }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
       {rows.map(([keys, what]) => (
         <div key={what} className="contents">
           <dt className="flex flex-wrap gap-1">
-            {keys.map((k) => (
-              <K key={k}>{k}</K>
+            {keys.map((k, i) => (
+              <K key={i}>{k}</K>
             ))}
           </dt>
           <dd>{what}</dd>
@@ -79,12 +79,14 @@ const TOUCH: [string[], string][] = [
   [["Seret layar"], "Melihat ke sekeliling"],
 ];
 
-const SCREEN: [string[], string][] = [
-  [["Panduan"], "Membuka panduan ini kapan saja"],
-  [["Keluar"], "Keluar dari simulasi"],
-  [["Risiko AI"], "Menampilkan bangunan berisiko"],
-  [["Suara"], "Menyalakan atau mematikan suara"],
-  [["Orang pertama"], "Sama dengan tombol V"],
+const icon = "size-4 my-0.5";
+const SCREEN: [ReactNode[], string][] = [
+  [[<Keyboard key="k" aria-label="Panduan" className={icon} />], "Membuka panduan ini kapan saja"],
+  [[<MapIcon key="k" aria-label="Peta" className={icon} />], "Membuka peta evakuasi, sama dengan tombol M"],
+  [[<Layers key="k" aria-label="Risiko AI" className={icon} />], "Menampilkan bangunan berisiko"],
+  [[<Volume2 key="k" aria-label="Bisukan" className={icon} />], "Mematikan atau menyalakan lagi suara"],
+  [[<Eye key="k" aria-label="Orang pertama" className={icon} />], "Ganti kamera orang pertama atau ketiga, sama dengan tombol V"],
+  [[<LogOut key="k" aria-label="Keluar" className={`${icon} text-bahaya`} />], "Keluar dari simulasi"],
   [["Jalur AI"], "Menampilkan jalur evakuasi terbaik (−150 poin)"],
   [["Akhiri latihan"], "Menyelesaikan latihan dan melihat skor"],
 ];
@@ -150,8 +152,8 @@ function ConfirmExit({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-// The Controls and Exit buttons for the HUD's top-right corner, with their dialogs.
-export default function SimControls() {
+// The HUD toolbar: the guide first, the exit last, the screen's own tools between; the dialogs come with it.
+export default function SimControls({ children }: { children: ReactNode }) {
   // The guide opens by itself until the player has closed it once.
   const [guide, setGuide] = useState(() => {
     try {
@@ -170,18 +172,16 @@ export default function SimControls() {
     }
   };
 
-  const hudBtn = `${btn} min-h-10 border border-malam-3 bg-malam/90 px-3 text-sm text-pasir hover:border-redup`;
   return (
     <>
-      <div className="flex gap-2">
-        <button type="button" aria-haspopup="dialog" onClick={() => setGuide(true)} className={hudBtn}>
-          <Keyboard aria-hidden="true" className="size-4" />
-          <span className="sr-only sm:not-sr-only">Panduan</span>
-        </button>
-        <button type="button" aria-haspopup="dialog" onClick={() => setExit(true)} className={hudBtn}>
-          <LogOut aria-hidden="true" className="size-4 text-bahaya" />
-          Keluar
-        </button>
+      <div role="toolbar" aria-label="Alat simulasi" className="flex gap-0.5 rounded-lg border border-malam-3 bg-malam/90 p-1 shadow-lg">
+        <ToolButton label="Panduan" dialog onClick={() => setGuide(true)}>
+          <Keyboard aria-hidden="true" />
+        </ToolButton>
+        {children}
+        <ToolButton label="Keluar" dialog onClick={() => setExit(true)}>
+          <LogOut aria-hidden="true" className="text-bahaya" />
+        </ToolButton>
       </div>
       <Guide open={guide} onClose={closeGuide} />
       <ConfirmExit open={exit} onClose={() => setExit(false)} />
