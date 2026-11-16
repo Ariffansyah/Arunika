@@ -135,8 +135,8 @@ export const player = {
 export const input = { up: false, down: false, left: false, right: false, crouch: false, run: false, jump: false };
 // Set by the room connection; actions here use it to tell the other players.
 export const net = { send: null as ((event: string, payload: Record<string, unknown>) => void) | null };
-// yaw 0 puts the camera south of the player, looking north.
-export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05 };
+// yaw 0 puts the camera south of the player, looking north. cine is how far the camera is into its aerial shot, 0 to 1.
+export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05, cine: 1 };
 export const remotes = new Map<string, { x: number; z: number; layer: number; anim: Anim; at: number }>();
 const blankTrack = (): Tracked => ({
   reached: false,

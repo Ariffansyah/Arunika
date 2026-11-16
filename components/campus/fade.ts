@@ -1,5 +1,5 @@
 import type { Material, Mesh, Object3D, Vector3 } from "three";
-import { player } from "./drillStore";
+import { look, player } from "./drillStore";
 
 // Liang-Barsky clip of the camera-to-player sight line against a footprint; returns where it enters, or null.
 function sightEnters(cam: Vector3, x0: number, z0: number, x1: number, z1: number) {
@@ -27,6 +27,8 @@ function sightEnters(cam: Vector3, x0: number, z0: number, x1: number, z1: numbe
 
 // Whether something with this footprint and top stands between the camera and the player's eyes.
 export function hides(cam: Vector3, top: number, x0: number, z0: number, x1: number, z1: number) {
+  // From the aerial shot the player is a speck; buildings fading in and out as it circles would only distract.
+  if (look.cine > 0.3) return false;
   const t = sightEnters(cam, x0, z0, x1, z1);
   if (t === null) return false;
   const eye = player.y + 1.4;

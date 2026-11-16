@@ -24,7 +24,7 @@ import {
 } from "./drillStore";
 import { closedDoors, findPrompt, interact } from "./interact";
 import { play, splash } from "./sound";
-import { MAP, TILE, surfaceAt } from "@/lib/campus";
+import { MAP, SITE_D, SITE_W, TILE, elevationAt, surfaceAt } from "@/lib/campus";
 
 const KEYS: Record<string, keyof typeof input> = {
   KeyW: "up",
@@ -40,6 +40,8 @@ const KEYS: Record<string, keyof typeof input> = {
   ShiftRight: "run",
 };
 const CAM_DIST = 5;
+// Seconds of countdown the camera spends flying down from the sky to the player.
+const FLY_S = 3;
 // A jump: a short crouch, 0.4 s in the air, then the landing squat before walking on.
 const VAULT_S = 0.8;
 const PACE: Partial<Record<Anim, number>> = { walk: WALK_SPEED, sprint: RUN_SPEED, crouchWalk: CROUCH_SPEED };
@@ -81,6 +83,11 @@ export default function Player({ look: character, name }: { look: Look; name: st
   const bob = useRef(0);
   const bobAmp = useRef(0);
   const wasFirst = useRef(view === "first");
+  const aim = useRef(new Vector3());
+  // Until the player moves, the menu sits over a slow aerial orbit of the campus; cine is how far the camera is up there.
+  const lobby = useRef(true);
+  const lastPhase = useRef("idle");
+  const cine = useRef(1);
   const needsCursor = useDrill((s) => s.chatOpen || s.mapOpen || s.phase === "done");
 
   useEffect(() => {
@@ -144,6 +151,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     };
     const down = (e: PointerEvent) => {
       if (e.button !== 0 || locked()) return;
+      lobby.current = false;
       // A mouse is taken over as in any game: hidden, turning the view, given back with Esc. Dragging stays
       // for touch, and for a mouse wherever the lock is refused.
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -195,6 +203,11 @@ export default function Player({ look: character, name }: { look: Look; name: st
     let dx = -Math.sin(look.yaw) * ahead + Math.cos(look.yaw) * side;
     let dz = -Math.cos(look.yaw) * ahead - Math.sin(look.yaw) * side;
     const len = Math.hypot(dx, dz);
+    if (s.phase !== lastPhase.current) {
+      if (s.phase === "idle") lobby.current = true;
+      lastPhase.current = s.phase;
+    }
+    if (len > 0 || input.crouch || input.jump) lobby.current = false;
     const [ox, oz] = [player.x, player.z];
     const frozen = s.chatOpen || s.mapOpen || (running && t < 0);
     const v = vault.current;
@@ -331,11 +344,7 @@ export default function Player({ look: character, name }: { look: Look; name: st
     if (first) {
       camera.position.set(target.x + jitter(), target.y + jitter(), target.z + jitter());
       const c = Math.cos(look.eyePitch);
-      camera.lookAt(
-        target.x - Math.sin(look.yaw) * c,
-        target.y + Math.sin(look.eyePitch),
-        target.z - Math.cos(look.yaw) * c,
-      );
+      aim.current.set(target.x - Math.sin(look.yaw) * c, target.y + Math.sin(look.eyePitch), target.z - Math.cos(look.yaw) * c);
     } else {
       // Something between camera and player: swing up a little first, then pull in; whatever still blocks the view fades.
       // Indoors the ceiling leaves no room to swing up, so the camera only pulls in. Looking up, the camera sinks
@@ -353,8 +362,29 @@ export default function Player({ look: character, name }: { look: Look; name: st
       const bz = Math.cos(look.yaw) * Math.cos(pitch);
       const by = Math.sin(pitch);
       camera.position.set(pivot.x + bx * d + jitter(), pivot.y + by * d + jitter(), pivot.z + bz * d + jitter());
-      camera.lookAt(pivot);
+      aim.current.copy(pivot);
     }
+
+    // A drill opens on the aerial view and flies down to the player through the countdown; the lobby eases in and out.
+    if (running && t < 0) cine.current = reducedMotion.current ? 0 : Math.min(1, -t / FLY_S);
+    else {
+      const to = s.phase === "idle" && lobby.current ? 1 : 0;
+      cine.current = reducedMotion.current ? to : cine.current + (to - cine.current) * (1 - Math.exp(-dt * 1.5));
+    }
+    const k = cine.current * cine.current * (3 - 2 * cine.current);
+    look.cine = k;
+    if (k > 0.001) {
+      const a = reducedMotion.current ? 0.6 : (Date.now() / 1000) * 0.04;
+      const r = Math.max(SITE_W, SITE_D) * 0.62;
+      const [cx, cz] = [SITE_W / 2, SITE_D / 2];
+      const cy = elevationAt(cx, cz);
+      const p = camera.position;
+      // Across first and down last, so the camera drops onto the player from above instead of through the walls around them.
+      const kv = Math.sqrt(k);
+      p.set(p.x + (cx + Math.sin(a) * r - p.x) * k, p.y + (cy + r * 0.5 - p.y) * kv, p.z + (cz + Math.cos(a) * r - p.z) * k);
+      aim.current.lerp(pivotAt.current.set(cx, cy, cz), k);
+    }
+    camera.lookAt(aim.current);
 
     const prompt = findPrompt();
     if (prompt?.id !== s.prompt?.id || prompt?.label !== s.prompt?.label) setState({ prompt });
