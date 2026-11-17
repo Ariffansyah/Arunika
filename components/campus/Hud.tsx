@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
+import DebriefingTrail from "./DebriefingTrail";
 import { H, MAP, TILE, W } from "@/lib/campus";
 import { PLAN } from "@/lib/floorplan";
 import { MAPS } from "@/lib/maps";
@@ -286,29 +287,34 @@ function Caught({ result }: { result: DrillResult }) {
 
 function GuidedResults({ result, onStart }: { result: DrillResult; onStart: () => void }) {
   return (
-    <div className="space-y-4">
-      <h2 id="results-title" className="text-2xl font-extrabold">
-        Latihan selesai
-      </h2>
-      <ul className="space-y-1">
-        <Caught result={result} />
-        {result.checks.map((c) => (
-          <li key={c.label} className="flex items-start gap-2">
-            {c.ok ? <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-aman" /> : <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-bahaya" />}
-            <span>
-              <span className="sr-only">{c.ok ? "Benar: " : "Belum: "}</span>
-              {c.label}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="grid gap-2">
-        <button type="button" autoFocus className={primary} onClick={onStart}>
-          Mulai simulasi
-        </button>
-        <button type="button" className={ghost} onClick={() => setState({ phase: "idle", showRoute: false, result: null })}>
-          Kembali belajar
-        </button>
+    <div className="grid gap-6 md:grid-cols-2">
+      <div className="space-y-4">
+        <h2 id="results-title" className="text-2xl font-extrabold">
+          Latihan selesai
+        </h2>
+        <ul className="space-y-1">
+          <Caught result={result} />
+          {result.checks.map((c) => (
+            <li key={c.label} className="flex items-start gap-2">
+              {c.ok ? <Check aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-aman" /> : <X aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-bahaya" />}
+              <span>
+                <span className="sr-only">{c.ok ? "Benar: " : "Belum: "}</span>
+                {c.label}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="grid gap-2 pt-2">
+          <button type="button" autoFocus className={primary} onClick={onStart}>
+            Mulai simulasi berwaktu
+          </button>
+          <button type="button" className={ghost} onClick={() => setState({ phase: "idle", showRoute: false, result: null })}>
+            Kembali belajar
+          </button>
+        </div>
+      </div>
+      <div>
+        <DebriefingTrail result={result} />
       </div>
     </div>
   );
@@ -404,21 +410,7 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
         </button>
       </div>
       <div className="space-y-4">
-        <figure className="space-y-1">
-          <div className="overflow-hidden rounded-md border border-malam-3">
-            <CampusPlan path={result.route} label="Jejakmu dan jalur terbaik di peta kampus">
-              <polyline
-                points={result.trail.map(([x, z]) => `${x},${z}`).join(" ")}
-                fill="none"
-                stroke="#f4ecdc"
-                strokeWidth={0.3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </CampusPlan>
-          </div>
-          <figcaption className="text-redup">Putih jejakmu, jingga jalur terbaik.</figcaption>
-        </figure>
+        <DebriefingTrail result={result} />
         <div>
           <h3 className="font-bold">Peringkat ruang ini</h3>
           {error ? (
@@ -692,7 +684,7 @@ export default function Hud({
           aria-labelledby="results-title"
           className="pointer-events-auto absolute inset-0 z-40 flex items-center justify-center bg-malam/70 p-3 sm:p-6"
         >
-          <div className={`${panel} max-h-full w-full overflow-y-auto text-sm sm:p-6 ${result.guided ? "max-w-md" : "max-w-3xl"}`}>
+          <div className={`${panel} max-h-full w-full max-w-4xl overflow-y-auto text-sm sm:p-6`}>
             {result.guided ? (
               <GuidedResults result={result} onStart={() => onStart(result.scenario)} />
             ) : (

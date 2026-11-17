@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "for p in pesisir pegunungan kota; do PETA=$p node --test lib/*.test.ts || exit 1; done"
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
