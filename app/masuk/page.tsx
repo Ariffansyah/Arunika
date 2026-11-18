@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import StillScene from "@/components/landing/StillScene";
+import { AVATARS } from "@/lib/supabase";
 import LoginFlow from "./LoginFlow";
 
 export const metadata: Metadata = { title: "Masuk" };
@@ -21,10 +22,27 @@ export default function MasukPage() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgb(7_21_48/0.7),transparent)]"
         />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-[linear-gradient(0deg,#071530_10%,rgb(7_21_48/0.75)_50%,transparent)]"
+        />
         <Link href="/" className={`absolute top-4 left-8 ${logo}`}>
           {mark}
           Arunika
         </Link>
+        <div className="absolute inset-x-8 bottom-10 space-y-6 xl:inset-x-12 xl:bottom-14">
+          <ul aria-hidden="true" className="flex -space-x-3">
+            {AVATARS.map((look) => (
+              <li key={look}>
+                {/* eslint-disable-next-line @next/next/no-img-element -- 128px sprites, nothing to optimise */}
+                <img src={`/characters/previews/${look}.png`} alt="" width={64} height={64} className="size-16 rounded-full border-4 border-malam bg-malam-2" />
+              </li>
+            ))}
+          </ul>
+          <p className="max-w-[18ch] text-4xl leading-[1.02] font-extrabold tracking-tight xl:text-5xl">
+            Satu akun untuk latihan, gladi, dan dasbor.
+          </p>
+        </div>
       </div>
       <div className="flex flex-col px-4 py-6 sm:px-10">
         <Link href="/" className={`${logo} self-start lg:hidden`}>

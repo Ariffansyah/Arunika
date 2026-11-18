@@ -1,13 +1,26 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import Drill from "@/components/landing/Drill";
 import GladiTeaser from "@/components/landing/GladiTeaser";
 import Hero from "@/components/landing/Hero";
+import Lessons from "@/components/landing/Lessons";
 import PlanDemo from "@/components/landing/PlanDemo";
+import Roles from "@/components/landing/Roles";
 import SiteHeader from "@/components/SiteHeader";
+import SitePlan, { CAMPUSES } from "@/components/SitePlan";
 
-const MORE = [
-  { href: "/sekolah", text: "Tanya Petugas AI di sekolah." },
-  { href: "/dashboard", text: "Lihat sekolah yang belum siap." },
+const FLOW = [
+  { href: "#pelajari", label: "Pelajari" },
+  { href: "#coba", label: "Latihan" },
+  { href: "#gladi", label: "Gladi" },
+  { href: "#pantau", label: "Pantau" },
+];
+
+const FOOTER = [
+  { href: "/sekolah", label: "Sekolah" },
+  { href: "/gladi", label: "Gladi ruang" },
+  { href: "/dashboard", label: "Dasbor" },
+  { href: "/masuk", label: "Masuk" },
 ];
 
 export default function Home() {
@@ -17,33 +30,79 @@ export default function Home() {
         <SiteHeader overlay />
         <main>
           <Hero />
-          <PlanDemo />
-          <GladiTeaser />
-          <nav aria-label="Fitur lain" className="border-t border-malam-3">
-            <ul className="mx-auto max-w-6xl divide-y divide-malam-3">
-              {MORE.map(({ href, text }) => (
-                <li key={href}>
-                  <Link
+          <nav aria-label="Alur Arunika" className="border-b border-malam-3">
+            <ol className="mx-auto grid max-w-6xl grid-cols-2 sm:grid-cols-4">
+              {FLOW.map(({ href, label }, i) => (
+                <li key={href} className="border-malam-3 max-sm:odd:border-r max-sm:nth-[-n+2]:border-b sm:not-last:border-r">
+                  <a
                     href={href}
-                    className="group flex min-h-28 items-center justify-between gap-6 px-4 py-8 text-3xl font-extrabold tracking-tight transition-colors hover:text-langit sm:px-6 sm:text-5xl"
+                    className="group flex min-h-24 items-center gap-3 px-4 py-6 text-2xl font-extrabold tracking-tight transition-colors hover:bg-malam-2 sm:min-h-32 sm:px-6 sm:text-3xl lg:text-4xl"
                   >
-                    {text}
-                    <ArrowRight aria-hidden="true" className="size-8 shrink-0 transition-transform group-hover:translate-x-2 sm:size-12" />
-                  </Link>
+                    <span className="tabular-nums text-langit">{i + 1}</span>
+                    <span className="flex-1">{label}</span>
+                    <ArrowDown aria-hidden="true" className="size-6 text-redup transition-transform group-hover:translate-y-1 group-hover:text-pasir" />
+                  </a>
                 </li>
               ))}
-            </ul>
+            </ol>
           </nav>
+          <Lessons />
+          <PlanDemo />
+          <Drill />
+          <GladiTeaser />
+          <Roles />
+          <section aria-labelledby="ajak" className="relative isolate overflow-hidden border-t border-malam-3">
+            <div aria-hidden="true" className="absolute inset-0 -z-10 flex items-center justify-center gap-6 opacity-[0.14] sm:gap-10">
+              {CAMPUSES.map(({ id }, i) => (
+                <SitePlan key={id} id={id} className={`h-auto w-[60%] shrink-0 sm:w-[34%] ${i === 1 ? "translate-y-10" : "-translate-y-6"}`} />
+              ))}
+            </div>
+            <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgb(7_21_48/0.4),#071530_75%)]" />
+            <div className="mx-auto flex max-w-6xl flex-col items-start gap-10 px-4 py-28 sm:px-6 lg:py-40">
+              <h2 id="ajak" className="max-w-[16ch] text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl">
+                Gempa berikutnya tidak menunggu sekolah <span className="text-fajar">siap</span>.
+              </h2>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/sekolah"
+                  className="group inline-flex min-h-14 items-center gap-3 rounded-md bg-laut px-7 text-lg font-bold text-white shadow-[0_14px_40px_-12px_rgb(30_99_240/0.7)] hover:bg-laut-terang active:translate-y-px"
+                >
+                  Mulai latihan
+                  <ArrowRight aria-hidden="true" className="size-5 transition-transform group-hover:translate-x-1" />
+                </Link>
+                <Link
+                  href="/masuk"
+                  className="inline-flex min-h-14 items-center rounded-md border border-pasir/25 bg-malam/60 px-7 text-lg font-bold hover:border-pasir active:translate-y-px"
+                >
+                  Buat akun
+                </Link>
+              </div>
+            </div>
+          </section>
         </main>
       </div>
       <footer className="border-t border-malam-3 bg-malam-2">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-8 gap-y-4 px-4 py-10 sm:px-6">
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto] md:items-center">
           <span className="flex items-center gap-2.5 text-lg font-extrabold tracking-wider uppercase">
             {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, nothing to optimise */}
             <img src="/arunika-mark.svg" alt="" width={24} height={27} className="h-7 w-auto" />
             Arunika
           </span>
-          <p className="text-redup">Prototipe kompetisi. Sekolah di dasbor adalah data contoh. Data gempa dari BMKG.</p>
+          <nav aria-label="Tautan kaki">
+            <ul className="flex flex-wrap gap-x-7 gap-y-2">
+              {FOOTER.map(({ href, label }) => (
+                <li key={href}>
+                  <Link href={href} className="flex min-h-11 items-center font-semibold text-redup hover:text-pasir">
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <p className="text-redup md:col-span-2">
+            Prototipe kompetisi. Sekolah di dasbor adalah data contoh. Data gempa dari BMKG, urutan evakuasi mengikuti panduan sekolah aman BNPB,
+            karakter 3D dari Quaternius.
+          </p>
         </div>
       </footer>
     </>

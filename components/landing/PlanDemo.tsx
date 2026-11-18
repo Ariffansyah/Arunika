@@ -89,7 +89,7 @@ export default function PlanDemo() {
             hazardColor={HAZARD_COLOR[scenario.kind]}
             label={`Denah sekolah, ${SCENARIO_LABEL[scenario.kind]} ${num(scenario.intensity, 1)} ${meta.unit}`.trim() + ", dengan jalur evakuasi"}
           />
-          <figcaption className="flex flex-wrap gap-x-6 gap-y-1 border-t border-malam-3 px-4 py-3 text-sm">
+          <figcaption className="flex flex-wrap gap-x-6 gap-y-1 border-t border-malam-3 px-4 py-3">
             <span className="inline-flex items-center gap-2">
               <svg aria-hidden="true" width="28" height="6" viewBox="0 0 28 6">
                 <line x1="2" y1="3" x2="26" y2="3" stroke="#ff8a3d" strokeWidth="4" strokeDasharray="6 4" strokeLinecap="round" />

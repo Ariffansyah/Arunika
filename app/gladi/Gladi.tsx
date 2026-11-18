@@ -210,21 +210,33 @@ function Verdict({ step }: { step: Step }) {
   );
 }
 
-function Entry({ i, step }: { i: number; step: Step }) {
-  const Who = step.move ? Cpu : Sparkles;
+// One step of the log: the exercise clock and who judges it in the margin, the step itself beside them.
+function Slot({ i, map, children, as: Tag = "div" }: { i: number; map: boolean; children: React.ReactNode; as?: "div" | "li" }) {
+  const Who = map ? Cpu : Sparkles;
+  const who = map ? "Dinilai mesin simulasi" : "Dari pengendali AI";
   return (
-    <li className="border-t border-malam-3 py-4">
-      <div className="flex items-center gap-2 text-sm text-redup">
-        <span className="font-bold tabular-nums text-langit">{CLOCKS[i]}</span>
-        <Who aria-hidden="true" className="size-3.5" />
-        <span>{step.move ? "dinilai mesin simulasi" : "dinilai AI"}</span>
-      </div>
-      <p className="mt-1.5 leading-relaxed text-redup">
+    <Tag className="grid grid-cols-[3.25rem_1fr] gap-3 border-t border-malam-3 py-4">
+      <span className="flex flex-col items-start gap-2 pt-0.5 font-bold tabular-nums text-langit">
+        {CLOCKS[i]}
+        <span title={who} className="text-redup">
+          <Who aria-hidden="true" className="size-4" />
+          <span className="sr-only">{who}</span>
+        </span>
+      </span>
+      <div>{children}</div>
+    </Tag>
+  );
+}
+
+function Entry({ i, step }: { i: number; step: Step }) {
+  return (
+    <Slot as="li" i={i} map={!!step.move}>
+      <p className="leading-relaxed text-redup">
         {step.situation} {step.question}
       </p>
       <p className="mt-2 font-semibold">{step.answer}</p>
       <Verdict step={step} />
-    </li>
+    </Slot>
   );
 }
 
@@ -391,11 +403,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
   }
 
   const campuses = Object.keys(MAPS) as Setting[];
-  const status = (
-    <p className="text-redup">
-      {MAP.name} · {pick === "bmkg" && quake ? `gempa BMKG ${quakeLine(quake)}` : `${HAZARD_LABEL[hazard].toLowerCase()}, ${intensityLine(hazard, intensity)}`}
-    </p>
-  );
+  const status = `${MAP.name} · ${pick === "bmkg" && quake ? `gempa BMKG ${quakeLine(quake)}` : `${HAZARD_LABEL[hazard].toLowerCase()}, ${intensityLine(hazard, intensity)}`}`;
 
   return (
     <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start">
@@ -417,6 +425,12 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
           </nav>
         )}
         <div className="overflow-hidden rounded-xl border border-malam-3 bg-malam shadow-[0_30px_80px_-30px_rgb(0_0_0/0.7)]">
+          {stage !== "siap" && (
+            <p className="flex items-center gap-2.5 border-b border-malam-3 bg-malam-2 px-4 py-3">
+              <span aria-hidden="true" className={`size-2 shrink-0 rounded-full bg-langit ${stage === "selesai" ? "" : "animate-pulse"}`} />
+              <span className="truncate">{status}</span>
+            </p>
+          )}
           <Board
             hazard={hazard}
             risks={board.risks}
@@ -433,7 +447,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
             onPick={onPick}
             onPreview={setPreview}
           />
-          <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-malam-3 px-4 py-3 text-sm">
+          <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-malam-3 px-4 py-3">
             {[
               ["#34c47c", "Risiko < 30%"],
               ["#f0b429", "30–59%"],
@@ -493,9 +507,30 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
                 ))}
               </div>
             </fieldset>
+            <ol aria-label="Langkah gladi" className="divide-y divide-malam-3 rounded-lg border border-malam-3 bg-malam">
+              {(
+                [
+                  ["Situasi pembuka", false],
+                  ["Gedung yang disisir", true],
+                  ["Titik kumpul dan rute", true],
+                  ["Kejadian susulan", false],
+                ] as const
+              ).map(([text, map], i) => {
+                const Who = map ? Cpu : Sparkles;
+                return (
+                  <li key={text} className="flex min-h-12 items-center gap-3 px-3 py-2">
+                    <span className="w-12 font-bold tabular-nums text-langit">{CLOCKS[i]}</span>
+                    <span className="flex-1 font-semibold">{text}</span>
+                    <span className="inline-flex items-center gap-1.5 text-redup">
+                      <Who aria-hidden="true" className="size-4" />
+                      {map ? "Peta" : "AI"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
             <p className="leading-relaxed text-redup">
-              Peta ini sudah dihitung mesin simulasi untuk{" "}
-              <strong className="text-pasir">{me.school?.name ?? "sekolah umum"}</strong>. Langkah 1 dan 4 disusun AI; langkah 2 dan 3 kamu putuskan langsung di peta.
+              Risiko tiap gedung dihitung mesin simulasi untuk <strong className="text-pasir">{me.school?.name ?? "sekolah umum"}</strong>.
             </p>
             {error && <p role="alert" className="text-bahaya">{error}</p>}
             <button
@@ -508,8 +543,8 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
           </form>
         ) : (
           <div>
-            <div className="flex items-baseline justify-between gap-4">
-              <span className="text-4xl font-extrabold tabular-nums text-langit">{CLOCKS[Math.min(steps.length, 3)]}</span>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-3xl font-extrabold tabular-nums text-langit">{CLOCKS[Math.min(steps.length, 3)]}</span>
               <ol aria-label="Langkah gladi" className="flex flex-1 gap-1.5">
                 {CLOCKS.map((c, i) => (
                   <li key={c} className="h-1.5 flex-1 rounded-full bg-malam-3">
@@ -521,21 +556,15 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
                 ))}
               </ol>
             </div>
-            <div className="mt-2">{status}</div>
-            <ol className="mt-3">
+            <ol className="mt-4">
               {steps.map((s, i) => (
                 <Entry key={i} i={i} step={s} />
               ))}
             </ol>
 
             {(stage === "aksi" || stage === "susulan") && pending && (
-              <div className="border-t border-malam-3 pt-4">
-                <div className="flex items-center gap-2 text-sm text-redup">
-                  <span className="font-bold tabular-nums text-langit">{CLOCKS[steps.length]}</span>
-                  <Sparkles aria-hidden="true" className="size-3.5" />
-                  <span>dari pengendali AI</span>
-                </div>
-                <p className="mt-1.5 text-lg leading-relaxed">{pending.situation}</p>
+              <Slot i={steps.length} map={false}>
+                <p className="text-lg leading-relaxed">{pending.situation}</p>
                 <p className="mt-2 text-lg font-bold">{pending.question}</p>
                 {answer ? (
                   <>
@@ -550,17 +579,12 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
                 ) : (
                   <Choices key={steps.length} inject={pending} busy={busy} onDecide={decide} />
                 )}
-              </div>
+              </Slot>
             )}
 
             {(stage === "gedung" || stage === "kumpul") && (
-              <div className="border-t border-malam-3 pt-4">
-                <div className="flex items-center gap-2 text-sm text-redup">
-                  <span className="font-bold tabular-nums text-langit">{CLOCKS[steps.length]}</span>
-                  <Cpu aria-hidden="true" className="size-3.5" />
-                  <span>keputusan di peta</span>
-                </div>
-                <p className="mt-1.5 text-lg leading-relaxed">{ask?.situation}</p>
+              <Slot i={steps.length} map>
+                <p className="text-lg leading-relaxed">{ask?.situation}</p>
                 <p className="mt-2 text-lg font-bold">{ask?.question}</p>
                 <p className="mt-3 text-redup">Klik di peta, atau pilih:</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
@@ -584,7 +608,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
                     {previewRoute.meters} m, sekitar {Math.round(previewRoute.meters / 1.5)} detik berjalan
                   </p>
                 )}
-              </div>
+              </Slot>
             )}
 
             {stage === "lanjut" && (

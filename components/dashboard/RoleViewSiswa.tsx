@@ -3,10 +3,11 @@
 import { CircleCheck, CircleDashed, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { HAZARD_ICON } from "@/components/hazards";
 import type { Me } from "@/components/RequireAuth";
 import { num } from "@/lib/format";
 import { SCENARIO_LABEL, type Scenario } from "@/lib/sim";
-import type { School } from "@/lib/supabase";
+import { avatarOf, type School } from "@/lib/supabase";
 import { Facts, PrintSheet, primaryBtn, secondaryBtn } from "./ui";
 
 export type DrillRecord = {
@@ -40,14 +41,25 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
     ["Sekolah", school?.name ?? "Belum terhubung"],
     ["Latihan selesai", `${drills.length} kali`],
     ["Rata-rata skor", average === null ? "Belum ada" : `${num(average)} dari ${num(1200)}`],
+    ["Batas lulus", `${PASS} dari ${num(1200)}`],
   ];
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-6">
-        <h2 className="max-w-[24ch] text-3xl font-extrabold tracking-tight sm:text-4xl">
-          {me.profile.display_name} lulus {passed} dari 4 skenario.
-        </h2>
+        <div className="flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element -- 128px sprites, nothing to optimise */}
+          <img
+            src={`/characters/previews/${avatarOf(me.profile.avatar)}.png`}
+            alt=""
+            width={64}
+            height={64}
+            className="size-16 shrink-0 rounded-full border-2 border-laut bg-malam-2 sm:size-20"
+          />
+          <h2 className="max-w-[24ch] text-3xl font-extrabold tracking-tight sm:text-4xl">
+            {me.profile.display_name} lulus {passed} dari 4 skenario.
+          </h2>
+        </div>
         <div className="flex flex-wrap gap-3">
           <Link href={room} className={primaryBtn}>
             Latihan evakuasi
@@ -59,42 +71,41 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="overflow-x-auto rounded-lg border border-malam-3">
-          <table className="w-full text-left sm:min-w-[32rem]">
-            <caption className="sr-only">Rapor latihan per skenario</caption>
-            <thead className="border-b border-malam-3 text-redup">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium">Skenario</th>
-                <th scope="col" className="whitespace-nowrap px-4 py-3 text-right font-medium">Skor terbaik</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium max-sm:hidden">Waktu</th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Status<span className="max-sm:hidden"> (lulus ≥ {PASS})</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-malam-3">
-              {stats.map((s) => (
-                <tr key={s.kind}>
-                  <th scope="row" className="px-4 py-3 font-semibold">{SCENARIO_LABEL[s.kind]}</th>
-                  <td className="px-4 py-3 text-right tabular-nums">{s.best?.score ?? "–"}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-redup max-sm:hidden">{s.best ? `${num(s.best.time_s, 1)} dtk` : "–"}</td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5">
-                      {s.passed ? (
-                        <CircleCheck aria-hidden="true" className="size-4 text-aman" />
-                      ) : s.attempts ? (
-                        <TriangleAlert aria-hidden="true" className="size-4 text-fajar" />
-                      ) : (
-                        <CircleDashed aria-hidden="true" className="size-4 text-redup" />
-                      )}
-                      {s.passed ? "Lulus" : s.attempts ? `Belum lulus, ${s.attempts}× dicoba` : "Belum dicoba"}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul aria-label="Rapor latihan per skenario" className="grid gap-3 sm:grid-cols-2">
+          {stats.map((s) => {
+            const Icon = HAZARD_ICON[s.kind];
+            return (
+              <li key={s.kind} className="space-y-3 rounded-lg border border-malam-3 bg-malam-2 p-4">
+                <p className="flex items-center gap-3 text-lg font-bold">
+                  <Icon aria-hidden="true" className="size-5 shrink-0 text-langit" />
+                  <span className="flex-1">{SCENARIO_LABEL[s.kind]}</span>
+                  <span className="tabular-nums">{s.best?.score ?? "–"}</span>
+                </p>
+                {/* The tick marks the pass score. */}
+                <div aria-hidden="true" className="relative h-2 rounded-full bg-malam-3">
+                  {s.best && (
+                    <div
+                      className={`h-full origin-left rounded-full motion-safe:animate-grow ${s.passed ? "bg-aman" : "bg-langit"}`}
+                      style={{ width: `${Math.min(100, (s.best.score / 1200) * 100)}%` }}
+                    />
+                  )}
+                  <span className="absolute -inset-y-1 w-0.5 rounded-full bg-pasir/70" style={{ left: `${(PASS / 1200) * 100}%` }} />
+                </div>
+                <p className="flex items-center gap-1.5">
+                  {s.passed ? (
+                    <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-aman" />
+                  ) : s.attempts ? (
+                    <TriangleAlert aria-hidden="true" className="size-4 shrink-0 text-fajar" />
+                  ) : (
+                    <CircleDashed aria-hidden="true" className="size-4 shrink-0 text-redup" />
+                  )}
+                  <span className="flex-1">{s.passed ? "Lulus" : s.attempts ? `Belum lulus, ${s.attempts}× dicoba` : "Belum dicoba"}</span>
+                  {s.best && <span className="tabular-nums text-redup">{num(s.best.time_s, 1)} dtk</span>}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
         <Facts items={facts} />
       </div>
 

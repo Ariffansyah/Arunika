@@ -78,6 +78,10 @@ body {
     text-wrap: balance;
   }
 
+  h2[id] {
+    scroll-margin-top: 4rem;
+  }
+
   p,
   li {
     text-wrap: pretty;
@@ -107,6 +111,13 @@ body {
       animation-range: entry var(--delay, 0%) entry calc(75% + var(--delay, 0%));
     }
 
+    .draw {
+      stroke-dasharray: 1;
+      animation: draw linear both;
+      animation-timeline: view();
+      animation-range: entry 30% cover 55%;
+    }
+
     .parallax-fore,
     .parallax-back {
       animation: var(--name) linear both;
@@ -126,6 +137,12 @@ body {
   from {
     opacity: 0;
     transform: translateY(56px) scale(0.97);
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
   }
 }
 

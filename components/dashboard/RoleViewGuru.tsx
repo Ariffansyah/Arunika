@@ -6,12 +6,13 @@ import { useState } from "react";
 import type { Me } from "@/components/RequireAuth";
 import { num } from "@/lib/format";
 import { SCENARIO_LABEL, type Scenario } from "@/lib/sim";
-import type { School } from "@/lib/supabase";
+import { avatarOf, type School } from "@/lib/supabase";
 import { Facts, primaryBtn, secondaryBtn } from "./ui";
 
 export type SchoolDrillItem = {
   id: number;
   user_name: string;
+  user_avatar: number;
   scenario: Scenario["kind"];
   score: number;
   time_s: number;
@@ -123,7 +124,13 @@ export default function RoleViewGuru({ me, school, drills }: { me: Me; school: S
               <tbody className="divide-y divide-malam-3">
                 {drills.slice(0, 10).map((d) => (
                   <tr key={d.id}>
-                    <th scope="row" className="px-4 py-3 font-semibold">{d.user_name}</th>
+                    <th scope="row" className="px-4 py-2.5 font-semibold">
+                      <span className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- 128px sprites, nothing to optimise */}
+                        <img src={`/characters/previews/${avatarOf(d.user_avatar)}.png`} alt="" width={36} height={36} className="size-9 shrink-0 rounded-full bg-malam-3" />
+                        {d.user_name}
+                      </span>
+                    </th>
                     <td className="px-4 py-3 text-redup max-sm:hidden">{SCENARIO_LABEL[d.scenario]}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{d.score}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-redup max-sm:hidden">{num(d.time_s, 1)} dtk</td>

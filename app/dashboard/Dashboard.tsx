@@ -12,7 +12,7 @@ import {
   type Recommendation,
 } from "@/lib/assessment";
 import { structureRisk, type Scenario } from "@/lib/sim";
-import { ROLE_LABEL, supabase, type Role, type School } from "@/lib/supabase";
+import { ROLE_LABEL, supabase, type Profile, type Role, type School } from "@/lib/supabase";
 import RoleViewGuru, { type SchoolDrillItem } from "@/components/dashboard/RoleViewGuru";
 import RoleViewKepalaSekolah from "@/components/dashboard/RoleViewKepalaSekolah";
 import RoleViewPemda from "@/components/dashboard/RoleViewPemda";
@@ -170,7 +170,7 @@ function Board({ me }: { me: Me }) {
     const targetSchoolId = me.profile.school_id;
     if (targetSchoolId) {
       sb.from("drill_results")
-        .select("id, scenario, score, time_s, reached, created_at, profiles(display_name)")
+        .select("id, scenario, score, time_s, reached, created_at, profiles(display_name, avatar)")
         .eq("school_id", targetSchoolId)
         .order("created_at", { ascending: false })
         .limit(20)
@@ -183,19 +183,21 @@ function Board({ me }: { me: Me }) {
               time_s: number;
               reached: boolean;
               created_at: string;
-              profiles: { display_name: string } | { display_name: string }[] | null;
+              profiles: Pick<Profile, "display_name" | "avatar"> | Pick<Profile, "display_name" | "avatar">[] | null;
             };
-            const formatted: SchoolDrillItem[] = (data as unknown as DrillQueryItem[]).map((d) => ({
-              id: d.id,
-              scenario: d.scenario,
-              score: d.score,
-              time_s: d.time_s,
-              reached: d.reached,
-              created_at: d.created_at,
-              user_name: Array.isArray(d.profiles)
-                ? d.profiles[0]?.display_name || "Siswa"
-                : d.profiles?.display_name || "Siswa",
-            }));
+            const formatted: SchoolDrillItem[] = (data as unknown as DrillQueryItem[]).map((d) => {
+              const who = Array.isArray(d.profiles) ? d.profiles[0] : d.profiles;
+              return {
+                id: d.id,
+                scenario: d.scenario,
+                score: d.score,
+                time_s: d.time_s,
+                reached: d.reached,
+                created_at: d.created_at,
+                user_name: who?.display_name || "Siswa",
+                user_avatar: who?.avatar ?? 0,
+              };
+            });
             setSchoolDrills(formatted);
           }
         });
@@ -356,7 +358,7 @@ function Board({ me }: { me: Me }) {
                 onSelect={setSelected}
               />
             </div>
-            <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-malam-3 bg-malam-2 px-3 py-2.5 text-sm">
+            <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-malam-3 bg-malam-2 px-4 py-3">
               {[...STATUS, NO_DATA].map((s) => (
                 <span key={s.label} className="inline-flex items-center gap-1.5">
                   <s.Icon aria-hidden="true" className="size-4" style={{ color: s.color }} />
