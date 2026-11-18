@@ -24,13 +24,13 @@ export default function Lessons() {
         </h2>
         <fieldset className="sm:max-w-2xl">
           <legend className="sr-only">Bencana</legend>
-          <div className="grid grid-cols-2 gap-1 rounded-xl border border-malam-3 bg-malam-2 p-1 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-1 rounded-lg border border-malam-3 bg-malam-2 p-1 shadow-edge sm:grid-cols-4">
             {HAZARDS.map((k) => {
               const Icon = HAZARD_ICON[k];
               return (
                 <label
                   key={k}
-                  className="flex min-h-14 items-center justify-center gap-2.5 rounded-lg px-3 text-lg font-bold text-redup transition-colors hover:text-pasir has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit"
+                  className="flex min-h-14 items-center justify-center gap-2.5 rounded-md px-3 text-lg font-bold text-redup transition-colors duration-300 ease-crisp hover:bg-malam-3/50 hover:text-pasir has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit"
                 >
                   <input
                     type="radio"
@@ -59,7 +59,7 @@ export default function Lessons() {
               style={{ animationDelay: `${i * 60}ms` }}
               className="grid animate-rise grid-cols-[3rem_1fr] gap-4 py-5 text-lg leading-relaxed sm:grid-cols-[4.5rem_1fr] sm:text-xl"
             >
-              <span aria-hidden="true" className="text-3xl leading-none font-extrabold tabular-nums text-langit sm:text-4xl">
+              <span aria-hidden="true" className="font-mono text-3xl leading-none font-bold text-langit sm:text-4xl">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <p>
@@ -69,7 +69,7 @@ export default function Lessons() {
           ))}
         </ol>
 
-        <div key={`q-${kind}`} className="self-start rounded-2xl border border-malam-3 bg-malam-2 p-6 shadow-[0_30px_80px_-30px_rgb(0_0_0/0.7)] sm:p-7">
+        <div key={`q-${kind}`} className="track self-start rounded-lg border border-malam-3 bg-malam-2 p-6 shadow-edge sm:p-7">
           <h3 className="text-2xl leading-snug font-extrabold tracking-tight">{q.q}</h3>
           <div role="group" aria-label="Jawaban" className="mt-6 space-y-2.5">
             {q.options.map((o, i) => {
@@ -81,7 +81,7 @@ export default function Lessons() {
                   type="button"
                   disabled={picked !== null}
                   onClick={() => setPicked(i)}
-                  className={`flex min-h-13 w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-lg font-semibold transition-colors enabled:hover:border-laut enabled:active:translate-y-px ${
+                  className={`flex min-h-13 w-full items-center gap-3 rounded-md border px-4 py-3 text-left text-lg font-semibold transition-colors duration-300 ease-crisp enabled:hover:border-laut enabled:hover:bg-malam-3/40 enabled:active:translate-y-px ${
                     shown ? (right ? "border-aman bg-aman/10" : "border-bahaya bg-bahaya/10") : "border-malam-3 bg-malam"
                   } disabled:cursor-default`}
                 >

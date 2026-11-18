@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import { predict } from "@/components/campus/drillStore";
 import { ASSEMBLY_NAMES, GRID, SPAWN, tileAt } from "@/lib/campus";
@@ -28,7 +28,7 @@ export default function PlanDemo() {
     // A faint survey grid: this section is the site plan the drill is played on.
     <section
       aria-labelledby="coba"
-      className="border-y border-malam-3 bg-malam-2 bg-[linear-gradient(rgb(175_196_236/0.05)_1px,transparent_1px),linear-gradient(90deg,rgb(175_196_236/0.05)_1px,transparent_1px)] bg-[size:32px_32px]"
+      className="grain border-y border-malam-3 bg-malam-2 bg-[linear-gradient(rgb(175_196_236/0.05)_1px,transparent_1px),linear-gradient(90deg,rgb(175_196_236/0.05)_1px,transparent_1px)] bg-[size:32px_32px]"
     >
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,25rem)_1fr] lg:gap-16 lg:py-28">
         <div className="flex flex-col gap-8">
@@ -37,11 +37,11 @@ export default function PlanDemo() {
           </h2>
           <fieldset>
             <legend className="sr-only">Skenario</legend>
-            <div className="grid grid-cols-2 rounded-lg border border-malam-3 bg-malam p-1">
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-malam-3 bg-malam p-1 shadow-edge">
               {(["banjir", "gempa"] as const).map((k) => (
                 <label
                   key={k}
-                  className="flex min-h-12 items-center justify-center rounded-md px-3 font-semibold text-redup hover:text-pasir has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit"
+                  className="flex min-h-12 items-center justify-center rounded-md px-3 font-semibold text-redup transition-colors duration-300 ease-crisp hover:bg-malam-3/50 hover:text-pasir has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit"
                 >
                   <input
                     type="radio"
@@ -56,7 +56,7 @@ export default function PlanDemo() {
             </div>
           </fieldset>
           <label htmlFor="demo-intensity" className="block text-lg font-semibold">
-            {meta.label} <span className="tabular-nums text-langit">{`${num(scenario.intensity, 1)} ${meta.unit}`.trim()}</span>
+            {meta.label} <span className="font-mono text-langit">{`${num(scenario.intensity, 1)} ${meta.unit}`.trim()}</span>
             <input
               id="demo-intensity"
               type="range"
@@ -65,7 +65,8 @@ export default function PlanDemo() {
               step={meta.step}
               value={scenario.intensity}
               onChange={(e) => setScenario({ ...scenario, intensity: Number(e.target.value) })}
-              className="mt-4 block w-full accent-langit"
+              style={{ "--fill": `${((scenario.intensity - meta.range[0]) / (meta.range[1] - meta.range[0])) * 100}%` } as CSSProperties}
+              className="range mt-3 block w-full"
             />
           </label>
           <p role="status" className="text-2xl leading-snug font-semibold lg:mt-auto">
@@ -81,7 +82,7 @@ export default function PlanDemo() {
             )}
           </p>
         </div>
-        <figure className="self-start overflow-hidden rounded-xl border border-malam-3 bg-malam shadow-[0_30px_80px_-30px_rgb(0_0_0/0.7)]">
+        <figure className="self-start overflow-hidden rounded-lg border border-malam-3 bg-malam shadow-edge">
           <CampusPlan
             labels={1.2}
             route={route ?? undefined}

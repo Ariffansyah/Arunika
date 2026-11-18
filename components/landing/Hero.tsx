@@ -40,13 +40,13 @@ export default function Hero() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[70%] bg-[linear-gradient(0deg,#071530_15%,rgb(7_21_48/0.8)_45%,transparent)] lg:inset-y-0 lg:left-0 lg:h-auto lg:w-[62%] lg:bg-[linear-gradient(90deg,#071530_0%,rgb(7_21_48/0.86)_40%,rgb(7_21_48/0.4)_70%,transparent)]"
       />
-      <div className="absolute top-16 right-4 flex items-center gap-2 sm:right-6">
+      <div className="absolute top-16 right-4 flex animate-rise items-center gap-2 [animation-delay:450ms] sm:right-6">
         <p
           aria-hidden="true"
           className="hidden min-h-11 items-center gap-2 rounded-md border border-pasir/20 bg-malam/70 px-3 text-sm text-pasir/90 md:flex"
         >
           <span className={`size-2 rounded-full bg-langit ${paused ? "" : "animate-pulse"}`} />
-          Simulasi banjir · air <span ref={levelRef} className="min-w-[3.5ch] font-bold tabular-nums">0,0 m</span>
+          Simulasi banjir · air <span ref={levelRef} className="min-w-[5ch] font-mono font-semibold">0,0 m</span>
         </p>
         <button
           type="button"
@@ -62,19 +62,19 @@ export default function Hero() {
           Hafal jalan selamat <span className="text-fajar">sebelum</span> bencana datang.
         </h1>
       </div>
-      <nav aria-label="Pilih sekolah latihan" className="animate-rise border-t border-pasir/15 bg-malam/90 [animation-delay:200ms]">
+      <nav aria-label="Pilih sekolah latihan" className="border-t border-pasir/15 bg-malam/90">
         <ul className="mx-auto grid max-w-6xl divide-y divide-pasir/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0 lg:border-x lg:border-pasir/10">
-          {CAMPUSES.map(({ id, hazard }) => (
-            <li key={id}>
+          {CAMPUSES.map(({ id, hazard }, i) => (
+            <li key={id} className="animate-rise" style={{ animationDelay: `${200 + i * 90}ms` }}>
               <Link
                 href={`/sekolah?peta=${id}`}
-                className="group flex min-h-18 items-center gap-4 px-4 py-3 transition-colors duration-200 hover:bg-laut focus-visible:bg-laut sm:px-6 lg:px-5 lg:py-5"
+                className="group flex min-h-18 items-center gap-4 px-4 py-3 transition-colors duration-300 ease-crisp hover:bg-laut focus-visible:bg-laut sm:px-6 lg:px-5 lg:py-5"
               >
                 <SitePlan id={id} className="h-auto w-16 shrink-0 rounded-sm bg-malam-2 xl:w-20" />
                 <span className="flex-1 text-xl leading-tight font-bold">
                   {MAPS[id]!.name} <span className="font-medium text-redup group-hover:text-pasir/85">{hazard}</span>
                 </span>
-                <ArrowRight aria-hidden="true" className="size-6 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
+                <ArrowRight aria-hidden="true" className="size-6 shrink-0 transition-transform duration-300 ease-crisp group-hover:translate-x-1.5" />
               </Link>
             </li>
           ))}

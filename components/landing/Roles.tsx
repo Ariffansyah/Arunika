@@ -145,7 +145,7 @@ export default function Roles() {
               return (
                 <label
                   key={r}
-                  className="flex min-h-14 items-center gap-3 rounded-xl border border-malam-3 px-4 font-bold sm:text-lg text-redup transition-colors hover:border-redup hover:text-pasir has-checked:border-laut has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit lg:min-h-18 lg:text-xl"
+                  className="flex min-h-14 items-center gap-3 rounded-md border border-malam-3 px-4 font-bold text-redup transition-colors duration-300 ease-crisp hover:border-redup hover:text-pasir has-checked:border-laut has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit sm:text-lg lg:min-h-18 lg:text-xl"
                 >
                   <input type="radio" name="landing-role" className="sr-only" checked={role === r} onChange={() => setRole(r)} />
                   <Icon aria-hidden="true" className="size-5 shrink-0" />
@@ -155,7 +155,7 @@ export default function Roles() {
             })}
           </div>
         </fieldset>
-        <div className="flex flex-col gap-6 rounded-2xl border border-malam-3 bg-malam-2 p-5 shadow-[0_30px_80px_-30px_rgb(0_0_0/0.7)] sm:p-8">
+        <div className="track flex flex-col gap-6 rounded-lg border border-malam-3 bg-malam-2 p-5 shadow-edge sm:p-8">
           <div key={role} className="flex animate-rise flex-col gap-6">
             <View role={role} />
           </div>

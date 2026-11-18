@@ -1,15 +1,15 @@
 "use client";
 
-import { ArrowRight, Link2, Mic, ShieldCheck } from "lucide-react";
+import { ArrowRight, Link2, Mic, Plus, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import { ASSEMBLY, ASSEMBLY_NAMES, GRID, SPAWN, TILE, findTiles, tileAt } from "@/lib/campus";
 import { num } from "@/lib/format";
 import { WALK_SPEED, bestRoute, pathLength } from "@/lib/sim";
 import { AVATARS } from "@/lib/supabase";
 
-const CLASS = ["Rani", "Bayu", "Sekar", "Dimas", "Ayu", "Nina"];
+const CLASS = ["Rani", "Bayu", "Sekar", "Dimas", "Ayu", "Nina", "Raka"];
 
 // Example answers in the shape the warden's prompt asks for: short, plain, and in BNPB's order.
 const ASK = [
@@ -40,11 +40,20 @@ const bestM = Math.round(pathLength(best) * TILE);
 const trailM = Math.round(pathLength(trail) * TILE);
 const centre = (t: [number, number][]) => t.map(([x, z]) => `${x + 0.5},${z + 0.5}`).join(" ");
 
-const card = "rounded-2xl border border-malam-3 bg-malam-2 p-5 sm:p-7";
+const card = "track rounded-lg border border-malam-3 bg-malam-2 p-5 shadow-edge sm:p-7";
 const cardTitle = "text-2xl leading-snug font-extrabold tracking-tight sm:text-3xl";
 
 export default function Drill() {
   const [ask, setAsk] = useState(0);
+  // Words of the answer typed so far, or null once it is whole. The first answer starts whole: it loads off screen.
+  const [typed, setTyped] = useState<number | null>(null);
+  const words = ASK[ask].a.split(" ");
+
+  useEffect(() => {
+    if (typed === null) return;
+    const t = setTimeout(() => setTyped(typed + 1 >= words.length ? null : typed + 1), typed === 0 ? 450 : 40);
+    return () => clearTimeout(t);
+  }, [typed, words.length]);
 
   return (
     <section aria-labelledby="bersama" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
@@ -54,7 +63,7 @@ export default function Drill() {
 
       <div className="mt-14 grid gap-5 lg:grid-cols-2">
         <article aria-labelledby="jejak" className={`${card} reveal grid gap-6 lg:col-span-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-10`}>
-          <div className="self-start overflow-hidden rounded-xl border border-malam-3 lg:order-last">
+          <div className="self-start overflow-hidden rounded-md border border-malam-3 lg:order-last">
             <CampusPlan labels={1.2} route={best} label="Contoh jejak evakuasi seorang siswa yang memutar lewat gerbang, dan rute terbaik ke titik kumpul">
               <polyline
                 points={centre(trail)}
@@ -106,21 +115,33 @@ export default function Drill() {
           <h3 id="sekelas" className={cardTitle}>
             Satu tautan, satu kelas evakuasi serentak.
           </h3>
-          <ul className="grid grid-cols-3 gap-2">
+          <ul className="grid grid-cols-4 gap-2">
             {AVATARS.map((look, i) => (
               <li key={look} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element -- 128px sprites, nothing to optimise */}
-                <img src={`/characters/previews/${look}.png`} alt="" width={128} height={128} loading="lazy" className="aspect-square w-full rounded-xl bg-malam" />
-                <span className="absolute inset-x-1.5 bottom-1.5 flex items-center justify-center gap-1.5 rounded-md bg-malam/85 py-0.5 font-semibold">
-                  <span aria-hidden="true" className="size-1.5 rounded-full bg-langit" />
+                <img src={`/characters/previews/${look}.png`} alt="" width={128} height={128} loading="lazy" className="aspect-square w-full rounded-md bg-malam" />
+                <span className="absolute inset-x-1 bottom-1 flex items-center justify-center gap-1.5 rounded-sm bg-malam/85 py-0.5 text-sm font-semibold sm:text-base">
+                  <span aria-hidden="true" className="size-1.5 shrink-0 animate-pulse rounded-full bg-langit" style={{ animationDelay: `${i * 270}ms` }} />
                   {CLASS[i]}
                 </span>
               </li>
             ))}
+            <li>
+              {/* The same room as the link below, as the empty seat it fills; kept out of the tab order. */}
+              <Link
+                href="/sekolah?room=umum"
+                tabIndex={-1}
+                aria-hidden="true"
+                className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-redup/40 font-semibold text-redup transition-colors duration-300 ease-crisp hover:border-laut hover:text-pasir"
+              >
+                <Plus className="size-6" />
+                Kamu
+              </Link>
+            </li>
           </ul>
           <Link
             href="/sekolah?room=umum"
-            className="group flex min-h-13 items-center gap-3 rounded-lg border border-malam-3 bg-malam px-4 font-semibold transition-colors hover:border-laut"
+            className="group flex min-h-13 items-center gap-3 rounded-md border border-malam-3 bg-malam px-4 font-semibold transition-colors duration-300 ease-crisp hover:border-laut"
           >
             <Link2 aria-hidden="true" className="size-5 shrink-0 text-langit" />
             <span className="flex-1">Masuk ruang umum</span>
@@ -138,31 +159,42 @@ export default function Drill() {
                 key={x.chip}
                 type="button"
                 aria-pressed={ask === i}
-                onClick={() => setAsk(i)}
-                className="min-h-11 rounded-full border border-malam-3 px-4 font-semibold text-redup transition-colors hover:text-pasir aria-pressed:border-laut aria-pressed:bg-laut aria-pressed:text-white"
+                onClick={() => {
+                  if (ask === i) return;
+                  setAsk(i);
+                  setTyped(matchMedia("(prefers-reduced-motion: reduce)").matches ? null : 0);
+                }}
+                className="min-h-11 rounded-md border border-malam-3 px-4 font-semibold text-redup transition-colors duration-300 ease-crisp hover:border-redup hover:text-pasir aria-pressed:border-laut aria-pressed:bg-laut aria-pressed:text-white"
               >
                 {x.chip}
               </button>
             ))}
           </div>
           <div key={ask} aria-live="polite" className="space-y-3 leading-relaxed">
-            <p className="ml-auto w-fit max-w-[88%] animate-rise rounded-2xl rounded-br-md bg-laut px-4 py-2.5 text-white">{ASK[ask].q}</p>
+            <p className="ml-auto w-fit max-w-[88%] animate-rise rounded-lg rounded-br-sm bg-laut px-4 py-2.5 text-white">{ASK[ask].q}</p>
             <div className="flex animate-rise gap-3 [animation-delay:200ms]">
               <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-full bg-aman/15 text-aman">
                 <ShieldCheck className="size-5" />
               </span>
-              <p className="rounded-2xl rounded-tl-md bg-malam px-4 py-2.5">
-                <span className="sr-only">Petugas AI: </span>
-                {ASK[ask].a}
+              {/* The whole answer sits invisible underneath, so the bubble keeps its final size while the words arrive. */}
+              <p className="grid rounded-lg rounded-tl-sm border border-malam-3 bg-malam px-4 py-2.5">
+                <span className="sr-only">Petugas AI: {ASK[ask].a}</span>
+                <span aria-hidden="true" className="invisible col-start-1 row-start-1">
+                  {ASK[ask].a}
+                </span>
+                <span aria-hidden="true" className="col-start-1 row-start-1">
+                  {typed === null ? ASK[ask].a : words.slice(0, typed).join(" ")}
+                  {typed !== null && <span className="ml-0.5 inline-block h-[1.1em] w-0.5 translate-y-[0.2em] animate-pulse bg-langit" />}
+                </span>
               </p>
             </div>
           </div>
           <Link
             href="/sekolah"
-            className="group mt-auto flex min-h-13 items-center gap-3 rounded-full border border-malam-3 bg-malam pr-2 pl-5 font-semibold transition-colors hover:border-laut"
+            className="group mt-auto flex min-h-13 items-center gap-3 rounded-md border border-malam-3 bg-malam pr-1.5 pl-4 font-semibold transition-colors duration-300 ease-crisp hover:border-laut"
           >
             <span className="flex-1 text-redup group-hover:text-pasir">Tanya Petugas AI</span>
-            <span aria-hidden="true" className="flex size-10 items-center justify-center rounded-full bg-laut text-white">
+            <span aria-hidden="true" className="flex size-10 items-center justify-center rounded-sm bg-laut text-white transition-colors group-hover:bg-laut-terang">
               <Mic className="size-5" />
             </span>
           </Link>
