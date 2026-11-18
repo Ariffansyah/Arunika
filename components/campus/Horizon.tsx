@@ -7,15 +7,20 @@ import { Instances, M, type Placement } from "@/components/Model";
 import { MAP, SITE_D, SITE_W, TILE, elevationAt, findTiles, isBlocked, surfaceAt, tileAt } from "@/lib/campus";
 import type { Setting } from "@/lib/maps";
 import { random } from "@/lib/sim";
+import { TIER, useDrill } from "./drillStore";
 
 const CX = SITE_W / 2;
 const CZ = SITE_D / 2;
 
-// Light and air for each map: a coastal sunset, a misty mountain morning, a hazy city noon.
-export const LOOK: Record<Setting, { sky: [number, number, number]; light: [number, number, number]; fog: [number, number]; fogColor: string; ground: string }> = {
-  pesisir: { sky: [100, 6, -60], light: [CX + 90, 66, CZ - 54], fog: [140, 900], fogColor: "#d9b08c", ground: "#6f8f4c" },
-  pegunungan: { sky: [100, 22, 40], light: [CX + 100, 55, CZ + 40], fog: [90, 620], fogColor: "#c3cfd2", ground: "#5d8443" },
-  kota: { sky: [-30, 70, -40], light: [CX - 40, 95, CZ - 50], fog: [110, 620], fogColor: "#cbc3b5", ground: "#8f9283" },
+// Light and air for each map at drill time, mid-morning: sea haze on the coast, mist in the mountains, a pale city sky.
+// The sun stands high enough that rooms are lit by the sky and the shade under trees reads as noon-ish shade.
+export const LOOK: Record<
+  Setting,
+  { sky: [number, number, number]; light: [number, number, number]; fog: [number, number]; fogColor: string; ground: string; sun: string }
+> = {
+  pesisir: { sky: [100, 62, -60], light: [CX + 80, 92, CZ - 60], fog: [160, 900], fogColor: "#cfdbe2", ground: "#6f8f4c", sun: "#fff1d9" },
+  pegunungan: { sky: [100, 46, 40], light: [CX + 100, 84, CZ + 40], fog: [90, 620], fogColor: "#c9d5da", ground: "#5d8443", sun: "#fff4e3" },
+  kota: { sky: [-30, 80, -40], light: [CX - 40, 104, CZ - 50], fog: [110, 620], fogColor: "#d3d5d1", ground: "#8f9283", sun: "#fff6ea" },
 };
 
 // A band of hills on a circle round the campus, from angle a0 to a1 (radians, 0 is east, π/2 south),
@@ -247,13 +252,15 @@ const rand = (i: number) => {
 };
 
 // A belt of trees outside the fence, thickening with distance, kept off the road and the beach.
-function TreeBelt() {
+function TreeBelt({ share }: { share: number }) {
   const sets = useMemo(() => {
     const kinds = MAP.id === "pegunungan" ? [M.pines[4], M.pines[2], M.trees[4]] : MAP.id === "kota" ? [M.trees[4]] : [M.trees[4], M.palms[0], M.palms[3]];
     const count = MAP.id === "kota" ? 70 : 520;
     const out = kinds.map(() => [] as Placement[]);
     for (let i = 0; i < count; i++) {
       const a = rand(i) * Math.PI * 2;
+      // The distance grows with this draw, so a lighter tier keeping the low draws keeps the nearer trees.
+      if (rand(i + 500) > share) continue;
       const r = 80 + Math.sqrt(rand(i + 500)) * 220;
       const x = CX + Math.cos(a) * r * 1.2;
       const z = CZ + Math.sin(a) * r;
@@ -265,7 +272,7 @@ function TreeBelt() {
       out[k].push({ x, y: 0, z, ry: rand(i + 77) * Math.PI * 2, size: [0, h, 0] });
     }
     return kinds.map((src, k) => ({ src, items: out[k] }));
-  }, []);
+  }, [share]);
   return sets.map((s) => <Instances key={s.src} src={s.src} items={s.items} shadows={false} />);
 }
 
@@ -306,6 +313,7 @@ function Undergrowth() {
 
 export default function Horizon() {
   const look = LOOK[MAP.id];
+  const tier = TIER[useDrill((s) => s.quality)];
   return (
     <>
       <mesh rotation-x={-Math.PI / 2} position={[CX, 0.03, (SITE_D - 480) / 2]} receiveShadow>
@@ -339,8 +347,8 @@ export default function Horizon() {
         </>
       )}
       <Suspense fallback={null}>
-        <TreeBelt />
-        <Undergrowth />
+        <TreeBelt share={tier.trees} />
+        {tier.grass && <Undergrowth />}
       </Suspense>
     </>
   );

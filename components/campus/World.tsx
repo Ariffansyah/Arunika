@@ -1,6 +1,6 @@
 "use client";
 
-import { Line, Sky } from "@react-three/drei";
+import { Line, PerformanceMonitor, Sky } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import {
@@ -45,7 +45,7 @@ import Avatar from "./Avatar";
 import { Buildings } from "./Building";
 import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, Landslide, QuakeDebris, Rain, Vortex } from "./Effects";
 import { fadeTo, hides } from "./fade";
-import { drillTime, fallenAt, getState, player, predict, run, useDrill } from "./drillStore";
+import { TIER, drillTime, fallenAt, getState, lowerQuality, player, predict, run, useDrill } from "./drillStore";
 import { wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
@@ -562,13 +562,22 @@ function Route() {
 
 function Sun({
   position = [SITE_W / 2 + 90, 66, SITE_D / 2 - 54],
+  color = "#ffc48a",
   follow = false,
 }: {
   position?: [number, number, number];
+  color?: string;
   follow?: boolean;
 }) {
   const ref = useRef<DirectionalLight>(null);
   const scene = useThree((s) => s.scene);
+  const tier = TIER[useDrill((s) => s.quality)];
+  // three keeps the old shadow map when the size changes; dropping it makes the next frame build one at the new size.
+  useLayoutEffect(() => {
+    const light = ref.current!;
+    light.shadow.map?.dispose();
+    light.shadow.map = null;
+  }, [tier.shadowSize]);
   useLayoutEffect(() => {
     const light = ref.current!;
     light.target.position.set(SITE_W / 2, 0, SITE_D / 2);
@@ -592,10 +601,10 @@ function Sun({
     <directionalLight
       ref={ref}
       position={position}
-      color="#ffc48a"
+      color={color}
       intensity={2.2}
-      castShadow
-      shadow-mapSize={[2048, 2048]}
+      castShadow={tier.shadows}
+      shadow-mapSize={[tier.shadowSize || 512, tier.shadowSize || 512]}
       shadow-camera-left={-half}
       shadow-camera-right={half}
       shadow-camera-top={half}
@@ -605,27 +614,58 @@ function Sun({
   );
 }
 
+// Without `sun` it is the landing page's dawn: a low orange sun under a warm sky. With it, daylight.
 export function Backdrop({
   sky = [100, 6, -60],
   light,
   fog = [120, 420],
   fogColor = "#d9b08c",
+  sun,
   follow = false,
 }: {
   sky?: [number, number, number];
   light?: [number, number, number];
   fog?: [number, number];
   fogColor?: string;
+  sun?: string;
   follow?: boolean;
 }) {
   return (
     <>
-      <Sky sunPosition={sky} turbidity={7} rayleigh={2.2} mieCoefficient={0.008} />
+      {sun ? (
+        <Sky sunPosition={sky} turbidity={3.5} rayleigh={1.1} mieCoefficient={0.004} mieDirectionalG={0.8} />
+      ) : (
+        <Sky sunPosition={sky} turbidity={7} rayleigh={2.2} mieCoefficient={0.008} />
+      )}
       <fog attach="fog" args={[fogColor, ...fog]} />
-      <hemisphereLight args={["#ffe2c2", "#22324f", 0.9]} />
-      <Sun position={light} follow={follow} />
+      <hemisphereLight args={sun ? ["#d6e7ff", "#6a6047", 1.15] : ["#ffe2c2", "#22324f", 0.9]} />
+      <Sun position={light} color={sun} follow={follow} />
     </>
   );
+}
+
+// Eyes and cameras adapt: indoors, lit only by the sky through the windows, exposure rises so the room reads
+// as the bright classroom it is, and the view outside the windows blooms the way it does on a phone camera.
+function Exposure() {
+  const get = useThree((s) => s.get);
+  useFrame((_, dt) => {
+    const { gl } = get();
+    const inside = getState().phase !== "idle" && !!buildingAt(player.x, player.z);
+    const target = inside ? 1.5 : 1;
+    gl.toneMappingExposure += (target - gl.toneMappingExposure) * (1 - Math.exp(-dt * 2.5));
+  });
+  return null;
+}
+
+// The camera's far plane is only read when the canvas is made; later tiers set it here.
+function Far({ far }: { far: number }) {
+  const get = useThree((s) => s.get);
+  useLayoutEffect(() => {
+    const { camera } = get();
+    camera.far = far;
+    camera.updateProjectionMatrix();
+  }, [get, far]);
+  return null;
 }
 
 export default function World({
@@ -640,15 +680,21 @@ export default function World({
   const scenario = useDrill((s) => s.scenario);
   const showRisk = useDrill((s) => s.showRisk);
   const { risks, hazards, goals } = useMemo(() => predict(scenario, school), [scenario, school]);
+  const tier = TIER[useDrill((s) => s.quality)];
 
   return (
     <Canvas
       shadows="percentage"
-      dpr={[1, 2]}
-      camera={{ fov: 55, near: 0.1, far: 1500 }}
+      dpr={tier.dpr}
+      // Antialiasing is fixed when the context is made, so it follows the tier the page opened with.
+      gl={{ antialias: getState().quality !== "ringan", powerPreference: "high-performance" }}
+      camera={{ fov: 55, near: 0.1, far: tier.far }}
       style={{ touchAction: "none" }}
       aria-label="Kampus sekolah"
     >
+      <PerformanceMonitor onDecline={lowerQuality} flipflops={3} />
+      <Far far={tier.far} />
+      <Exposure />
       <Backdrop {...LOOK[MAP.id]} follow />
       <Storm />
       <Scenery />

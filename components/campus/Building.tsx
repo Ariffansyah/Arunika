@@ -22,7 +22,7 @@ import { BUILDINGS } from "@/lib/campus";
 import { CEILING, PLAN, STOREY, WALL, type Box, type Door, type Furniture, type Part, type PartKind, type Spot } from "@/lib/floorplan";
 import { buildingAt } from "@/lib/nav";
 import { random } from "@/lib/sim";
-import { aftershockAt, collapsed, drillTime, fallTilt, getState, player, run, shakingAt, useDrill } from "./drillStore";
+import { TIER, aftershockAt, collapsed, drillTime, fallTilt, getState, player, run, shakingAt, useDrill } from "./drillStore";
 import { fadeTo, hides } from "./fade";
 
 const furniture = (m: Furniture) => `/models/furniture/${m}.glb`;
@@ -101,6 +101,37 @@ function roofTiles() {
   return texture;
 }
 
+// Ceramic floor tiles, 40 cm with grout, drawn in the shader on every face that looks up, in world space so a long
+// corridor slab and a small landing tile the same. No texture, no extra draw call.
+const TILE_VERTEX = /* glsl */ `
+  vec4 tileWorld = vec4(transformed, 1.0);
+  vec3 tileNormal = objectNormal;
+  #ifdef USE_INSTANCING
+    tileWorld = instanceMatrix * tileWorld;
+    tileNormal = mat3(instanceMatrix) * tileNormal;
+  #endif
+  vTilePos = (modelMatrix * tileWorld).xyz;
+  vTileUp = normalize(mat3(modelMatrix) * tileNormal).y;
+`;
+const TILE_FRAGMENT = /* glsl */ `
+  if (vTileUp > 0.9) {
+    vec2 cell = vTilePos.xz / 0.4;
+    vec2 edge = abs(fract(cell) - 0.5);
+    // Grout fades out where a tile is only a few pixels wide, so distant floors stay calm instead of shimmering.
+    float grout = smoothstep(0.46, 0.49, max(edge.x, edge.y)) * (1.0 - smoothstep(0.04, 0.12, max(fwidth(cell.x), fwidth(cell.y))));
+    float tone = fract(sin(dot(floor(cell), vec2(12.9898, 78.233))) * 43758.5453);
+    diffuseColor.rgb *= (0.95 + 0.07 * tone) * (1.0 - 0.2 * grout);
+  }
+`;
+function tileFloors(shader: { vertexShader: string; fragmentShader: string }) {
+  shader.vertexShader = shader.vertexShader
+    .replace("#include <common>", "#include <common>\nvarying vec3 vTilePos;\nvarying float vTileUp;")
+    .replace("#include <begin_vertex>", `#include <begin_vertex>\n${TILE_VERTEX}`);
+  shader.fragmentShader = shader.fragmentShader
+    .replace("#include <common>", "#include <common>\nvarying vec3 vTilePos;\nvarying float vTileUp;")
+    .replace("#include <color_fragment>", `#include <color_fragment>\n${TILE_FRAGMENT}`);
+}
+
 function Boxes({ parts, colorOf }: { parts: Part[]; colorOf: (p: Part) => Color | string }) {
   const ref = useRef<InstancedMesh>(null);
   useLayoutEffect(() => {
@@ -122,7 +153,7 @@ function Boxes({ parts, colorOf }: { parts: Part[]; colorOf: (p: Part) => Color 
   }, [parts, colorOf]);
   return (
     <instancedMesh ref={ref} args={[UNIT, undefined, parts.length]} castShadow receiveShadow>
-      <meshStandardMaterial />
+      <meshStandardMaterial onBeforeCompile={tileFloors} />
     </instancedMesh>
   );
 }
@@ -264,6 +295,8 @@ function SpotMesh({ s }: { s: Spot }) {
 }
 
 function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: number; showRisk: boolean }) {
+  // Furniture sits indoors where the sun barely reaches, so its shadow pass is the first thing a lighter tier drops.
+  const furnitureShadows = TIER[useDrill((s) => s.quality)].furnitureShadows;
   const { opaque, bands, glass, items, doors, spots } = useMemo(() => {
     const parts = PLAN.parts.filter((p) => p.b === b && p.floor === floor && p.kind !== "under" && p.kind !== "roof");
     const items: Partial<Record<Furniture, typeof PLAN.items>> = {};
@@ -305,7 +338,7 @@ function Storey({ b, floor, risk, showRisk }: { b: string; floor: number; risk: 
       {glass.length > 0 && <Glass parts={glass} />}
       <Suspense fallback={null}>
         {items.map(([model, list, tilt]) => (
-          <Instances key={model} src={furniture(model)} items={list} turn={TURN[model] ?? 0} tilt={tilt} />
+          <Instances key={model} src={furniture(model)} items={list} turn={TURN[model] ?? 0} tilt={tilt} shadows={furnitureShadows} />
         ))}
       </Suspense>
       {doors.map((d) => (
