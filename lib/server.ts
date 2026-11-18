@@ -59,9 +59,10 @@ async function hit(fn: "hit_rate_limit" | "hit_ip_rate_limit", args: Record<stri
 export const rateLimit = (userId: string, bucket: string, limit: number, windowS: number) =>
   hit("hit_rate_limit", { p_user: userId, p_bucket: bucket, p_limit: limit, p_window_s: windowS }, windowS);
 
-// The caller's address as the hosting proxy reports it. Vercel overwrites x-forwarded-for, so a client cannot forge
-// it there; any other host needs a proxy in front that does the same.
-const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+// The caller's address as a proxy saw it, never as the client claims it: Vercel's own header first, else the last
+// x-forwarded-for entry, which the nearest proxy appended. Earlier entries are whatever the client sent.
+const clientIp = (req: Request) =>
+  req.headers.get("x-vercel-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || "unknown";
 
 // Guest accounts cost nothing to make, so a per-user cap alone does not cap AI spend: this one counts per address.
 // A whole school can share one address, so its limits are wide. Addresses are stored only as salted hashes.

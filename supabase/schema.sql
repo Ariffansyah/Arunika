@@ -126,6 +126,7 @@ create table if not exists public.ip_rate_limits (
   hits int not null default 0,
   primary key (ip_hash, bucket, window_start)
 );
+create index if not exists ip_rate_limits_window_idx on public.ip_rate_limits (window_start);
 
 create or replace function public.hit_ip_rate_limit(p_ip text, p_bucket text, p_limit int, p_window_s int)
 returns boolean
@@ -133,7 +134,8 @@ language sql
 security definer
 set search_path = public
 as $$
-  delete from ip_rate_limits where ip_hash = p_ip and bucket = p_bucket and window_start < now() - interval '1 day';
+  -- Pruned table-wide: one-off addresses would otherwise leave their rows behind forever.
+  delete from ip_rate_limits where window_start < now() - interval '1 day';
   insert into ip_rate_limits as r (ip_hash, bucket, window_start, hits)
   values (p_ip, p_bucket, to_timestamp(floor(extract(epoch from now()) / p_window_s) * p_window_s), 1)
   on conflict (ip_hash, bucket, window_start) do update set hits = r.hits + 1
