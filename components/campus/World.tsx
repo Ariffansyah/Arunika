@@ -1,6 +1,6 @@
 "use client";
 
-import { Line, PerformanceMonitor, Sky } from "@react-three/drei";
+import { Line, PerformanceMonitor, Sky, useProgress } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
 import {
@@ -45,7 +45,7 @@ import Avatar from "./Avatar";
 import { Buildings } from "./Building";
 import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, Landslide, QuakeDebris, Rain, Vortex } from "./Effects";
 import { fadeTo, hides } from "./fade";
-import { TIER, drillTime, fallenAt, getState, lowerQuality, player, predict, run, useDrill } from "./drillStore";
+import { TIER, drillTime, fallenAt, getState, lowerQuality, player, predict, run, setState, useDrill } from "./drillStore";
 import { wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
@@ -53,6 +53,11 @@ import { setAmbience } from "./sound";
 import { LOOK } from "./Horizon";
 import RemotePlayers from "./RemotePlayers";
 import type { Peer } from "./useRoom";
+
+// The loading screen lives outside this chunk, so the file count is handed over through the store.
+const reportLoad = ({ loaded, total }: { loaded: number; total: number }) => setState({ loaded: total ? loaded / total : 0 });
+reportLoad(useProgress.getState());
+useProgress.subscribe(reportLoad);
 
 // Texture pixels per metre of ground.
 const PX = 16;
@@ -668,14 +673,28 @@ function Far({ far }: { far: number }) {
   return null;
 }
 
+// Lifts the loading screen once every file is in and the scene has drawn a few frames: the first one compiles
+// the shaders and stalls the page.
+function Ready({ onReady }: { onReady: () => void }) {
+  const frames = useRef(0);
+  useFrame(() => {
+    const { active, loaded, total } = useProgress.getState();
+    if (active || loaded < total) frames.current = 0;
+    else if (++frames.current === 3) onReady();
+  });
+  return null;
+}
+
 export default function World({
   me,
   peers,
   school,
+  onReady,
 }: {
   me: { name: string; look: Look };
   peers: Peer[];
   school: School | null;
+  onReady: () => void;
 }) {
   const scenario = useDrill((s) => s.scenario);
   const showRisk = useDrill((s) => s.showRisk);
@@ -693,6 +712,7 @@ export default function World({
       aria-label="Simulasi sekolah"
     >
       <PerformanceMonitor onDecline={lowerQuality} flipflops={3} />
+      <Ready onReady={onReady} />
       <Far far={tier.far} />
       <Exposure />
       <Backdrop {...LOOK[MAP.id]} follow />

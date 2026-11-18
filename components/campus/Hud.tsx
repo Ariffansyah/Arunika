@@ -8,14 +8,13 @@ import CampusPlan from "@/components/CampusPlan";
 import DebriefingTrail from "./DebriefingTrail";
 import { H, MAP, TILE, W } from "@/lib/campus";
 import { PLAN } from "@/lib/floorplan";
-import { MAPS } from "@/lib/maps";
 import { INTENSITY, SCENARIO_LABEL, waterLevel, within, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { aftershockAt, fallenAt, finishDrill, input, liveChecks, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
 import SimControls from "./Controls";
 import { interact } from "./interact";
 import Learn from "./Learn";
-import { GraphicsPicker, KindPicker, NpcPicker, ToolButton, ghost, panel, primary, radio } from "./ui";
+import { GraphicsPicker, KindPicker, NpcPicker, ToolButton, ghost, panel, primary } from "./ui";
 import { falloff, isMuted, play, rumble, setMuted, siren } from "./sound";
 import type { Peer } from "./useRoom";
 
@@ -95,7 +94,7 @@ function Minimap() {
 
 const campusUrl = (room: string, map: string) => `/sekolah?room=${encodeURIComponent(room)}&peta=${map}`;
 
-function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario) => void }) {
+function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
   const scenario = useDrill((s) => s.scenario);
   const meta = INTENSITY[scenario.kind];
   return (
@@ -106,24 +105,6 @@ function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario
         onStart(scenario);
       }}
     >
-      <fieldset>
-        <legend className="text-sm font-semibold">Peta</legend>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {Object.values(MAPS).map((m) => (
-            <label key={m.id} className={radio}>
-              <input
-                type="radio"
-                name="peta"
-                className="sr-only"
-                checked={MAP.id === m.id}
-                // The layout is fixed for a page load, so another map is another page.
-                onChange={() => location.assign(campusUrl(room, m.id))}
-              />
-              {m.name}
-            </label>
-          ))}
-        </div>
-      </fieldset>
       <KindPicker legend="Skenario" />
       <NpcPicker />
       <GraphicsPicker />
@@ -619,9 +600,13 @@ export default function Hud({
                 <img src="/arunika-mark.svg" alt="" width={20} height={23} className="h-6 w-auto" />
                 Arunika
               </Link>
-              <span className="truncate text-redup">
-                {school?.name ?? "Sekolah contoh"} · {MAP.name}
+              <span className="min-w-0 flex-1 truncate text-redup">
+                {MAP.name} · {school?.name ?? "Sekolah contoh"}
               </span>
+              {/* The menu is its own page load: the map is fixed for the life of a page. */}
+              <a href={`/sekolah?room=${encodeURIComponent(room)}`} className={`${ghost} min-h-9 shrink-0 px-3 text-sm`}>
+                Ganti peta
+              </a>
             </div>
             <div className="grid grid-cols-2 gap-1 rounded-lg bg-malam-2 p-1">
               {(["belajar", "simulasi"] as const).map((k) => (
@@ -641,7 +626,7 @@ export default function Hud({
             {tab === "belajar" ? (
               <Learn onGuided={() => onGuided(scenario)} onStart={() => onStart(scenario)} />
             ) : (
-              <ScenarioPicker room={room} onStart={onStart} />
+              <ScenarioPicker onStart={onStart} />
             )}
           </div>
           <RoomInfo room={room} peers={peers} status={status} />

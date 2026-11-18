@@ -59,6 +59,8 @@ type State = {
   // Graphics tier, and whether it was picked for this device rather than by the player.
   quality: Quality;
   qualityAuto: boolean;
+  // Share of the scene's model files downloaded so far, for the loading screen.
+  loaded: number;
 };
 
 export type Quality = "ringan" | "seimbang" | "tinggi";
@@ -122,6 +124,7 @@ let state: State = {
   npc: savedNpc(),
   quality,
   qualityAuto: !savedQuality,
+  loaded: 0,
 };
 
 const listeners = new Set<() => void>();
