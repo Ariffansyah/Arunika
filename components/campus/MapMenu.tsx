@@ -52,10 +52,10 @@ export default function MapMenu({ me, search }: { me: Me; search: string }) {
             <li key={id} className="animate-rise" style={{ animationDelay: `${100 + i * 80}ms` }}>
               <a
                 href={href(id)}
-                className="group flex items-center gap-4 rounded-xl border border-malam-3 bg-malam-2 p-3 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.8)] transition-[border-color,background-color,translate] duration-200 hover:-translate-y-1 hover:border-laut hover:bg-malam-3 sm:flex-col sm:items-stretch sm:p-4"
+                className="track group flex items-center gap-4 rounded-lg border border-malam-3 bg-malam-2 p-3 shadow-edge transition-[border-color,background-color,translate] duration-300 ease-crisp hover:-translate-y-1 hover:border-malam-3 hover:bg-malam-3/60 sm:flex-col sm:items-stretch sm:p-4"
               >
                 <span className="relative w-28 shrink-0 sm:w-full">
-                  <SitePlan id={id} className="block h-auto w-full rounded-lg bg-malam" />
+                  <SitePlan id={id} className="block h-auto w-full rounded-md bg-malam" />
                   <span className="absolute bottom-2 left-2 hidden gap-2.5 rounded-md bg-malam/90 px-2.5 py-2 text-langit shadow-lg sm:flex">
                     {MAPS[id]!.disasters.map((k) => {
                       const Icon = HAZARD_ICON[k];
@@ -71,7 +71,7 @@ export default function MapMenu({ me, search }: { me: Me; search: string }) {
                   <span className="text-xl leading-tight font-bold sm:text-2xl">
                     {MAPS[id]!.name} <span className="font-medium text-redup group-hover:text-pasir/85">{hazard}</span>
                   </span>
-                  <kbd aria-hidden="true" className="hidden rounded border border-malam-3 px-2 py-0.5 text-sm text-redup pointer-fine:inline">
+                  <kbd aria-hidden="true" className="hidden px-2 py-0.5 text-redup transition-colors group-hover:border-laut group-hover:text-pasir pointer-fine:inline">
                     {i + 1}
                   </kbd>
                 </span>
@@ -83,8 +83,8 @@ export default function MapMenu({ me, search }: { me: Me; search: string }) {
           <h2 id="karakter-title" className="text-3xl font-extrabold tracking-tight sm:text-4xl">
             Karakter
           </h2>
-          <div className="mt-6 grid gap-5 rounded-xl border border-malam-3 bg-malam-2 p-4 sm:p-5 md:grid-cols-[16rem_minmax(0,1fr)] md:items-center">
-            <div className="h-72 overflow-hidden rounded-lg bg-[radial-gradient(ellipse_at_50%_85%,#1b3461,#071530_70%)] md:h-80">
+          <div className="mt-6 grid gap-5 rounded-lg border border-malam-3 bg-malam-2 p-4 shadow-edge sm:p-5 md:grid-cols-[16rem_minmax(0,1fr)] md:items-center">
+            <div className="h-72 overflow-hidden rounded-md bg-[radial-gradient(ellipse_at_50%_85%,#1b3461,#071530_70%)] md:h-80">
               <CharacterStage look={avatarOf(avatar)} />
             </div>
             <CharacterPicker profileId={me.profile.id} value={avatar} onChange={setAvatar} cols="grid-cols-4 sm:grid-cols-7 md:grid-cols-4 lg:grid-cols-7" />

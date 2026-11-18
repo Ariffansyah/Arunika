@@ -216,7 +216,7 @@ function Slot({ i, map, children, as: Tag = "div" }: { i: number; map: boolean; 
   const who = map ? "Dinilai mesin simulasi" : "Dari pengendali AI";
   return (
     <Tag className="grid grid-cols-[3.25rem_1fr] gap-3 border-t border-malam-3 py-4">
-      <span className="flex flex-col items-start gap-2 pt-0.5 font-bold tabular-nums text-langit">
+      <span className="flex flex-col items-start gap-2 pt-0.5 font-mono font-bold text-langit">
         {CLOCKS[i]}
         <span title={who} className="text-redup">
           <Who aria-hidden="true" className="size-4" />
@@ -424,7 +424,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
             )}
           </nav>
         )}
-        <div className="overflow-hidden rounded-xl border border-malam-3 bg-malam shadow-[0_30px_80px_-30px_rgb(0_0_0/0.7)]">
+        <div className="overflow-hidden rounded-lg border border-malam-3 bg-malam shadow-edge">
           {stage !== "siap" && (
             <p className="flex items-center gap-2.5 border-b border-malam-3 bg-malam-2 px-4 py-3">
               <span aria-hidden="true" className={`size-2 shrink-0 rounded-full bg-langit ${stage === "selesai" ? "" : "animate-pulse"}`} />
@@ -476,7 +476,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
         </div>
       </div>
 
-      <section aria-label="Log gladi" className="rounded-xl border border-malam-3 bg-malam-2 p-5">
+      <section aria-label="Log gladi" className="rounded-lg border border-malam-3 bg-malam-2 p-5 shadow-edge">
         {stage === "siap" ? (
           <form
             className="space-y-5"
@@ -519,7 +519,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
                 const Who = map ? Cpu : Sparkles;
                 return (
                   <li key={text} className="flex min-h-12 items-center gap-3 px-3 py-2">
-                    <span className="w-12 font-bold tabular-nums text-langit">{CLOCKS[i]}</span>
+                    <span className="w-12 font-mono font-bold text-langit">{CLOCKS[i]}</span>
                     <span className="flex-1 font-semibold">{text}</span>
                     <span className="inline-flex items-center gap-1.5 text-redup">
                       <Who aria-hidden="true" className="size-4" />
@@ -536,7 +536,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex min-h-12 w-full items-center justify-center rounded-md bg-laut px-6 text-lg font-bold text-white hover:bg-laut-terang active:translate-y-px disabled:opacity-60"
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-md bg-laut px-6 text-lg font-bold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.22)] transition-colors hover:bg-laut-terang active:translate-y-px disabled:opacity-60"
             >
               {busy ? "AI menyusun situasi…" : "Mulai gladi"}
             </button>
@@ -544,11 +544,11 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
         ) : (
           <div>
             <div className="flex items-center justify-between gap-4">
-              <span className="text-3xl font-extrabold tabular-nums text-langit">{CLOCKS[Math.min(steps.length, 3)]}</span>
+              <span className="font-mono text-3xl font-bold text-langit">{CLOCKS[Math.min(steps.length, 3)]}</span>
               <ol aria-label="Langkah gladi" className="flex flex-1 gap-1.5">
                 {CLOCKS.map((c, i) => (
                   <li key={c} className="h-1.5 flex-1 rounded-full bg-malam-3">
-                    <span className={`block h-full rounded-full ${steps[i] ? VERDICT[steps[i].feedback.verdict].bar : i === steps.length ? "animate-pulse bg-langit" : ""}`} />
+                    <span className={`block h-full origin-left rounded-full ${steps[i] ? `${VERDICT[steps[i].feedback.verdict].bar} motion-safe:animate-grow` : i === steps.length ? "animate-pulse bg-langit" : ""}`} />
                     <span className="sr-only">
                       Langkah {i + 1}: {steps[i] ? VERDICT[steps[i].feedback.verdict].label : "belum"}
                     </span>

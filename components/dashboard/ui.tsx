@@ -28,7 +28,7 @@ export function StatusLabel({ readiness }: { readiness: number | null }) {
 // Label and value on one line: facts read as a list, not as stat tiles.
 export function Facts({ items }: { items: [string, React.ReactNode][] }) {
   return (
-    <dl className="divide-y divide-malam-3 rounded-lg border border-malam-3 bg-malam-2">
+    <dl className="divide-y divide-malam-3 rounded-lg border border-malam-3 bg-malam-2 shadow-edge">
       {items.map(([k, v]) => (
         <div key={k} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-4 py-3">
           <dt className="text-redup">{k}</dt>
@@ -57,7 +57,7 @@ export function PrintSheet({ title, onClose, children }: { title: string; onClos
   return (
     <div role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-50 flex items-center justify-center bg-malam/85 p-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full max-w-2xl space-y-5 overflow-y-auto rounded-xl border border-malam-3 bg-malam-2 p-6 shadow-[0_30px_80px_-20px_rgb(0_0_0/0.8)]"
+        className="max-h-[90vh] w-full max-w-2xl space-y-5 overflow-y-auto rounded-lg border border-malam-3 bg-malam-2 p-6 shadow-[0_30px_80px_-20px_rgb(0_0_0/0.8)]"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-2xl font-extrabold">{title}</h2>

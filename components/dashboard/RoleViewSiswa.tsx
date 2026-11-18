@@ -75,7 +75,7 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
           {stats.map((s) => {
             const Icon = HAZARD_ICON[s.kind];
             return (
-              <li key={s.kind} className="space-y-3 rounded-lg border border-malam-3 bg-malam-2 p-4">
+              <li key={s.kind} className="space-y-3 rounded-lg border border-malam-3 bg-malam-2 shadow-edge p-4">
                 <p className="flex items-center gap-3 text-lg font-bold">
                   <Icon aria-hidden="true" className="size-5 shrink-0 text-langit" />
                   <span className="flex-1">{SCENARIO_LABEL[s.kind]}</span>

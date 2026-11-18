@@ -21,8 +21,42 @@ import { Meter, NO_DATA, STATUS, StatusLabel, secondaryBtn, statusOf } from "@/c
 
 const IndonesiaMap = dynamic(() => import("@/components/dashboard/IndonesiaMap"), {
   ssr: false,
-  loading: () => <p className="p-4 text-redup">Memuat peta…</p>,
+  loading: () => <div role="status" aria-label="Memuat peta" className="skeleton h-full rounded-none" />,
 });
+
+// The board's outline while the account and schools load, so the page does not jump when they arrive.
+function Skeleton() {
+  return (
+    <div className="mt-8">
+      <p role="status" className="sr-only">
+        Memuat data sekolah…
+      </p>
+      <div aria-hidden="true" className="space-y-10">
+        <div className="flex flex-wrap gap-2 border-b border-malam-3 pb-6">
+          {["w-28", "w-24", "w-44", "w-52"].map((w) => (
+            <span key={w} className={`skeleton h-11 ${w}`} />
+          ))}
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="skeleton size-16 shrink-0 rounded-full sm:size-20" />
+          <span className="skeleton h-10 w-full max-w-md" />
+        </div>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[0, 1, 2, 3].map((i) => (
+              <span key={i} className="skeleton h-28 rounded-lg" />
+            ))}
+          </div>
+          <span className="skeleton h-64 rounded-lg" />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
+          <span className="skeleton h-96 rounded-lg sm:h-[32rem]" />
+          <span className="skeleton h-96 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type Row = School & {
   drills: number | null;
@@ -65,7 +99,7 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
   }, [row.id]);
 
   return (
-    <section aria-labelledby="detail-title" className="space-y-5 rounded-lg border border-malam-3 bg-malam-2 p-5">
+    <section aria-labelledby="detail-title" className="space-y-5 rounded-lg border border-malam-3 bg-malam-2 p-5 shadow-edge">
       <h2 id="detail-title" className="text-xl font-bold">
         {row.name}
       </h2>
@@ -94,9 +128,10 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
             {error}
           </p>
         ) : !recs ? (
-          <p role="status" className="mt-2 text-redup">
-            Memuat…
-          </p>
+          <div role="status" aria-label="Memuat rencana" className="mt-3 space-y-2">
+            <span className="skeleton block h-4" />
+            <span className="skeleton block h-4 w-2/3" />
+          </div>
         ) : recs.length === 0 ? (
           <p className="mt-2 text-redup">
             Belum ada.{" "}
@@ -250,7 +285,7 @@ function Board({ me }: { me: Me }) {
   }, [ranked, pemdaFilter]);
 
   if (error) return <Notice tone="error">Gagal memuat data sekolah: {error}</Notice>;
-  if (!rows) return <Notice>Memuat data sekolah…</Notice>;
+  if (!rows) return <Skeleton />;
   if (rows.length === 0) return <Notice>Belum ada sekolah terdaftar. Jalankan supabase/schema.sql untuk data contoh.</Notice>;
 
   const current = ranked.find((r) => r.row.id === selected) ?? ranked[0];
@@ -274,7 +309,7 @@ function Board({ me }: { me: Me }) {
                 type="button"
                 aria-pressed={activeRole === r}
                 onClick={() => setActiveRole(r)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-malam-3 px-4 font-semibold hover:border-redup aria-pressed:border-laut aria-pressed:bg-laut aria-pressed:text-white"
+                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-malam-3 px-4 font-semibold transition-colors duration-300 ease-crisp hover:border-redup aria-pressed:border-laut aria-pressed:bg-laut aria-pressed:text-white"
               >
                 <Icon className="size-4" aria-hidden="true" />
                 {ROLE_LABEL[r]}
@@ -343,7 +378,7 @@ function Board({ me }: { me: Me }) {
         </h2>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className="self-start overflow-hidden rounded-lg border border-malam-3">
+          <div className="track self-start overflow-hidden rounded-lg border border-malam-3 shadow-edge">
             <div className="h-96 sm:h-[32rem]">
               <IndonesiaMap
                 schools={filteredSchools.map(({ row, exp }) => ({
@@ -375,9 +410,9 @@ function Board({ me }: { me: Me }) {
           <h3 id="prioritas" className="text-2xl font-bold">
             Urutan prioritas intervensi
           </h3>
-          <div className="mt-4 overflow-x-auto rounded-lg border border-malam-3">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-malam-3 shadow-edge">
             <table className="w-full text-left sm:min-w-[40rem]">
-              <thead className="border-b border-malam-3 text-redup">
+              <thead className="border-b border-malam-3 bg-malam-2 text-redup">
                 <tr>
                   <th scope="col" className={`${cell} font-medium`}>Sekolah</th>
                   <th scope="col" className={`${cell} font-medium max-sm:hidden`}>Wilayah</th>
@@ -391,8 +426,8 @@ function Board({ me }: { me: Me }) {
                 {filteredSchools.map(({ row, exp }) => {
                   const active = row.id === current.row.id;
                   return (
-                    <tr key={row.id} className={active ? "bg-malam-2" : "hover:bg-malam-2/60"}>
-                      <th scope="row" className="p-0 font-semibold">
+                    <tr key={row.id} className={`transition-colors duration-200 ${active ? "bg-laut/10" : "hover:bg-malam-2/60"}`}>
+                      <th scope="row" className={`p-0 font-semibold ${active ? "shadow-[inset_2px_0_0_var(--color-laut)]" : ""}`}>
                         <button
                           type="button"
                           aria-pressed={active}
@@ -437,5 +472,5 @@ function Board({ me }: { me: Me }) {
 }
 
 export default function Dashboard() {
-  return <RequireAuth>{(me) => <Board me={me} />}</RequireAuth>;
+  return <RequireAuth loading={<Skeleton />}>{(me) => <Board me={me} />}</RequireAuth>;
 }

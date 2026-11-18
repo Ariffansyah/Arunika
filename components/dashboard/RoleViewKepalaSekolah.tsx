@@ -36,7 +36,7 @@ export default function RoleViewKepalaSekolah({
   );
 
   const actions = (
-    <ol className="divide-y divide-malam-3 rounded-lg border border-malam-3 bg-malam-2">
+    <ol className="divide-y divide-malam-3 rounded-lg border border-malam-3 bg-malam-2 shadow-edge">
       {recommendations.map((r) => (
         <li key={r.action} className="flex gap-3 p-4 leading-relaxed">
           {r.priority === "segera" ? (
@@ -77,7 +77,7 @@ export default function RoleViewKepalaSekolah({
         </div>
       </div>
 
-      <div className="grid gap-x-12 gap-y-6 rounded-lg border border-malam-3 bg-malam-2 p-5 sm:grid-cols-2 sm:p-6">
+      <div className="grid gap-x-12 gap-y-6 rounded-lg border border-malam-3 bg-malam-2 shadow-edge p-5 sm:grid-cols-2 sm:p-6">
         <Meter label="Kesiapan siswa dari latihan evakuasi" value={drill} max={100} href={link(`/sekolah?room=${school?.id ?? "umum"}`, "Mulai latihan")} />
         <Meter label="Kesiapan tim siaga dari gladi ruang" value={gladiScore} max={100} href={link("/gladi", "Mulai gladi")} />
       </div>
