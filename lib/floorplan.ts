@@ -271,6 +271,13 @@ function kelas(plan: Plan, F: Frame, b: string, y00: number, base: number) {
     const run = vF1 - vF0;
     const rise = STOREY / 2 / 12;
     s.box("wall", uA1, uB0, vIn, vF1, y00, top + 1);
+    // Elsewhere the slab between storeys closes the 20 cm between one storey's walls and the next; the stairwell has
+    // no slab, so its back and end walls carry on through that depth.
+    for (let f = 1; f < floors; f++) {
+      const y = y00 + f * STOREY;
+      s.box("wall", uA0, L, D - WALL, D, y - SLAB, y);
+      s.box("wall", L - WALL, L, vIn, D - WALL, y - SLAB, y);
+    }
     s.box("under", uB0, uB1, vF0, vF1, base, y00 + 1.9);
     s.box("under", uA0, uB1, vF1, vBack, base, y00 + 1.9);
     for (let k = 0; k < 12; k++) {

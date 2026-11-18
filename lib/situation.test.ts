@@ -29,7 +29,7 @@ test("every start spot is open ground with a way out, even past a fallen tree", 
           const [x, z] = cellCenter(k);
           return (layer === 0 && ASSEMBLY.some((a) => Math.hypot(...tileCenter(...a).map((v, i) => v - [x, z][i])) < 4.5)) || (layer === 1 && upperFloorAt(x, z));
         },
-        () => false,
+        () => 0,
         (layer, k) => {
           const [x, z] = cellCenter(k);
           return !!trunk && layer === 0 && x > trunk.x0 - 0.3 && x < trunk.x1 + 0.3 && z > trunk.z0 - 0.3 && z < trunk.z1 + 0.3;

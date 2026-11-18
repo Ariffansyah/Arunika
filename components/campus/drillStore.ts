@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
-import { BUILDINGS, MAP, SPAWN, TILE, buildingRects, idx, tileAt, tileCenter, type Tile } from "@/lib/campus";
+import { BUILDINGS, MAP, SPAWN, TILE, buildingRects, findTiles, idx, tileAt, tileCenter, type Tile } from "@/lib/campus";
 import { PLAN, classrooms, type Room } from "@/lib/floorplan";
-import { buildingAt, cellCenter, flowField, groundY, routeFrom, routeLength, upperFloorAt } from "@/lib/nav";
+import { N, buildingAt, cellCenter, flowField, groundY, routeFrom, routeLength, upperFloorAt } from "@/lib/nav";
 import {
   NONE,
   SLIDE_S,
@@ -223,6 +223,8 @@ export const run = {
   situation: null as Situation | null,
   // Where each classmate starts, as x, z, facing and floor.
   mates: [] as [number, number, number, number][],
+  // Each classmate's own field, out by the door nearest their seat; empty when the drill starts outside a room.
+  mateFields: [] as Float64Array[],
   // Doors jammed shut for the whole drill, and the assembly point a fallen pole made unsafe.
   locked: [] as string[],
   closedGoal: null as Tile | null,
@@ -393,7 +395,42 @@ export const GOAL_RADIUS = 4.5;
 // The upper floor of Gedung Kelas A, not its stairs.
 export const isUpstairs = (x: number, z: number, layer: number) => layer === 1 && upperFloorAt(x, z);
 
-function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blocked: string[], shelters: Room[], trunk: ReturnType<typeof fallenBox> | null) {
+const TREES = findTiles("T").map((t) => tileCenter(...t));
+const footprintGap = (f: { x0: number; z0: number; x1: number; z1: number }, x: number, z: number) =>
+  Math.hypot(Math.max(f.x0 - x, 0, x - f.x1), Math.max(f.z0 - z, 0, z - f.z1));
+
+// What makes a stretch of the campus dangerous to walk in this drill, as extra cost per metre on each nav cell,
+// so the route, the hint and the classmates take the safest way and not merely the shortest.
+// Quake: every minute indoors, then the strip under a building's walls and roof edge, worst under weak buildings,
+// and under trees. Flood: deeper water costs more, and knee-deep is avoided almost at any price.
+// Landslide: the slide's path. Whirlwind: trees, the open air, and the canteen's light roof.
+function dangerMap(s: Scenario, hazards: Set<number>, risks: Record<string, number>) {
+  const out = new Float32Array(2 * N);
+  const weight = (b: string) => (risks[b] >= 60 ? 1 : risks[b] >= 30 ? 0.6 : 0.3);
+  const near = (x: number, z: number, r: number) => TREES.reduce((m, [tx, tz]) => Math.max(m, 1 - Math.hypot(tx - x, tz - z) / r), 0);
+  for (let node = 0; node < 2 * N; node++) {
+    const layer = node >= N ? 1 : 0;
+    const [x, z] = cellCenter(node % N);
+    const inside = buildingAt(x, z);
+    const tile = hazards.has(idx(Math.floor(x / TILE), Math.floor(z / TILE)));
+    let d = 0;
+    if (s.kind === "gempa") {
+      if (inside) d = 2 + 2 * weight(inside);
+      else {
+        for (const [b, f] of Object.entries(PLAN.footprint)) d = Math.max(d, 6 * weight(b) * Math.max(0, 1 - footprintGap(f, x, z) / 6));
+        d = Math.max(d, 2 * near(x, z, 3));
+      }
+    } else if (s.kind === "banjir") {
+      const depth = s.intensity - groundY(x, z, layer);
+      d = depth <= 0 ? 0 : depth < 0.3 ? 1 : depth < 0.5 ? 3 : 12;
+    } else if (s.kind === "longsor") d = tile ? 12 : 0;
+    else d = (tile ? 4 : 0) + (inside ? (BUILDINGS[inside].kind === "kantin" ? 3 : 0) : 1 + 2 * near(x, z, 4));
+    out[node] = d;
+  }
+  return out;
+}
+
+function safetyField(goals: Tile[], danger: Float32Array, upstairs: boolean, blocked: string[], shelters: Room[], trunk: ReturnType<typeof fallenBox> | null) {
   const centres = goals.map((g) => tileCenter(...g));
   const rubble = PLAN.doors.filter((d) => blocked.includes(d.id));
   return flowField(
@@ -405,10 +442,7 @@ function safetyField(goals: Tile[], hazards: Set<number>, upstairs: boolean, blo
         shelters.some((r) => r.floor === layer && x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1)
       );
     },
-    (layer, k) => {
-      const [x, z] = cellCenter(k);
-      return layer === 0 && hazards.has(idx(Math.floor(x / TILE), Math.floor(z / TILE)));
-    },
+    (layer, k) => danger[layer * N + k],
     (layer, k) => {
       const [x, z] = cellCenter(k);
       const underTrunk = !!trunk && layer === 0 && x > trunk.x0 - 0.3 && x < trunk.x1 + 0.3 && z > trunk.z0 - 0.3 && z < trunk.z1 + 0.3;
@@ -466,7 +500,15 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
   const lockedRoom = sit.lockedRoom && pool.length > 1 && pool.some((r) => r.id === sit.lockedRoom) ? sit.lockedRoom : null;
   const shelters = pool.filter((r) => r.id !== lockedRoom);
   const locked = lockedRoom ? roomDoors(lockedRoom).map((d) => d.id) : [];
-  const field = safetyField(goals, hazards, upstairs, blocked, shelters, sit.fallen ? fallenBox(sit.fallen) : null);
+  const danger = dangerMap(scenario, hazards, risks);
+  const trunk = sit.fallen ? fallenBox(sit.fallen) : null;
+  const field = safetyField(goals, danger, upstairs, blocked, shelters, trunk);
+  // A class leaves by the door nearest each seat, as drills assign them, unless rubble has shut it.
+  const doors = exits.filter((d) => !blocked.includes(d.id));
+  const doorFields = doors.length > 1 ? doors.map((d) => safetyField(goals, danger, upstairs, [...blocked, ...doors.filter((o) => o !== d).map((o) => o.id)], shelters, trunk)) : [];
+  const mateFields = doorFields.length
+    ? mates.map(([x, z]) => doorFields[doors.reduce((best, d, i) => (Math.hypot(d.x - x, d.z - z) < Math.hypot(doors[best].x - x, doors[best].z - z) ? i : best), 0)])
+    : [];
   const route = routeFrom(field, player.x, player.z, layer);
   const falls = new Map<number, number>();
   const breaks = new Map<number, number>();
@@ -521,6 +563,7 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     lane: sit.lane,
     situation: sit,
     mates,
+    mateFields,
     locked,
     closedGoal,
     trail: [],

@@ -7,7 +7,7 @@ import Character, { type Anim, type Look } from "@/components/Character";
 import Model, { M } from "@/components/Model";
 import { ASSEMBLY, MAP, TILE, W, elevationAt, findTiles, surfaceAt, tileCenter, tileElevation } from "@/lib/campus";
 import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
-import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
+import { distanceAt, free, groundY, layerAt, lookAhead, type Waypoint } from "@/lib/nav";
 import { SLIDE_S, WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
 import { CLASSMATE_SEATS, TIER, aftershockAt, drillTime, getState, landslideSigns, roomSeats, run, shakingAt, useDrill } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
@@ -51,6 +51,9 @@ function Classmate({ i, count }: { i: number; count: number }) {
     rate: 1,
     under: 0,
     spot: null as { at: [number, number]; centre: [number, number] | null } | null,
+    // Where they are heading straight for, and when to look again.
+    aim: null as Waypoint | null,
+    aimAt: 0,
   });
   const speed = 1.3 + ((i * 37) % 10) / 25;
   const height = 1.45 + (i % 3) * 0.08;
@@ -66,13 +69,13 @@ function Classmate({ i, count }: { i: number; count: number }) {
       // Between drills the class sits in the first classroom; a drill puts them wherever it starts.
       const seat = roomSeats(HOME_ROOM)[CLASSMATE_SEATS[i]];
       const [x, z, ry, layer] = s.phase === "idle" ? [seat.x, seat.z, seat.ry, PLAN.rooms.find((r) => r.id === HOME_ROOM)!.floor] : (run.mates[i] ?? run.mates[0]);
-      Object.assign(st, { x, z, layer, heading: ry, face: ry, key, anim: "sit", spot: null });
+      Object.assign(st, { x, z, layer, heading: ry, face: ry, key, anim: "sit", spot: null, aim: null, aimAt: 0 });
     }
     const seated = s.phase === "idle" || run.situation?.place === "kelas";
     const t = drillTime();
     const quake = s.scenario.kind === "gempa";
     const shaking = quake && shakingAt(t);
-    const field = s.phase !== "idle" ? run.field : null;
+    const field = s.phase !== "idle" ? (run.mateFields[i] ?? run.field) : null;
 
     if (!field || t < 0) st.anim = seated ? "sit" : "idle";
     // At a desk they duck under it; anywhere else they drop where they stand.
@@ -83,8 +86,14 @@ function Classmate({ i, count }: { i: number; count: number }) {
       let to: { x: number; z: number } | null = null;
       if (st.spot) {
         if (Math.hypot(st.spot.at[0] - st.x, st.spot.at[1] - st.z) > 0.15) to = { x: st.spot.at[0], z: st.spot.at[1] };
-      } else if (distanceAt(field, st.x, st.z, st.layer) > 0) to = nextStep(field, st.x, st.z, st.layer);
-      else st.spot = arrivalSpot(st.x, st.z, st.layer, i);
+      } else if (distanceAt(field, st.x, st.z, st.layer) > 0) {
+        // Head straight for the farthest point down the route they can walk to, looking again every few steps.
+        if (!st.aim || t >= st.aimAt || Math.hypot(st.aim.x - st.x, st.aim.z - st.z) < 0.35) {
+          st.aim = lookAhead(field, st.x, st.z, st.layer, closedDoors);
+          st.aimAt = t + 0.3;
+        }
+        to = st.aim;
+      } else st.spot = arrivalSpot(st.x, st.z, st.layer, i);
       if (to) {
         const tx = to.x - st.x;
         const tz = to.z - st.z;

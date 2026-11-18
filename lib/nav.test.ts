@@ -22,7 +22,7 @@ import {
 
 const assembly = flowField(
   (layer, k) => layer === 0 && ASSEMBLY.some((a) => Math.hypot(...tileCenter(...a).map((v, i) => v - cellCenter(k)[i])) < 4.5),
-  () => false,
+  () => 0,
 );
 const seatLayer = (room: string) => PLAN.rooms.find((r) => r.id === room)!.floor;
 // A walker's own cell can sit just inside a desk's clearance; its neighbours cannot all be blocked.
@@ -52,7 +52,7 @@ test("the upper floor reaches the ground only by the stairs", () => {
 });
 
 test("in a flood, a ground-floor class climbs to the upper floor, not into the stairwell's void", () => {
-  const refuge = flowField((layer, k) => layer === 1 && upperFloorAt(...cellCenter(k)), () => false);
+  const refuge = flowField((layer, k) => layer === 1 && upperFloorAt(...cellCenter(k)), () => 0);
   const seat = PLAN.seats.find((s) => s.room === classrooms()[0].id)!;
   const end = routeFrom(refuge, seat.x, seat.z, 0).at(-1)!;
   assert.ok(end[1] > PLAN.floorY["1"] + 3.9, "route ends a storey up");
@@ -63,7 +63,7 @@ test("every seat can reach a whirlwind shelter room", () => {
   const field = flowField((layer, k) => {
     const [x, z] = cellCenter(k);
     return shelters.some((r) => r.floor === layer && x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
-  }, () => false);
+  }, () => 0);
   for (const s of PLAN.seats) {
     const layer = seatLayer(s.room);
     const d = Math.min(...[-0.5, 0, 0.5].flatMap((dx) => [-0.5, 0, 0.5].map((dz) => distanceAt(field, s.x + dx, s.z + dz, layer))));
@@ -88,7 +88,7 @@ test("routes never pass through a wall", () => {
 });
 
 test("every room can be left on foot", () => {
-  const outside = flowField((layer, k) => layer === 0 && !buildingAt(...cellCenter(k)), () => false);
+  const outside = flowField((layer, k) => layer === 0 && !buildingAt(...cellCenter(k)), () => 0);
   for (const r of PLAN.rooms) {
     let ok = false;
     for (let z = r.z0 + 0.25; z < r.z1 && !ok; z += 0.5) {

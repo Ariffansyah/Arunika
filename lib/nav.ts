@@ -188,13 +188,14 @@ export const CELL = 0.5;
 export const NX = Math.round(SITE_W / CELL);
 export const NZ = Math.round(SITE_D / CELL);
 export const N = NX * NZ;
-const HAZARD_COST = 8;
+// Walking right along a wall or furniture costs this much extra, so routes keep to the middle of doorways and corridors.
+const TIGHT_COST = 0.6;
 
 export const cellOf = (x: number, z: number) =>
   Math.min(NZ - 1, Math.max(0, Math.floor(z / CELL))) * NX + Math.min(NX - 1, Math.max(0, Math.floor(x / CELL)));
 export const cellCenter = (k: number): [number, number] => [((k % NX) + 0.5) * CELL, (Math.floor(k / NX) + 0.5) * CELL];
 
-type Grid = { open: Uint8Array; east: Uint8Array; south: Uint8Array; rampLayer: Int8Array };
+type Grid = { open: Uint8Array; east: Uint8Array; south: Uint8Array; rampLayer: Int8Array; tight: Uint8Array };
 let GRID_CACHE: Grid | null = null;
 
 // open[layer * N + k] is 1 where a walker fits at the cell centre. east/south say whether the step to the next
@@ -223,7 +224,18 @@ export function walkable(): Grid {
       if (k + NX < N && (layer === 0 || upper[k + NX])) south[layer * N + k] = free(x, z + CELL / 2, layer, NAV_CLEARANCE) ? 1 : 0;
     }
   }
-  GRID_CACHE = { open, east, south, rampLayer };
+  // A cell with anything solid next to it.
+  const tight = new Uint8Array(2 * N);
+  for (let node = 0; node < 2 * N; node++) {
+    if (!open[node]) continue;
+    const k = node % N;
+    const [cx, cz] = [k % NX, Math.floor(k / NX)];
+    for (const [dx, dz] of DIRS) {
+      const [nx, nz] = [cx + dx, cz + dz];
+      if (nx >= 0 && nz >= 0 && nx < NX && nz < NZ && !open[node - k + nz * NX + nx] && (node < N || upper[nz * NX + nx])) tight[node] = 1;
+    }
+  }
+  GRID_CACHE = { open, east, south, rampLayer, tight };
   return GRID_CACHE;
 }
 
@@ -319,10 +331,11 @@ class Heap {
 
 type CellTest = (layer: number, k: number) => boolean;
 
-// Walking distance (hazard-weighted) from every node to the nearest goal: one search serves every walker.
+// Walking distance from every node to the nearest goal, weighted by danger: one search serves every walker.
+// `danger` is the extra cost per metre through a cell, as a multiple of walking it (0 where it is safe).
 // `blocked` closes cells for this search only, such as a doorway buried by rubble.
-export function flowField(goal: CellTest, hazard: CellTest, blocked?: CellTest) {
-  const { open } = walkable();
+export function flowField(goal: CellTest, danger: (layer: number, k: number) => number, blocked?: CellTest) {
+  const { open, tight } = walkable();
   // Float64 on purpose: rounding stored costs to float32 makes equal-cost paths look like improvements forever.
   const dist = new Float64Array(2 * N).fill(Infinity);
   const heap = new Heap();
@@ -339,7 +352,7 @@ export function flowField(goal: CellTest, hazard: CellTest, blocked?: CellTest) 
     if (d > dist[node]) continue;
     eachNeighbour(node >= N ? 1 : 0, node % N, (next, step) => {
       if (shut?.[next]) return;
-      const cost = d + step * (hazard(next >= N ? 1 : 0, next % N) ? HAZARD_COST : 1);
+      const cost = d + step * (1 + tight[next] * TIGHT_COST + danger(next >= N ? 1 : 0, next % N));
       if (cost < dist[next]) {
         dist[next] = cost;
         heap.push(next, cost);
@@ -365,6 +378,33 @@ export function nextStep(dist: Float64Array, x: number, z: number, layer: number
   if (to < 0) return null;
   const [cx, cz] = cellCenter(to % N);
   return { x: cx, z: cz, layer: to >= N ? 1 : 0 };
+}
+
+// Whether a walker can head straight from one point to another on the same floor.
+function clearWalk(x0: number, z0: number, x1: number, z1: number, layer: number, extra?: Extra) {
+  const n = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.25);
+  for (let i = 1; i <= n; i++) {
+    const [x, z] = [x0 + ((x1 - x0) * i) / n, z0 + ((z1 - z0) * i) / n];
+    if (layerAt(x, z, layer) !== layer || !free(x, z, layer, NAV_CLEARANCE + 0.05, extra)) return false;
+  }
+  return true;
+}
+
+// The farthest point down the field, up to `reach` metres on, that a walker can head straight for: the field's
+// eight-way staircase of cells becomes a straight walk, and corners are still turned where the walls are.
+export function lookAhead(dist: Float64Array, x: number, z: number, layer: number, extra?: Extra, reach = 4): Waypoint | null {
+  const first = nextStep(dist, x, z, layer);
+  if (!first || first.layer !== layer) return first;
+  const pts = [first];
+  for (let at = first; pts.length < reach / CELL; ) {
+    const next = nextStep(dist, at.x, at.z, at.layer);
+    // No shortcuts across a change of floor.
+    if (!next || next.layer !== layer) break;
+    pts.push(next);
+    at = next;
+  }
+  for (let i = pts.length - 1; i > 0; i--) if (clearWalk(x, z, pts[i].x, pts[i].z, layer, extra)) return pts[i];
+  return first;
 }
 
 export function distanceAt(dist: Float64Array, x: number, z: number, layer: number) {
