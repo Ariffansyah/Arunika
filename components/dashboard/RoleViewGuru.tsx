@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, Copy, Download, Share2, Users } from "lucide-react";
+import { Check, CircleCheck, Copy, OctagonX } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Me } from "@/components/RequireAuth";
 import { SCENARIO_LABEL, type Scenario } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
+import { Facts, primaryBtn, secondaryBtn } from "./ui";
 
 export type SchoolDrillItem = {
   id: number;
@@ -17,27 +18,18 @@ export type SchoolDrillItem = {
   created_at: string;
 };
 
-export default function RoleViewGuru({
-  me,
-  school,
-  drills,
-}: {
-  me: Me;
-  school: School | null;
-  drills: SchoolDrillItem[];
-}) {
-  const [copied, setCopied] = useState(false);
+const PASS = 750;
 
-  const roomUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/kampus?room=${encodeURIComponent(school?.id ?? "umum")}`
-    : `/kampus?room=${school?.id ?? "umum"}`;
+export default function RoleViewGuru({ me, school, drills }: { me: Me; school: School | null; drills: SchoolDrillItem[] }) {
+  const [copied, setCopied] = useState(false);
+  const room = `/kampus?room=${encodeURIComponent(school?.id ?? "umum")}`;
+  const roomUrl = typeof window !== "undefined" ? `${window.location.origin}${room}` : room;
 
   const copyRoomLink = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(roomUrl);
+    navigator.clipboard?.writeText(roomUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    }
+    });
   };
 
   const exportCsv = () => {
@@ -49,164 +41,99 @@ export default function RoleViewGuru({
       `"${SCENARIO_LABEL[d.scenario]}"`,
       d.score,
       d.time_s.toFixed(1),
-      d.reached ? "Berhasil Mencapai Titik Kumpul" : "Terhenti",
+      d.reached ? "Sampai titik kumpul" : "Terhenti",
     ]);
-
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", encodeURI(csvContent));
     link.setAttribute("download", `rekap-latihan-${school?.name.replace(/\s+/g, "-") || "sekolah"}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const avgScore =
-    drills.length > 0 ? Math.round(drills.reduce((sum, d) => sum + d.score, 0) / drills.length) : 0;
-  const passedCount = drills.filter((d) => d.score >= 750).length;
-  const passRate = drills.length > 0 ? Math.round((passedCount / drills.length) * 100) : 0;
+  const avgScore = drills.length ? Math.round(drills.reduce((sum, d) => sum + d.score, 0) / drills.length) : null;
+  const passedCount = drills.filter((d) => d.score >= PASS).length;
 
   return (
-    <div className="space-y-6">
-      {/* Teacher Profile & Session Generator Banner */}
-      <div className="flex flex-col gap-4 rounded-xl border border-malam-3 bg-malam-2 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-malam-3 border border-fajar/30 text-fajar">
-            <Users className="size-8" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-extrabold text-pasir">{me.profile.display_name}</h2>
-              <span className="rounded-full bg-aman/20 px-2.5 py-0.5 text-xs font-semibold text-aman">
-                Guru Pembimbing
-              </span>
-            </div>
-            <p className="text-sm text-redup">
-              Pengelola Kelas Tanggap Bencana · {school?.name ?? "Sekolah Terbuka"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={exportCsv}
-            disabled={drills.length === 0}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-malam-3 bg-malam px-4 text-sm font-semibold text-pasir hover:border-redup disabled:opacity-50"
-          >
-            <Download className="size-4" aria-hidden="true" />
-            Ekspor Rekap Nilai (CSV)
-          </button>
-          <Link
-            href={`/kampus?room=${school?.id ?? "umum"}`}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-fajar px-5 text-sm font-semibold text-malam hover:bg-fajar-tua"
-          >
-            <Share2 className="size-4" aria-hidden="true" />
-            Masuk Sesi Kelas
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <h2 className="max-w-[26ch] text-3xl font-extrabold tracking-tight sm:text-4xl">
+          {drills.length
+            ? `${passedCount} dari ${drills.length} latihan terakhir di ${school?.name ?? "sekolahmu"} lulus.`
+            : `Belum ada latihan di ${school?.name ?? "sekolahmu"}.`}
+        </h2>
+        <div className="flex flex-wrap gap-3">
+          <Link href={room} className={primaryBtn}>
+            Masuk ruang kelas
           </Link>
-        </div>
-      </div>
-
-      {/* Classroom Link Sharing Panel */}
-      <div className="rounded-xl border border-fajar/30 bg-fajar/5 p-4 sm:p-5">
-        <h3 className="text-base font-bold text-pasir">Tautan Ruangan Simulasi Bersama (Multiplayer Room)</h3>
-        <p className="mt-1 text-xs text-redup">
-          Bagikan tautan ini ke siswa Anda agar seluruh murid bergabung di kampus virtual yang sama. Anda dapat mengkoordinasikan simulasi evakuasi secara serentak.
-        </p>
-
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            type="text"
-            readOnly
-            value={roomUrl}
-            className="min-h-11 flex-1 rounded-lg border border-malam-3 bg-malam px-3 font-mono text-xs text-pasir select-all"
-          />
-          <button
-            type="button"
-            onClick={copyRoomLink}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-fajar px-5 text-sm font-bold text-malam hover:bg-fajar-tua"
-          >
-            {copied ? (
-              <>
-                <Check className="size-4" aria-hidden="true" />
-                Tersalin!
-              </>
-            ) : (
-              <>
-                <Copy className="size-4" aria-hidden="true" />
-                Salin Tautan
-              </>
-            )}
+          <button type="button" onClick={exportCsv} disabled={drills.length === 0} className={secondaryBtn}>
+            Ekspor CSV
           </button>
         </div>
       </div>
 
-      {/* Class Statistics */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-malam-3 bg-malam-2 p-4">
-          <span className="text-xs font-medium text-redup">Total Aktivitas Drill Kelas</span>
-          <p className="mt-1 text-2xl font-extrabold text-pasir tabular-nums">
-            {drills.length}{" "}
-            <span className="text-sm font-normal text-redup">sesi selesai</span>
-          </p>
-          <p className="mt-1 text-xs text-redup">Tercatat di server sekolah</p>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="space-y-3">
+          <label htmlFor="room-url" className="block text-lg font-bold">
+            Tautan ruang latihan bersama
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id="room-url"
+              type="text"
+              readOnly
+              value={roomUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-h-11 flex-1 rounded-md border border-malam-3 bg-malam-2 px-3 text-pasir"
+            />
+            <button type="button" onClick={copyRoomLink} className={`${primaryBtn} justify-center`}>
+              {copied ? <Check aria-hidden="true" className="size-4" /> : <Copy aria-hidden="true" className="size-4" />}
+              {copied ? "Tersalin" : "Salin"}
+            </button>
+          </div>
+          <p className="text-redup">Siswa yang membuka tautan ini masuk ke kampus yang sama denganmu, jadi evakuasinya serentak.</p>
         </div>
-
-        <div className="rounded-xl border border-malam-3 bg-malam-2 p-4">
-          <span className="text-xs font-medium text-redup">Rata-rata Nilai Siswa</span>
-          <p className="mt-1 text-2xl font-extrabold text-pasir tabular-nums">
-            {avgScore}{" "}
-            <span className="text-sm font-normal text-redup">/ 1200 poin</span>
-          </p>
-          <p className="mt-1 text-xs text-redup">Standar minimal kelulusan BNPB: 750 poin</p>
-        </div>
-
-        <div className="rounded-xl border border-malam-3 bg-malam-2 p-4">
-          <span className="text-xs font-medium text-redup">Tingkat Kelulusan Kelas</span>
-          <p className="mt-1 text-2xl font-extrabold text-pasir tabular-nums">
-            {passRate}%{" "}
-            <span className="text-sm font-normal text-redup">({passedCount} sesi lulus)</span>
-          </p>
-          <p className="mt-1 text-xs text-redup">Berdasarkan kepatuhan prosedur evakuasi</p>
-        </div>
+        <Facts
+          items={[
+            ["Guru", me.profile.display_name],
+            ["Rata-rata skor", avgScore === null ? "Belum ada" : `${avgScore} dari 1200`],
+            ["Batas lulus", `${PASS} poin`],
+          ]}
+        />
       </div>
 
-      {/* Recent Drill Activity Table */}
-      <div className="rounded-xl border border-malam-3 bg-malam-2 p-4">
-        <h3 className="mb-3 text-base font-bold text-pasir">Riwayat Aktivitas Siswa Terkini</h3>
+      <div>
+        <h3 className="text-xl font-bold">Latihan terbaru</h3>
         {drills.length === 0 ? (
-          <p className="py-6 text-center text-sm text-redup">Belum ada catatan latihan siswa di sekolah ini.</p>
+          <p className="mt-3 text-redup">Bagikan tautan ruang di atas agar latihan siswa tercatat di sini.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-malam-3">
+            <table className="w-full min-w-[36rem] text-left">
               <thead className="border-b border-malam-3 text-redup">
                 <tr>
-                  <th className="py-2 pr-4 font-semibold">Waktu</th>
-                  <th className="py-2 pr-4 font-semibold">Nama Siswa</th>
-                  <th className="py-2 pr-4 font-semibold">Skenario</th>
-                  <th className="py-2 pr-4 font-semibold text-right">Skor</th>
-                  <th className="py-2 pr-4 font-semibold text-right">Waktu</th>
-                  <th className="py-2 font-semibold">Hasil</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Siswa</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Skenario</th>
+                  <th scope="col" className="px-4 py-3 text-right font-medium">Skor</th>
+                  <th scope="col" className="px-4 py-3 text-right font-medium">Waktu</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Hasil</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-malam-3/50">
-                {drills.slice(0, 8).map((d) => (
-                  <tr key={d.id} className="hover:bg-malam-3/30">
-                    <td className="py-2.5 pr-4 text-redup">
-                      {new Date(d.created_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                    </td>
-                    <td className="py-2.5 pr-4 font-medium text-pasir">{d.user_name}</td>
-                    <td className="py-2.5 pr-4 text-redup">{SCENARIO_LABEL[d.scenario]}</td>
-                    <td className="py-2.5 pr-4 text-right font-bold tabular-nums text-fajar">{d.score}</td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums text-redup">{d.time_s.toFixed(1)}s</td>
-                    <td className="py-2.5">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          d.reached ? "bg-aman/20 text-aman" : "bg-bahaya/20 text-bahaya"
-                        }`}
-                      >
-                        {d.reached ? "Tuntas" : "Gagal"}
+              <tbody className="divide-y divide-malam-3">
+                {drills.slice(0, 10).map((d) => (
+                  <tr key={d.id}>
+                    <th scope="row" className="px-4 py-3 font-semibold">{d.user_name}</th>
+                    <td className="px-4 py-3 text-redup">{SCENARIO_LABEL[d.scenario]}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{d.score}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-redup">{d.time_s.toFixed(1)} dtk</td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1.5">
+                        {d.reached ? (
+                          <CircleCheck aria-hidden="true" className="size-4 text-aman" />
+                        ) : (
+                          <OctagonX aria-hidden="true" className="size-4 text-bahaya" />
+                        )}
+                        {d.reached ? "Sampai titik kumpul" : "Terhenti"}
                       </span>
                     </td>
                   </tr>
