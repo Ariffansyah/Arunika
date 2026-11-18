@@ -4,12 +4,13 @@ import type { CSSProperties } from "react";
 import { latestQuake } from "@/lib/bmkg";
 import { quakeLine } from "@/lib/gladi";
 
-// How a gladi reads, step by step; the quake above it is live from BMKG.
+// How a gladi reads, step by step: the AI writes and judges the situations, the campus engine judges the map moves.
+// The quake above it is live from BMKG.
 const LOG = [
-  { at: "09.12", text: "Guncangan berhenti. Listrik padam, tangga timur retak, dan 32 siswa kelas 8B masih di lantai 2." },
-  { at: "Anda", text: "Turunkan 8B lewat tangga barat. Guru piket menjaga tangga timur agar tidak dilewati." },
-  { at: "AI", text: "Tepat. Tangga yang retak jangan dilewati. Lalu siapa yang menghitung siswa di titik kumpul?" },
-  { at: "09.19", text: "Orang tua berdatangan ke gerbang, dan kabar gedung roboh beredar di grup kelas." },
+  { at: "09.12", text: "Lantai kelas 9B di Gedung Kelas B bergetar keras dan lampu berayun." },
+  { at: "Anda", text: "Masuk ke bawah meja, lindungi kepala, pegang kaki meja." },
+  { at: "Peta", text: "Gedung Kelas A paling rawan runtuh, 78%. Rute ke Lapangan 51 m, aman." },
+  { at: "09.24", text: "Di Lapangan, absen kurang 3 siswa dan orang tua mulai berdatangan." },
 ];
 
 export default async function GladiTeaser() {
@@ -47,12 +48,12 @@ export default async function GladiTeaser() {
               style={{ "--delay": `${i * 10}%` } as CSSProperties}
               className="reveal grid grid-cols-[3.75rem_1fr] items-start gap-3 leading-relaxed"
             >
-              <span className={`pt-0.5 font-extrabold tabular-nums ${at === "Anda" ? "text-pasir" : at === "AI" ? "text-aman" : "text-langit"}`}>
+              <span className={`pt-0.5 font-extrabold tabular-nums ${at === "Anda" ? "text-pasir" : at === "Peta" ? "text-fajar" : "text-langit"}`}>
                 {at}
               </span>
               {at === "Anda" ? (
                 <p className="rounded-md bg-laut/20 px-3 py-2">{text}</p>
-              ) : at === "AI" ? (
+              ) : at === "Peta" ? (
                 <p className="flex gap-2">
                   <CircleCheck aria-hidden="true" className="mt-1 size-4 shrink-0 text-aman" />
                   {text}

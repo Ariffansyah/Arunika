@@ -21,13 +21,17 @@
 * **Visual Debriefing Trail:** Menampilkan visualisasi peta jejak langkah aktual siswa dibandingkan dengan rute evakuasi ideal, lengkap dengan perhitungan efisiensi rute dan catatan evaluasi.
 * **Petugas Keselamatan Virtual (AI Warden):** Asisten AI interaktif dengan respon *streaming* untuk menjawab pertanyaan evakuasi, isi tas siaga, dan P3K.
 
-### 2. Gladi Ruang AI untuk Tim Siaga Sekolah (`/gladi`)
-Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga: bencana dibahas langkah demi langkah di atas meja. Siswa berlatih di kampus 3D; guru dan kepala sekolah berlatih di sini.
-* **Skenario dari gempa sungguhan:** gempa terkini diambil langsung dari umpan publik **BMKG** (`autogempa.json`). Jarak episentrum ke sekolah dihitung (haversine); bila jauh, gempa yang sama "dipindahkan" ke dekat sekolah untuk latihan. Bisa juga memilih banjir, longsor, atau angin puting beliung.
-* **AI sebagai pengendali latihan:** memberi 4 situasi berurutan yang disesuaikan dengan profil sekolah (jumlah lantai, material, jarak ke pantai, jenis tanah). Peserta memilih salah satu dari 3 tindakan atau menulis keputusannya sendiri.
-* **Penilaian berbasis pedoman:** setiap keputusan dinilai *tepat*, *kurang*, atau *berbahaya* dengan acuan langkah sekolah aman bencana yang sama dengan yang diajarkan simulasi 3D, dan situasi berikutnya adalah akibat dari keputusan itu.
-* **Rencana tindak lanjut:** di akhir, AI menyusun catatan dan perbaikan rencana siaga (prioritas + kelas biaya) yang tersimpan ke dasbor sebagai skor kesiapan tim siaga. Skor dihitung dari putusan tiap langkah, bukan angka bebas dari model.
-* **Aman dari manipulasi:** setiap langkah ditandatangani HMAC di server, sehingga peramban tidak bisa mengubah situasi atau putusan AI sebelum skor disimpan. Jawaban peserta diperlakukan sebagai data, bukan instruksi, untuk menahan *prompt injection*.
+### 2. Gladi Ruang di Atas Denah Sekolah (`/gladi`)
+Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga: bencana dibahas langkah demi langkah di atas peta sekolah. Siswa berlatih di kampus 3D; guru dan kepala sekolah berlatih di sini. Mejanya adalah denah kampus yang sama, dan yang menghitung bahaya adalah mesin simulasi Arunika sendiri, bukan AI.
+* **Peta dihitung mesin simulasi:** risiko runtuh atau rusak tiap gedung (dari material, umur, jenis tanah, dan jarak pantai sekolah), petak tergenang atau rawan reruntuhan, dan titik kumpul yang aman. Peta berubah begitu skenario diganti, sebelum AI dipanggil.
+* **Skenario dari gempa sungguhan:** gempa terkini diambil langsung dari umpan publik **BMKG** (`autogempa.json`). Jarak episentrum ke sekolah dihitung (haversine); bila jauh, gempa yang sama "dipindahkan" ke dekat sekolah. Bisa juga memilih banjir, longsor, atau angin puting beliung, di kampus pesisir, pegunungan, atau kota.
+* **4 langkah, dua penilai:**
+  1. **AI** menyusun detik-detik pertama di sebuah kelas; peserta memilih atau menulis tindakannya, AI menilai.
+  2. **Di peta:** gedung mana yang dikosongkan lebih dulu. Dinilai mesin dari peringkat risiko.
+  3. **Di peta:** ke mana penghuninya dievakuasi. *Pathfinder* A* menggambar rute, menghitung meter, detik berjalan, dan petak bahaya yang dilewati, lalu membandingkannya dengan rute terbaik.
+  4. **AI** menyusun komplikasi yang lahir dari keputusan di peta (misalnya absen kurang di titik kumpul yang dipilih), lalu menilai tindakan peserta.
+* **Rencana tindak lanjut:** AI menyusun catatan dan perbaikan rencana siaga (prioritas + kelas biaya) yang tersimpan ke dasbor. Skornya rata-rata nilai keempat langkah, bukan angka bebas dari model.
+* **Aman dari manipulasi:** setiap langkah ditandatangani HMAC di server, sehingga peramban tidak bisa mengubah situasi atau putusan AI. Keputusan di peta dinilai ulang di server dengan aturan yang sama, dan jawaban peserta dikirim ke model sebagai data berformat JSON untuk menahan *prompt injection*.
 
 ### 3. Dasbor Kesiapsiagaan Multi-Peran (`/dashboard`)
 * **🎓 Siswa:** Rapor mandiri kelulusan 4 skenario BNPB, lencana prestasi, dan cetak kartu bukti prestasi siswa siaga.
