@@ -22,7 +22,7 @@ const PASS = 750;
 
 export default function RoleViewGuru({ me, school, drills }: { me: Me; school: School | null; drills: SchoolDrillItem[] }) {
   const [copied, setCopied] = useState(false);
-  const room = `/kampus?room=${encodeURIComponent(school?.id ?? "umum")}`;
+  const room = `/sekolah?room=${encodeURIComponent(school?.id ?? "umum")}`;
   const roomUrl = typeof window !== "undefined" ? `${window.location.origin}${room}` : room;
 
   const copyRoomLink = () => {
@@ -92,7 +92,7 @@ export default function RoleViewGuru({ me, school, drills }: { me: Me; school: S
               {copied ? "Tersalin" : "Salin"}
             </button>
           </div>
-          <p className="text-redup">Siswa yang membuka tautan ini masuk ke kampus yang sama denganmu, jadi evakuasinya serentak.</p>
+          <p className="text-redup">Siswa yang membuka tautan ini masuk ke sekolah yang sama denganmu, jadi evakuasinya serentak.</p>
         </div>
         <Facts
           items={[

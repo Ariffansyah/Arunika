@@ -118,7 +118,7 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
           </ul>
         )}
       </div>
-      <Link href={`/kampus?room=${row.id}`} className={secondaryBtn}>
+      <Link href={`/sekolah?room=${row.id}`} className={secondaryBtn}>
         Latihan di ruang ini
       </Link>
     </section>

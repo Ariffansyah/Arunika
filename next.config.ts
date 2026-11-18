@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     agentFeedback: true,
   },
   cacheComponents: true,
+  // Room links shared before the rename still open the drill.
+  redirects: () => [{ source: "/kampus", destination: "/sekolah", permanent: true }],
   partialPrefetching: true,
   turbopack: {
     rules: {

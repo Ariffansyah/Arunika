@@ -2,7 +2,7 @@
 /**
  * Arunika Test Suite Runner
  *
- * Menjalankan seluruh pengujian unit lintas konfigurasi peta kampus
+ * Menjalankan seluruh pengujian unit lintas konfigurasi peta sekolah
  * (Pesisir, Pegunungan, dan Kota) secara konsisten dan lintas platform (Windows/macOS/Linux).
  *
  * Penggunaan:

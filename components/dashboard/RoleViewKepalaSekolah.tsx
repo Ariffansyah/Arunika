@@ -78,7 +78,7 @@ export default function RoleViewKepalaSekolah({
       </div>
 
       <div className="grid gap-x-12 gap-y-6 rounded-lg border border-malam-3 bg-malam-2 p-5 sm:grid-cols-2 sm:p-6">
-        <Meter label="Kesiapan siswa dari latihan kampus" value={drill} max={100} href={link(`/kampus?room=${school?.id ?? "umum"}`, "Mulai latihan")} />
+        <Meter label="Kesiapan siswa dari latihan evakuasi" value={drill} max={100} href={link(`/sekolah?room=${school?.id ?? "umum"}`, "Mulai latihan")} />
         <Meter label="Kesiapan tim siaga dari gladi ruang" value={gladiScore} max={100} href={link("/gladi", "Mulai gladi")} />
       </div>
 

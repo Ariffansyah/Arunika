@@ -19,10 +19,10 @@ type Mode = "masuk" | "daftar";
 // Resolve against our own origin so "//host" or "/\host" can't send users to another site.
 function safeNext(raw: string | null) {
   try {
-    const u = new URL(raw ?? "/kampus", location.origin);
-    return u.origin === location.origin ? u.pathname + u.search + u.hash : "/kampus";
+    const u = new URL(raw ?? "/sekolah", location.origin);
+    return u.origin === location.origin ? u.pathname + u.search + u.hash : "/sekolah";
   } catch {
-    return "/kampus";
+    return "/sekolah";
   }
 }
 

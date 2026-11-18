@@ -32,7 +32,7 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
   const title =
     passed >= 4 ? "Duta Siaga Bencana" : passed >= 2 ? "Kader Tangguh Bencana" : passed >= 1 ? "Pelajar Waspada" : "Pelajar Siaga";
   const average = drills.length ? Math.round(drills.reduce((s, d) => s + d.score, 0) / drills.length) : null;
-  const room = `/kampus?room=${school?.id ?? "umum"}`;
+  const room = `/sekolah?room=${school?.id ?? "umum"}`;
 
   const facts: [string, React.ReactNode][] = [
     ["Predikat", title],
@@ -49,7 +49,7 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
         </h2>
         <div className="flex flex-wrap gap-3">
           <Link href={room} className={primaryBtn}>
-            Latihan di kampus
+            Latihan evakuasi
           </Link>
           <button type="button" onClick={() => setPrinting(true)} className={secondaryBtn}>
             Cetak kartu prestasi

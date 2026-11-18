@@ -15,7 +15,7 @@ import WardenChat from "./WardenChat";
 
 const World = dynamic(() => import("./World"), {
   ssr: false,
-  loading: () => <Notice>Memuat kampus…</Notice>,
+  loading: () => <Notice>Memuat sekolah…</Notice>,
 });
 
 function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
@@ -44,7 +44,7 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
 
   return (
     <div className="fixed inset-0">
-      <h1 className="sr-only">Kampus {me.school?.name ?? ""}</h1>
+      <h1 className="sr-only">Sekolah {me.school?.name ?? ""}</h1>
       <World me={{ name: self.name, look: avatarOf(self.avatar) }} peers={peers} school={me.school} />
       <Hud
         room={room}

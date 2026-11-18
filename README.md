@@ -14,17 +14,17 @@
 
 ## 🌟 Pilar & Fitur Utama
 
-### 1. Simulasi Kampus 3D Interaktif (`/kampus`)
-* **3 Ragam Topografi Indonesia:** Kampus Pesisir (ancaman rob & bukit evakuasi), Pegunungan (lereng rawan longsor), dan Kawasan Perkotaan (kawasan padat gedung bertingkat).
+### 1. Simulasi Sekolah 3D Interaktif (`/sekolah`)
+* **3 Ragam Topografi Indonesia:** dipilih dari menu peta sebelum masuk: Sekolah Pesisir (ancaman rob & bukit evakuasi), Pegunungan (lereng rawan longsor), dan Kawasan Perkotaan (kawasan padat gedung bertingkat).
 * **4 Skenario Bencana Utama:** Gempa Bumi (*Drop, Cover, Hold on*), Banjir/Rob (air meninggi, arus, bahaya listrik), Angin Puting Beliung, dan Tanah Longsor.
 * **Multiplayer Real-time (Supabase Channels & Presence):** Siswa dan guru dapat masuk ke dalam ruang simulasi yang sama, melihat pergerakan avatar teman, membunyikan kentongan/alarm bersama, dan melakukan evakuasi serentak.
 * **Visual Debriefing Trail:** Menampilkan visualisasi peta jejak langkah aktual siswa dibandingkan dengan rute evakuasi ideal, lengkap dengan perhitungan efisiensi rute dan catatan evaluasi.
 * **Petugas Keselamatan Virtual (AI Warden):** Asisten AI interaktif dengan respon *streaming* untuk menjawab pertanyaan evakuasi, isi tas siaga, dan P3K.
 
 ### 2. Gladi Ruang di Atas Denah Sekolah (`/gladi`)
-Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga: bencana dibahas langkah demi langkah di atas peta sekolah. Siswa berlatih di kampus 3D; guru dan kepala sekolah berlatih di sini. Mejanya adalah denah kampus yang sama, dan yang menghitung bahaya adalah mesin simulasi Arunika sendiri, bukan AI.
+Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga: bencana dibahas langkah demi langkah di atas peta sekolah. Siswa berlatih di sekolah 3D; guru dan kepala sekolah berlatih di sini. Mejanya adalah denah sekolah yang sama, dan yang menghitung bahaya adalah mesin simulasi Arunika sendiri, bukan AI.
 * **Peta dihitung mesin simulasi:** risiko runtuh atau rusak tiap gedung (dari material, umur, jenis tanah, dan jarak pantai sekolah), petak tergenang atau rawan reruntuhan, dan titik kumpul yang aman. Peta berubah begitu skenario diganti, sebelum AI dipanggil.
-* **Skenario dari gempa sungguhan:** gempa terkini diambil langsung dari umpan publik **BMKG** (`autogempa.json`). Jarak episentrum ke sekolah dihitung (haversine); bila jauh, gempa yang sama "dipindahkan" ke dekat sekolah. Bisa juga memilih banjir, longsor, atau angin puting beliung, di kampus pesisir, pegunungan, atau kota.
+* **Skenario dari gempa sungguhan:** gempa terkini diambil langsung dari umpan publik **BMKG** (`autogempa.json`). Jarak episentrum ke sekolah dihitung (haversine); bila jauh, gempa yang sama "dipindahkan" ke dekat sekolah. Bisa juga memilih banjir, longsor, atau angin puting beliung, di sekolah pesisir, pegunungan, atau kota.
 * **4 langkah, dua penilai:**
   1. **AI** menyusun detik-detik pertama di sebuah kelas; peserta memilih atau menulis tindakannya, AI menilai.
   2. **Di peta:** gedung mana yang dikosongkan lebih dulu. Dinilai mesin dari peringkat risiko.
@@ -36,7 +36,7 @@ Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga: bencana d
 ### 3. Dasbor Kesiapsiagaan Multi-Peran (`/dashboard`)
 * **🎓 Siswa:** Rapor mandiri kelulusan 4 skenario BNPB, lencana prestasi, dan cetak kartu bukti prestasi siswa siaga.
 * **🧑‍🏫 Guru:** Generator tautan/kode sesi kelas multiplayer, monitoring nilai dan kepatuhan evakuasi kelas, serta ekspor rekap nilai (CSV).
-* **🏛️ Kepala Sekolah:** Indeks Kesiapan Gabungan (kesiapan siswa dari latihan kampus + kesiapan tim siaga dari gladi ruang), rencana tindak lanjut untuk RKAS, serta cetak laporan sekolah.
+* **🏛️ Kepala Sekolah:** Indeks Kesiapan Gabungan (kesiapan siswa dari latihan evakuasi + kesiapan tim siaga dari gladi ruang), rencana tindak lanjut untuk RKAS, serta cetak laporan sekolah.
 * **🏢 Pemda / BPBD:** Peta 3D geospasial Indonesia, filter prioritas intervensi wilayah, dan ekspor data analisis risiko sekolah se-daerah.
 
 ---
@@ -92,7 +92,7 @@ Buka [http://localhost:3000](http://localhost:3000) pada peramban Anda.
 
 ## 🧪 Pengujian & Kualitas Kode
 
-Platform Arunika dilengkapi dengan suite pengujian otomatis yang menguji logika denah gedung (*floorplan*), *pathfinding/navigation*, fisika rintangan, dan skenario bencana lintas seluruh varian peta kampus:
+Platform Arunika dilengkapi dengan suite pengujian otomatis yang menguji logika denah gedung (*floorplan*), *pathfinding/navigation*, fisika rintangan, dan skenario bencana lintas seluruh varian peta sekolah:
 
 ```bash
 # Menjalankan seluruh pengujian unit di semua konfigurasi peta
@@ -117,7 +117,7 @@ arunika/
 │   ├── gladi/            # Gladi ruang AI untuk tim siaga sekolah
 │   ├── api/              # Route handlers (/api/gladi, /api/warden)
 │   ├── dashboard/        # Dasbor analitik multi-peran & peta 3D Indonesia
-│   ├── kampus/           # Halaman simulasi kampus 3D interaktif
+│   ├── sekolah/          # Halaman simulasi sekolah 3D interaktif
 │   └── masuk/            # Alur autentikasi & kelengkapan profil pengguna
 ├── components/           # Komponen React UI
 │   ├── campus/           # Engine 3D (World, Player, Hud, Controls, DebriefingTrail)

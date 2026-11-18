@@ -690,7 +690,7 @@ export default function World({
       gl={{ antialias: getState().quality !== "ringan", powerPreference: "high-performance" }}
       camera={{ fov: 55, near: 0.1, far: tier.far }}
       style={{ touchAction: "none" }}
-      aria-label="Kampus sekolah"
+      aria-label="Simulasi sekolah"
     >
       <PerformanceMonitor onDecline={lowerQuality} flipflops={3} />
       <Far far={tier.far} />

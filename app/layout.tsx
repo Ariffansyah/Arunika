@@ -10,7 +10,7 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: { default: "Arunika", template: "%s · Arunika" },
   description:
-    "Latihan evakuasi bersama di kampus digital, asisten keselamatan AI, dan peta kesiapan sekolah rawan bencana.",
+    "Latihan evakuasi bersama di sekolah virtual, asisten keselamatan AI, dan peta kesiapan sekolah rawan bencana.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

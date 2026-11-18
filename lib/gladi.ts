@@ -305,7 +305,7 @@ function describeBoard(hazard: Hazard, board: Board) {
   const risks = ranked(board.risks).map((id) => `${name(id)} ${board.risks[id]}%`).join(", ");
   const places = [...Object.keys(MAPS[board.peta]!.assemblyNames), ...Object.keys(board.risks)];
   const safe = places.filter((id) => board.safe.includes(id)).map(name);
-  return `Kampus ${MAPS[board.peta]!.name}. Mesin simulasi Arunika menghitung risiko ${RISK_WORD[hazard]} per gedung: ${risks}.
+  return `Sekolah ${MAPS[board.peta]!.name}. Mesin simulasi Arunika menghitung risiko ${RISK_WORD[hazard]} per gedung: ${risks}.
 Tujuan evakuasi yang aman menurut mesin: ${safe.join(", ") || "tidak ada"}.`;
 }
 

@@ -93,12 +93,12 @@ export default function Hero() {
           Hafal jalan selamat <span className="text-fajar">sebelum</span> bencana datang.
         </h1>
       </div>
-      <nav aria-label="Pilih kampus latihan" className="animate-rise border-t border-pasir/15 bg-malam/90 [animation-delay:200ms]">
+      <nav aria-label="Pilih sekolah latihan" className="animate-rise border-t border-pasir/15 bg-malam/90 [animation-delay:200ms]">
         <ul className="mx-auto grid max-w-6xl divide-y divide-pasir/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0 lg:border-x lg:border-pasir/10">
           {CAMPUSES.map(({ id, hazard }) => (
             <li key={id}>
               <Link
-                href={`/kampus?peta=${id}`}
+                href={`/sekolah?peta=${id}`}
                 className="group flex min-h-18 items-center gap-4 px-4 py-3 transition-colors duration-200 hover:bg-laut focus-visible:bg-laut sm:px-6 lg:px-5 lg:py-5"
               >
                 <SitePlan id={id} />

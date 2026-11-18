@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const LINKS = [
-  { href: "/kampus", label: "Kampus" },
+  { href: "/sekolah", label: "Sekolah" },
   { href: "/gladi", label: "Gladi" },
   { href: "/dashboard", label: "Dasbor" },
 ];

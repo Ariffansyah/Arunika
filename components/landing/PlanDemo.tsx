@@ -86,7 +86,7 @@ export default function PlanDemo() {
             route={route ?? undefined}
             hazards={hazards}
             hazardColor={HAZARD_COLOR[scenario.kind]}
-            label={`Denah kampus, ${SCENARIO_LABEL[scenario.kind]} ${fmt(scenario.intensity)} ${meta.unit}`.trim() + ", dengan jalur evakuasi"}
+            label={`Denah sekolah, ${SCENARIO_LABEL[scenario.kind]} ${fmt(scenario.intensity)} ${meta.unit}`.trim() + ", dengan jalur evakuasi"}
           />
           <figcaption className="flex flex-wrap gap-x-6 gap-y-1 border-t border-malam-3 px-4 py-3 text-sm">
             <span className="inline-flex items-center gap-2">

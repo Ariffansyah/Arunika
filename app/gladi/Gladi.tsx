@@ -107,7 +107,7 @@ function Board({
       route={route ?? undefined}
       hazards={hazards}
       hazardColor={HAZARD_FILL[hazard]}
-      label={`Denah kampus ${MAP.name} saat ${HAZARD_LABEL[hazard].toLowerCase()}, dengan risiko tiap gedung dan tujuan evakuasi`}
+      label={`Denah sekolah ${MAP.name} saat ${HAZARD_LABEL[hazard].toLowerCase()}, dengan risiko tiap gedung dan tujuan evakuasi`}
     >
       {best && (
         <polyline
@@ -402,7 +402,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
       <div className="sticky top-0 z-10 space-y-3 bg-malam py-2 lg:top-4 lg:py-0">
         {stage === "siap" && (
           // Each campus is its own page load: the engine fixes its grid when the page opens.
-          <nav aria-label="Kampus" className="flex flex-wrap gap-2">
+          <nav aria-label="Peta" className="flex flex-wrap gap-2">
             {campuses.map((id) =>
               id === MAP.id ? (
                 <span key={id} aria-current="page" className="inline-flex min-h-11 items-center rounded-md bg-laut px-4 font-semibold text-white">

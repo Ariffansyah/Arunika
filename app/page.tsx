@@ -6,7 +6,7 @@ import PlanDemo from "@/components/landing/PlanDemo";
 import SiteHeader from "@/components/SiteHeader";
 
 const MORE = [
-  { href: "/kampus", text: "Tanya Petugas AI di kampus." },
+  { href: "/sekolah", text: "Tanya Petugas AI di sekolah." },
   { href: "/dashboard", text: "Lihat sekolah yang belum siap." },
 ];
 

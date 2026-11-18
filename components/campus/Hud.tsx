@@ -68,7 +68,7 @@ function MapOverlay() {
       <div className={`${panel} w-full max-w-2xl space-y-3`} onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold">Peta evakuasi</h2>
         <div className="overflow-hidden rounded-md border border-malam-3">
-          <CampusPlan label="Peta evakuasi kampus dengan titik kumpul dan posisi kamu">
+          <CampusPlan label="Peta evakuasi sekolah dengan titik kumpul dan posisi kamu">
             <circle ref={dot} r={0.9} fill="#ff8a3d" stroke="#071530" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
           </CampusPlan>
         </div>
@@ -86,14 +86,14 @@ function Minimap() {
   const route = useDrill((s) => (s.showRoute ? s.route : null));
   return (
     <div className="hidden w-44 overflow-hidden rounded-lg border border-malam-3 shadow-lg sm:block lg:w-52">
-      <CampusPlan path={route?.map(([x, , z]) => [x / TILE, z / TILE])} label="Peta mini kampus dengan posisi kamu">
+      <CampusPlan path={route?.map(([x, , z]) => [x / TILE, z / TILE])} label="Peta mini sekolah dengan posisi kamu">
         <circle ref={dot} r={0.8} fill="#eaf1ff" stroke="#071530" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
       </CampusPlan>
     </div>
   );
 }
 
-const campusUrl = (room: string, map: string) => `/kampus?room=${encodeURIComponent(room)}&peta=${map}`;
+const campusUrl = (room: string, map: string) => `/sekolah?room=${encodeURIComponent(room)}&peta=${map}`;
 
 function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario) => void }) {
   const scenario = useDrill((s) => s.scenario);
@@ -620,7 +620,7 @@ export default function Hud({
                 Arunika
               </Link>
               <span className="truncate text-redup">
-                {school?.name ?? "Kampus contoh"} · {MAP.name}
+                {school?.name ?? "Sekolah contoh"} · {MAP.name}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-1 rounded-lg bg-malam-2 p-1">
