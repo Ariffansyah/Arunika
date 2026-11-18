@@ -6,7 +6,7 @@
 [![Three.js](https://img.shields.io/badge/Three.js-R3F-orange?logo=three.js)](https://threejs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8?logo=tailwind-css)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Realtime%20%26%20Postgres-3ecf8e?logo=supabase)](https://supabase.com/)
-[![Groq AI](https://img.shields.io/badge/AI%20Vision-Groq%20Llama%203.2-f55036)](https://groq.com/)
+[![Groq AI](https://img.shields.io/badge/AI-Groq%20gpt--oss%20%26%20Qwen3-f55036)](https://groq.com/)
 
 **Arunika** adalah platform berbasis web interaktif 3D dan kecerdasan buatan (*AI*) yang dirancang untuk melatih, mengevaluasi, dan memperkuat kesiapsiagaan warga sekolah di wilayah rawan bencana Indonesia sesuai standar dan pedoman Badan Nasional Penanggulangan Bencana (BNPB).
 
@@ -21,15 +21,18 @@
 * **Visual Debriefing Trail:** Menampilkan visualisasi peta jejak langkah aktual siswa dibandingkan dengan rute evakuasi ideal, lengkap dengan perhitungan efisiensi rute dan catatan evaluasi.
 * **Petugas Keselamatan Virtual (AI Warden):** Asisten AI interaktif dengan respon *streaming* untuk menjawab pertanyaan evakuasi, isi tas siaga, dan P3K.
 
-### 2. Audit Kerentanan Bangunan Sekolah Berbasis AI Vision (`/analisis`)
-* Unggah foto struktur fisik sekolah (dinding retak, kolom beton, balok, sambungan atap, lantai dasar).
-* Kompresi otomatis di sisi peramban (*client-side canvas downscaling*).
-* Diagnosis visual berbasis **Groq Llama 3.2 Vision** yang menghasilkan skor kerentanan (0–100), observasi fisik empiris, serta rekomendasi perbaikan berkategori prioritas dan estimasi biaya (*cost band*).
+### 2. Gladi Ruang AI untuk Tim Siaga Sekolah (`/gladi`)
+Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga: bencana dibahas langkah demi langkah di atas meja. Siswa berlatih di kampus 3D; guru dan kepala sekolah berlatih di sini.
+* **Skenario dari gempa sungguhan:** gempa terkini diambil langsung dari umpan publik **BMKG** (`autogempa.json`). Jarak episentrum ke sekolah dihitung (haversine); bila jauh, gempa yang sama "dipindahkan" ke dekat sekolah untuk latihan. Bisa juga memilih banjir, longsor, atau angin puting beliung.
+* **AI sebagai pengendali latihan:** memberi 4 situasi berurutan yang disesuaikan dengan profil sekolah (jumlah lantai, material, jarak ke pantai, jenis tanah). Peserta memilih salah satu dari 3 tindakan atau menulis keputusannya sendiri.
+* **Penilaian berbasis pedoman:** setiap keputusan dinilai *tepat*, *kurang*, atau *berbahaya* dengan acuan langkah sekolah aman bencana yang sama dengan yang diajarkan simulasi 3D, dan situasi berikutnya adalah akibat dari keputusan itu.
+* **Rencana tindak lanjut:** di akhir, AI menyusun catatan dan perbaikan rencana siaga (prioritas + kelas biaya) yang tersimpan ke dasbor sebagai skor kesiapan tim siaga. Skor dihitung dari putusan tiap langkah, bukan angka bebas dari model.
+* **Aman dari manipulasi:** setiap langkah ditandatangani HMAC di server, sehingga peramban tidak bisa mengubah situasi atau putusan AI sebelum skor disimpan. Jawaban peserta diperlakukan sebagai data, bukan instruksi, untuk menahan *prompt injection*.
 
 ### 3. Dasbor Kesiapsiagaan Multi-Peran (`/dashboard`)
 * **🎓 Siswa:** Rapor mandiri kelulusan 4 skenario BNPB, lencana prestasi, dan cetak kartu bukti prestasi siswa siaga.
 * **🧑‍🏫 Guru:** Generator tautan/kode sesi kelas multiplayer, monitoring nilai dan kepatuhan evakuasi kelas, serta ekspor rekap nilai (CSV).
-* **🏛️ Kepala Sekolah:** Indeks Kesiapan Gabungan (Ketahanan Fisik + Kesiapan Warga), daftar tindakan mitigasi terjadwal untuk RKAS, serta cetak laporan audit resmi sekolah.
+* **🏛️ Kepala Sekolah:** Indeks Kesiapan Gabungan (kesiapan siswa dari latihan kampus + kesiapan tim siaga dari gladi ruang), rencana tindak lanjut untuk RKAS, serta cetak laporan sekolah.
 * **🏢 Pemda / BPBD:** Peta 3D geospasial Indonesia, filter prioritas intervensi wilayah, dan ekspor data analisis risiko sekolah se-daerah.
 
 ---
@@ -40,7 +43,8 @@
 * **3D Visuals & Engine:** Three.js, `@react-three/fiber`, `@react-three/drei`
 * **Styling & Icons:** Tailwind CSS v4, Lucide React
 * **Backend & Database:** Supabase (PostgreSQL, Row Level Security, Realtime Broadcast & Presence)
-* **AI & LLM Services:** Groq SDK (Llama 3.2 Vision & Llama 3 Chat)
+* **AI & LLM Services:** Groq SDK: `openai/gpt-oss-120b` dengan *strict structured output* untuk gladi ruang, `qwen/qwen3.8-27b` untuk Petugas AI (*streaming chat*)
+* **Data publik:** BMKG `autogempa.json` (gempa terkini), di-*cache* 1 menit dengan `"use cache"` Next.js
 * **Test Suite:** Native Node.js Test Runner dengan cross-platform suite runner
 
 ---
@@ -106,8 +110,8 @@ pnpm lint
 ```text
 arunika/
 ├── app/                  # Next.js App Router (Halaman & Endpoint API)
-│   ├── analisis/         # Halaman asesmen kerentanan gedung berbasis AI
-│   ├── api/              # Route handlers (/api/analyze, /api/warden)
+│   ├── gladi/            # Gladi ruang AI untuk tim siaga sekolah
+│   ├── api/              # Route handlers (/api/gladi, /api/warden)
 │   ├── dashboard/        # Dasbor analitik multi-peran & peta 3D Indonesia
 │   ├── kampus/           # Halaman simulasi kampus 3D interaktif
 │   └── masuk/            # Alur autentikasi & kelengkapan profil pengguna

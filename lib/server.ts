@@ -2,9 +2,10 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import Groq from "groq-sdk";
 
-// Chat needs speed and good Indonesian; the analyzer needs image input and JSON-schema output.
+// Chat needs speed and good Indonesian. The gladi needs replies that always fit its JSON schema, which
+// gpt-oss gives with strict structured output; qwen broke the schema in about one step in five.
 export const CHAT_MODEL = "qwen/qwen3.8-27b";
-export const VISION_MODEL = "qwen/qwen3.8-27b";
+export const GLADI_MODEL = "openai/gpt-oss-120b";
 
 let client: Groq | null = null;
 export function groq() {
