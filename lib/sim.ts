@@ -226,19 +226,24 @@ export function bestRoute(grid: string[], start: Tile, goals: Tile[], hazards: S
   return null;
 }
 
+// The yard tile just outside a building's main doors.
+export function entranceTile(id: string): Tile {
+  const r = buildingRects()[id];
+  const mx = Math.round((r.x0 + r.x1) / 2);
+  const mz = Math.round((r.z0 + r.z1) / 2);
+  const side = BUILDINGS[id].entrance;
+  return side === "S" ? [mx, r.z1 + 1] : side === "N" ? [mx, r.z0 - 1] : side === "E" ? [r.x1 + 1, mz] : [r.x0 - 1, mz];
+}
+
 export type EvacSign = { x: number; z: number; tile: Tile; ry: number; arrow: number };
 
 // Permanent signs from every building's entrance to the nearest assembly point, as a school would post them.
 // Each panel faces whoever walks up the route; "up" on it means straight on. `ry` turns the panel about y,
 // `arrow` turns the arrow on its face.
 export function evacuationSigns(): EvacSign[] {
-  const rects = buildingRects();
   const out: EvacSign[] = [];
-  for (const [id, b] of Object.entries(BUILDINGS)) {
-    const r = rects[id];
-    const mx = Math.round((r.x0 + r.x1) / 2);
-    const mz = Math.round((r.z0 + r.z1) / 2);
-    const start: Tile = b.entrance === "S" ? [mx, r.z1 + 1] : b.entrance === "N" ? [mx, r.z0 - 1] : b.entrance === "E" ? [r.x1 + 1, mz] : [r.x0 - 1, mz];
+  for (const id of Object.keys(BUILDINGS)) {
+    const start = entranceTile(id);
     if (isBlocked(...start)) continue;
     const path = bestRoute(GRID, start, ASSEMBLY, new Set()) ?? [];
     for (let i = 1; i + 2 < path.length; i += 5) {
