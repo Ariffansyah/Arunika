@@ -5,10 +5,12 @@ import { latestQuake } from "@/lib/bmkg";
 import {
   HAZARDS,
   SCHEMAS,
-  STEPS,
+  aiStep,
+  parseBoard,
   parseDebrief,
   parseFeedback,
   parseInject,
+  parseMoves,
   phaseOf,
   stepPrompt,
   systemPrompt,
@@ -21,7 +23,8 @@ import { GLADI_MODEL, adminDb, groq, rateLimit, requestUser, text } from "@/lib/
 import type { School } from "@/lib/supabase";
 
 // The browser carries the exercise between steps. The signature keeps it from rewriting an inject or a verdict,
-// which matters because the last step saves a score for the user's school.
+// which matters because the last step saves a score for the user's school. The board facts and the two map moves
+// are measured by the campus engine in the browser, so the server can only check that they are well formed.
 function sign(userId: string, state: State) {
   return createHmac("sha256", process.env.SUPABASE_SECRET_KEY!)
     .update(`gladi:${userId}:${JSON.stringify(state)}`)
@@ -74,56 +77,56 @@ export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return text("Format permintaan tidak valid.", 400);
 
+  const state = body.state ? (body.state as State) : null;
+  if (state && !verified(user.id, state, body.token)) return text("Sesi gladi tidak valid. Mulai ulang gladi.", 400);
+  const phase = phaseOf(state);
+  if (!phase) return text("Gladi ini sudah selesai.", 400);
+
   let seed: Seed;
-  let state: State | null = null;
-  let answer: string | null = null;
-  if (body.state) {
-    state = body.state as State;
-    if (!verified(user.id, state, body.token)) return text("Sesi gladi tidak valid. Mulai ulang gladi.", 400);
-    if (state.done.length >= STEPS) return text("Gladi ini sudah selesai.", 400);
-    answer = str(body.answer, 400);
-    if (!answer) return text("Tulis atau pilih keputusan dulu.", 400);
-    seed = state.seed;
-  } else if (body.hazard === "bmkg") {
-    const quake = await latestQuake();
-    if (!quake) return text("Data gempa BMKG sedang tidak tersedia. Pilih ancaman lain.", 503);
-    seed = { hazard: "gempa", quake };
-  } else {
-    seed = { hazard: HAZARDS.find((h) => h === body.hazard) ?? "gempa", quake: null };
+  if (state) seed = state.seed;
+  else {
+    const board = parseBoard(body.board);
+    if (!board) return text("Data peta tidak valid. Muat ulang halaman.", 400);
+    const quake = body.hazard === "bmkg" ? await latestQuake() : null;
+    if (body.hazard === "bmkg" && !quake) return text("Data gempa BMKG sedang tidak tersedia. Pilih ancaman lain.", 503);
+    seed = { hazard: quake ? "gempa" : (HAZARDS.find((h) => h === body.hazard) ?? "gempa"), quake, board };
   }
+
+  const answer = phase === "judge" || phase === "end" ? str(body.answer, 400) : null;
+  if ((phase === "judge" || phase === "end") && !answer) return text("Tulis atau pilih keputusan dulu.", 400);
+  const moves = phase === "twist" ? parseMoves(body.moves, seed.hazard, seed.board) : [];
+  if (!moves) return text("Keputusan di peta tidak valid.", 400);
+  const steps = [...(state?.steps ?? []), ...moves];
+  const pending = state?.pending ?? null;
 
   const limited = await rateLimit(user.id, "gladi", 40, 60 * 60);
   if (limited) return limited;
 
-  const done = state?.done ?? [];
-  const phase = phaseOf(done.length + (answer ? 1 : 0));
   try {
     const school = await schoolOf(user.id);
     // One retry: a malformed reply mid-exercise costs the participant their place, a second call costs little.
     for (let attempt = 0; attempt < 2; attempt++) {
-      const out = await ask(systemPrompt(seed, school), stepPrompt(done, state?.pending ?? null, answer), phase);
+      const out = await ask(systemPrompt(seed, school), stepPrompt(phase, seed, steps, pending, answer), phase);
 
-      if (phase === "start") {
-        const pending = shuffled(parseInject(out?.inject));
-        if (!pending) continue;
-        const next: State = { seed, done: [], pending };
-        return Response.json({ state: next, token: sign(user.id, next) });
+      if (phase === "start" || phase === "twist") {
+        const next = shuffled(parseInject(out?.inject));
+        if (!next) continue;
+        const after: State = { seed, steps, pending: next };
+        return Response.json({ state: after, token: sign(user.id, after) });
       }
 
       const feedback = parseFeedback(out?.feedback);
-      if (!feedback || !state || !answer) continue;
-      const turns = [...done, { inject: state.pending, answer, feedback }];
+      if (!feedback || !pending || !answer) continue;
+      const done = [...steps, aiStep(phase === "judge" ? "aksi" : "susulan", pending, answer, feedback)];
 
-      if (phase === "step") {
-        const pending = shuffled(parseInject(out?.inject));
-        if (!pending) continue;
-        const next: State = { seed, done: turns, pending };
-        return Response.json({ state: next, token: sign(user.id, next) });
+      if (phase === "judge") {
+        const after: State = { seed, steps: done, pending: null };
+        return Response.json({ state: after, token: sign(user.id, after) });
       }
 
-      const debrief = parseDebrief(out, turns);
+      const debrief = parseDebrief(out, done);
       if (!debrief) continue;
-      return Response.json({ done: turns, debrief, saved: await save(user.id, school, seed, debrief) });
+      return Response.json({ steps: done, debrief, saved: await save(user.id, school, seed, debrief) });
     }
     return text("AI mengembalikan hasil yang tidak lengkap. Coba lagi.", 502);
   } catch (e) {

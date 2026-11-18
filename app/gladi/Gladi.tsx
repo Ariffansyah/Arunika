@@ -1,106 +1,300 @@
 "use client";
 
-import { CircleCheck, OctagonX, TriangleAlert } from "lucide-react";
+import { CircleCheck, Cpu, OctagonX, Sparkles, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import CampusPlan from "@/components/CampusPlan";
+import { predict } from "@/components/campus/drillStore";
 import RequireAuth, { type Me } from "@/components/RequireAuth";
 import { COST_LABEL, LEVEL_LABEL, PRIORITY_LABEL, type Assessment } from "@/lib/assessment";
-import { HAZARDS, HAZARD_LABEL, STEPS, quakeLine, type Feedback, type Inject, type Quake, type State, type Turn } from "@/lib/gladi";
+import { ASSEMBLY, BUILDINGS, MAP, buildingRects, tileAt, type Tile } from "@/lib/campus";
+import {
+  CLOCKS,
+  HAZARD_LABEL,
+  RISK_WORD,
+  buildingStep,
+  intensityLine,
+  nameIn,
+  openingRoom,
+  quakeLine,
+  routeAsk,
+  routeStep,
+  sweepAsk,
+  type Hazard,
+  type Inject,
+  type Quake,
+  type State,
+  type Step,
+} from "@/lib/gladi";
+import { boardOf, riskTone, routeMove, targets, walk, type Target } from "@/lib/gladiBoard";
+import { MAPS, type Setting } from "@/lib/maps";
+import { INTENSITY } from "@/lib/sim";
 import { authHeader } from "@/lib/supabase";
-
-type Run =
-  | { kind: "setup" }
-  | { kind: "live"; state: State; token: string }
-  | { kind: "done"; done: Turn[]; debrief: Assessment; saved: boolean };
 
 const VERDICT = {
   tepat: { label: "Tepat", Icon: CircleCheck, tone: "text-aman", bar: "bg-aman" },
   kurang: { label: "Kurang tepat", Icon: TriangleAlert, tone: "text-fajar", bar: "bg-fajar" },
   berbahaya: { label: "Berbahaya", Icon: OctagonX, tone: "text-bahaya", bar: "bg-bahaya" },
 };
+const HAZARD_FILL: Record<Hazard, string> = { gempa: "#ff6b6b", banjir: "#22ccee", longsor: "#c9874a", angin: "#7fd18b" };
+const short = (id: string) => nameIn(MAP.id, id).replace(/^Gedung |^Titik Kumpul /, "").replace(" Guru & TU", "");
+const RECTS = buildingRects();
+const center = (id: string): [number, number] => {
+  const r = RECTS[id];
+  return [(r.x0 + r.x1 + 1) / 2, (r.z0 + r.z1 + 1) / 2];
+};
+// Where on the plan a building or an assembly point sits.
+const spot = (id: string): [number, number] => {
+  if (id in BUILDINGS) return center(id);
+  const [x, z] = ASSEMBLY.find((a) => tileAt(...a) === id)!;
+  return [x + 0.5, z + 0.5];
+};
 
-const fmt = (n: number) => n.toLocaleString("id-ID", { maximumFractionDigits: 1 });
+type Pick = "bmkg" | Hazard;
+type RouteChoice = ReturnType<typeof routeMove>;
+type Finished = { steps: Step[]; debrief: Assessment; saved: boolean };
 
-function Step({ inject, children }: { inject: Inject; children?: React.ReactNode }) {
+function Board({
+  hazard,
+  risks,
+  hazards,
+  reveal,
+  mode,
+  from,
+  options,
+  safe,
+  selected,
+  route,
+  best,
+  pin,
+  onPick,
+  onPreview,
+}: {
+  hazard: Hazard;
+  risks: Record<string, number>;
+  hazards: Set<number>;
+  reveal: boolean;
+  mode: "idle" | "gedung" | "kumpul";
+  from: string | null;
+  options: Target[];
+  safe: string[];
+  selected: string | null;
+  route: Tile[] | null;
+  best: Tile[] | null;
+  pin: [number, number] | null;
+  onPick: (id: string) => void;
+  onPreview: (id: string | null) => void;
+}) {
+  const active = (id: string) => (mode === "gedung" ? id in BUILDINGS : mode === "kumpul" && options.some((t) => t.id === id));
+  const press = (id: string) => ({
+    role: "button",
+    tabIndex: 0,
+    onClick: () => onPick(id),
+    onPointerEnter: () => onPreview(id),
+    onPointerLeave: () => onPreview(null),
+    onFocus: () => onPreview(id),
+    onBlur: () => onPreview(null),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onPick(id);
+      }
+    },
+    className: "cursor-pointer outline-none [&:focus-visible>.ring]:stroke-langit [&:hover>.ring]:stroke-langit",
+  });
   return (
-    <li className="grid grid-cols-[4rem_1fr] gap-x-4 sm:grid-cols-[5.5rem_1fr] sm:gap-x-6">
-      <span className="pt-0.5 text-xl font-extrabold tabular-nums text-langit sm:text-2xl">{inject.clock}</span>
-      <div className="border-l border-malam-3 pb-10 pl-4 sm:pl-6">
-        <p className="text-lg leading-relaxed">{inject.situation}</p>
-        <p className="mt-2 text-lg font-bold">{inject.question}</p>
-        {children}
+    <CampusPlan
+      route={route ?? undefined}
+      hazards={hazards}
+      hazardColor={HAZARD_FILL[hazard]}
+      label={`Denah kampus ${MAP.name} saat ${HAZARD_LABEL[hazard].toLowerCase()}, dengan risiko tiap gedung dan tujuan evakuasi`}
+    >
+      {best && (
+        <polyline
+          points={best.map(([x, z]) => `${x + 0.5},${z + 0.5}`).join(" ")}
+          fill="none"
+          stroke="#22ccee"
+          strokeWidth={0.22}
+          strokeDasharray="0.4 0.5"
+          opacity={0.9}
+        />
+      )}
+      {Object.keys(BUILDINGS).map((id) => {
+        const r = RECTS[id];
+        const [cx, cz] = center(id);
+        const clickable = active(id);
+        const body = (
+          <>
+            <rect
+              className="ring"
+              x={r.x0 - 0.15}
+              y={r.z0 - 0.15}
+              width={r.x1 - r.x0 + 1.3}
+              height={r.z1 - r.z0 + 1.3}
+              rx={0.35}
+              fill={riskTone(risks[id])}
+              fillOpacity={0.45}
+              stroke={selected === id || from === id ? "#eaf1ff" : clickable ? "#eaf1ff80" : "none"}
+              strokeWidth={selected === id || from === id ? 0.3 : 0.15}
+              strokeDasharray={clickable && selected !== id ? "0.5 0.35" : undefined}
+            />
+            <text x={cx} y={reveal ? cz - 0.2 : cz + 0.35} textAnchor="middle" fontSize={short(id).length > 7 ? 0.72 : 0.95} fontWeight={700} fill="#071530">
+              {short(id)}
+            </text>
+            {reveal && (
+              <text x={cx} y={cz + 1} textAnchor="middle" fontSize={0.9} fontWeight={800} fill="#071530">
+                {risks[id]}%
+              </text>
+            )}
+          </>
+        );
+        return clickable ? (
+          <g key={id} {...press(id)} aria-label={`${nameIn(MAP.id, id)}${reveal ? `, risiko ${RISK_WORD[hazard]} ${risks[id]}%` : ""}`}>
+            {body}
+          </g>
+        ) : (
+          <g key={id}>{body}</g>
+        );
+      })}
+      {ASSEMBLY.map(([x, z]) => {
+        const id = tileAt(x, z);
+        const clickable = active(id);
+        const body = (
+          <>
+            <circle className="ring" cx={x + 0.5} cy={z + 0.5} r={1.5} fill="#07153099" stroke={clickable ? "#eaf1ff80" : "none"} strokeWidth={0.15} strokeDasharray="0.5 0.35" />
+            {reveal && !safe.includes(id) && (
+              <path d={`M${x - 0.3} ${z - 0.3}L${x + 1.3} ${z + 1.3}M${x + 1.3} ${z - 0.3}L${x - 0.3} ${z + 1.3}`} stroke="#ff6b6b" strokeWidth={0.3} strokeLinecap="round" />
+            )}
+            <text
+              x={x + 0.5}
+              y={z - 1.3}
+              textAnchor="middle"
+              fontSize={0.9}
+              fontWeight={700}
+              fill="#eaf1ff"
+              stroke="#071530"
+              strokeWidth={0.25}
+              paintOrder="stroke"
+            >
+              {short(id)}
+            </text>
+          </>
+        );
+        return clickable ? (
+          <g key={id} {...press(id)} aria-label={nameIn(MAP.id, id)}>
+            {body}
+          </g>
+        ) : (
+          <g key={id}>{body}</g>
+        );
+      })}
+      {pin && (
+        <g aria-hidden="true">
+          <circle cx={pin[0]} cy={pin[1]} r={1.4} fill="none" stroke="#ff8a3d" strokeWidth={0.3} className="animate-ping [transform-box:fill-box] [transform-origin:center]" />
+          <circle cx={pin[0]} cy={pin[1]} r={0.55} fill="#ff8a3d" stroke="#071530" strokeWidth={0.15} />
+        </g>
+      )}
+    </CampusPlan>
+  );
+}
+
+function Verdict({ step }: { step: Step }) {
+  const v = VERDICT[step.feedback.verdict];
+  return (
+    <p className="mt-2 flex gap-2 leading-relaxed">
+      <v.Icon aria-hidden="true" className={`mt-1 size-4 shrink-0 ${v.tone}`} />
+      <span>
+        <strong className={v.tone}>{v.label}.</strong> {step.feedback.note}
+      </span>
+    </p>
+  );
+}
+
+function Entry({ i, step }: { i: number; step: Step }) {
+  const Who = step.move ? Cpu : Sparkles;
+  return (
+    <li className="border-t border-malam-3 py-4">
+      <div className="flex items-center gap-2 text-sm text-redup">
+        <span className="font-bold tabular-nums text-langit">{CLOCKS[i]}</span>
+        <Who aria-hidden="true" className="size-3.5" />
+        <span>{step.move ? "dinilai mesin simulasi" : "dinilai AI"}</span>
       </div>
+      <p className="mt-1.5 leading-relaxed text-redup">
+        {step.situation} {step.question}
+      </p>
+      <p className="mt-2 font-semibold">{step.answer}</p>
+      <Verdict step={step} />
     </li>
   );
 }
 
-function Answered({ answer, feedback, waiting = false }: { answer: string; feedback?: Feedback; waiting?: boolean }) {
-  const v = feedback && VERDICT[feedback.verdict];
+function Choices({ inject, busy, onDecide }: { inject: Inject; busy: boolean; onDecide: (text: string) => void }) {
+  const [draft, setDraft] = useState("");
   return (
-    <>
-      <p className="mt-4 rounded-md bg-malam-2 px-4 py-3 leading-relaxed">{answer}</p>
-      {v ? (
-        <p className="mt-3 flex gap-2.5 leading-relaxed">
-          <v.Icon aria-hidden="true" className={`mt-0.5 size-5 shrink-0 ${v.tone}`} />
-          <span>
-            <strong className={v.tone}>{v.label}.</strong> {feedback.note}
-          </span>
-        </p>
-      ) : (
-        waiting && <p role="status" className="mt-3 flex items-center gap-2.5 text-redup">
-          <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-langit" />
-          AI menilai keputusan dan menyusun situasi berikutnya…
-        </p>
-      )}
-    </>
+    <form
+      className="mt-4 space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (draft.trim()) onDecide(draft.trim());
+      }}
+    >
+      <div role="group" aria-label="Pilihan keputusan" className="space-y-2">
+        {inject.options.map((o) => (
+          <button
+            key={o}
+            type="button"
+            disabled={busy}
+            onClick={() => onDecide(o)}
+            className="block min-h-12 w-full rounded-lg border border-malam-3 bg-malam px-4 py-3 text-left leading-snug hover:border-laut active:translate-y-px disabled:opacity-60"
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+      <label htmlFor="sendiri" className="block pt-2 font-semibold">
+        Atau tulis keputusanmu
+      </label>
+      <div className="flex gap-2">
+        <input
+          id="sendiri"
+          maxLength={400}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          className="block min-h-11 w-full rounded-lg border border-malam-3 bg-malam px-3 hover:border-redup focus-visible:border-langit"
+        />
+        <button
+          type="submit"
+          disabled={busy || !draft.trim()}
+          className="min-h-11 shrink-0 rounded-lg bg-laut px-4 font-semibold text-white hover:bg-laut-terang disabled:opacity-60"
+        >
+          Kirim
+        </button>
+      </div>
+    </form>
   );
 }
 
-function Progress({ turns, current }: { turns: Turn[]; current: boolean }) {
-  return (
-    <ol aria-label="Langkah gladi" className="grid grid-cols-4 gap-1.5">
-      {Array.from({ length: STEPS }, (_, i) => {
-        const t = turns[i];
-        const label = t ? VERDICT[t.feedback.verdict].label : i === turns.length && current ? "sedang berjalan" : "belum";
-        return (
-          <li key={i} className="h-1.5 rounded-full bg-malam-3">
-            <span
-              className={`block h-full rounded-full ${t ? VERDICT[t.feedback.verdict].bar : i === turns.length && current ? "animate-pulse bg-langit" : ""}`}
-            />
-            <span className="sr-only">
-              Langkah {i + 1}: {label}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-function Debrief({ a, saved, onAgain }: { a: Assessment; saved: boolean; onAgain: () => void }) {
+function Debrief({ a, saved }: { a: Assessment; saved: boolean }) {
   const tone = a.score >= 75 ? "text-aman" : a.score >= 45 ? "text-fajar" : "text-bahaya";
   return (
-    <section aria-labelledby="hasil" className="space-y-6 rounded-xl border border-malam-3 bg-malam-2 p-5 sm:p-8">
-      <h2 id="hasil" className="text-3xl font-extrabold tracking-tight">
+    <section aria-labelledby="hasil" className="space-y-5 border-t border-malam-3 pt-5">
+      <h2 id="hasil" className="text-2xl font-extrabold tracking-tight">
         Skor gladi <span className={`tabular-nums ${tone}`}>{a.score}</span> dari 100. {LEVEL_LABEL[a.level]}.
       </h2>
-      <p className="max-w-[65ch] text-lg leading-relaxed">{a.summary}</p>
+      <p className="leading-relaxed">{a.summary}</p>
       {a.observations.length > 0 && (
-        <div>
-          <h3 className="text-xl font-bold">Catatan</h3>
-          <ul className="mt-3 list-disc space-y-1.5 pl-5 leading-relaxed text-redup marker:text-langit">
-            {a.observations.map((o) => (
-              <li key={o}>{o}</li>
-            ))}
-          </ul>
-        </div>
+        <ul className="list-disc space-y-1.5 pl-5 leading-relaxed text-redup marker:text-langit">
+          {a.observations.map((o) => (
+            <li key={o}>{o}</li>
+          ))}
+        </ul>
       )}
       {a.recommendations.length > 0 && (
         <div>
-          <h3 className="text-xl font-bold">Rencana tindak lanjut</h3>
-          <ol className="mt-3 divide-y divide-malam-3 rounded-lg border border-malam-3 bg-malam">
+          <h3 className="font-bold">Rencana tindak lanjut</h3>
+          <ol className="mt-2 divide-y divide-malam-3 rounded-lg border border-malam-3 bg-malam">
             {a.recommendations.map((r) => (
-              <li key={r.action} className="p-4 leading-relaxed">
+              <li key={r.action} className="p-3 leading-relaxed">
                 {r.action}{" "}
                 <span className="text-redup">
                   (<span className={r.priority === "segera" ? "font-semibold text-fajar" : ""}>{PRIORITY_LABEL[r.priority].toLowerCase()}</span>,{" "}
@@ -115,17 +309,10 @@ function Debrief({ a, saved, onAgain }: { a: Assessment; saved: boolean; onAgain
         {saved ? "Tersimpan ke dasbor kesiapan sekolah." : "Hasil tidak tersimpan ke dasbor. Coba gladi lagi nanti."}
       </p>
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={onAgain}
-          className="inline-flex min-h-12 items-center rounded-md bg-laut px-6 font-semibold text-white hover:bg-laut-terang active:translate-y-px"
-        >
+        <a href={`/gladi?peta=${MAP.id}`} className="inline-flex min-h-11 items-center rounded-md bg-laut px-5 font-semibold text-white hover:bg-laut-terang">
           Gladi lagi
-        </button>
-        <Link
-          href="/dashboard"
-          className="inline-flex min-h-12 items-center rounded-md border border-malam-3 px-6 font-semibold hover:border-redup active:translate-y-px"
-        >
+        </a>
+        <Link href="/dashboard" className="inline-flex min-h-11 items-center rounded-md border border-malam-3 px-5 font-semibold hover:border-redup">
           Buka dasbor
         </Link>
       </div>
@@ -133,10 +320,20 @@ function Debrief({ a, saved, onAgain }: { a: Assessment; saved: boolean; onAgain
   );
 }
 
-function Exercise({ me, quake }: { me: Me; quake: Quake | null }) {
-  const [run, setRun] = useState<Run>({ kind: "setup" });
+function Table({ me, quake }: { me: Me; quake: Quake | null }) {
+  const disasters = MAP.disasters as Hazard[];
+  const [pick, setPick] = useState<Pick>(quake ? "bmkg" : "gempa");
+  const hazard: Hazard = pick === "bmkg" ? "gempa" : pick;
+  const intensity = pick === "bmkg" && quake ? Math.min(8, Math.max(5, quake.magnitude)) : INTENSITY[hazard].start;
+  const p = useMemo(() => predict({ kind: hazard, intensity }, me.school, new Date().getFullYear()), [hazard, intensity, me.school]);
+  const board = useMemo(() => boardOf(hazard, intensity, p), [hazard, intensity, p]);
+
+  const [live, setLive] = useState<{ state: State; token: string } | null>(null);
+  const [finished, setFinished] = useState<Finished | null>(null);
+  const [sweep, setSweep] = useState<string | null>(null);
+  const [go, setGo] = useState<RouteChoice | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const last = useRef<object | null>(null);
@@ -153,9 +350,9 @@ function Exercise({ me, quake }: { me: Me; quake: Quake | null }) {
       });
       if (!res.ok) throw new Error((await res.text()) || `HTTP ${res.status}`);
       const out = await res.json();
-      setRun(out.debrief ? { kind: "done", ...out } : { kind: "live", ...out });
+      if (out.debrief) setFinished(out);
+      else setLive(out);
       setAnswer(null);
-      setDraft("");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -163,179 +360,270 @@ function Exercise({ me, quake }: { me: Me; quake: Quake | null }) {
     }
   }
 
+  const server = finished?.steps ?? live?.state.steps ?? [];
+  // The two map steps are judged in the browser with the same rules the server applies when they are sent.
+  const local = [
+    ...(server.length === 1 && sweep ? [buildingStep(hazard, board, sweep)] : []),
+    ...(server.length === 1 && sweep && go ? [routeStep(hazard, board, go.move)] : []),
+  ];
+  const steps = [...server, ...local];
+  const pending = finished ? null : (live?.state.pending ?? null);
+  const stage = finished ? "selesai" : !live ? "siap" : pending ? (server.length === 0 ? "aksi" : "susulan") : !sweep ? "gedung" : !go ? "kumpul" : "lanjut";
+  const options = sweep ? targets(hazard, sweep) : [];
+  const hovered = stage === "kumpul" ? options.find((t) => t.id === preview) : undefined;
+  const previewRoute = sweep && hovered ? walk(sweep, hovered.tile, p.hazards) : null;
+  const kumpul = steps[2]?.move?.target;
+  const pin = stage === "aksi" ? center(openingRoom(board)) : stage === "susulan" && kumpul ? spot(kumpul) : null;
+  const ask = stage === "gedung" ? sweepAsk(hazard) : stage === "kumpul" && sweep ? routeAsk(hazard, MAP.id, sweep) : null;
+
   function decide(text: string) {
-    if (run.kind !== "live" || busy || !text.trim()) return;
-    setAnswer(text.trim());
-    send({ state: run.state, token: run.token, answer: text.trim() });
+    if (!live || busy) return;
+    setAnswer(text);
+    send({ state: live.state, token: live.token, answer: text });
   }
 
-  function again() {
-    setRun({ kind: "setup" });
-    setAnswer(null);
-    setError(null);
+  function onPick(id: string) {
+    if (stage === "gedung" && id in BUILDINGS) setSweep(id);
+    else if (stage === "kumpul" && sweep) {
+      const t = options.find((o) => o.id === id);
+      if (t) setGo(routeMove(hazard, board, p, sweep, t));
+    }
   }
 
-  const failure = error && (
-    <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-bahaya">
-      {error}
-      <button
-        type="button"
-        onClick={() => last.current && send(last.current)}
-        disabled={busy}
-        className="min-h-11 rounded-md border border-bahaya/60 px-4 font-semibold hover:border-bahaya disabled:opacity-60"
-      >
-        Coba lagi
-      </button>
-    </div>
+  const campuses = Object.keys(MAPS) as Setting[];
+  const status = (
+    <p className="text-redup">
+      {MAP.name} · {pick === "bmkg" && quake ? `gempa BMKG ${quakeLine(quake)}` : `${HAZARD_LABEL[hazard].toLowerCase()}, ${intensityLine(hazard, intensity)}`}
+    </p>
   );
 
-  if (run.kind === "setup") {
-    const school = me.school;
-    return (
-      <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-16">
-        <form
-          className="space-y-8"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send({ hazard: new FormData(e.currentTarget).get("hazard") });
-          }}
-        >
-          <fieldset className="space-y-3">
-            <legend className="mb-4 text-xl font-bold">Skenario</legend>
-            {quake && (
-              <label className="flex min-h-16 items-start gap-4 rounded-lg border border-malam-3 p-4 hover:border-redup has-checked:border-langit has-checked:bg-malam-2 has-focus-visible:outline-2 has-focus-visible:outline-langit">
-                <input type="radio" name="hazard" value="bmkg" defaultChecked className="mt-1.5 size-4 shrink-0 accent-langit" />
-                <span className="leading-relaxed">
-                  <strong className="inline-flex items-center gap-2">
-                    <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-langit" />
-                    Gempa terkini BMKG
-                  </strong>{" "}
-                  <span className="text-redup">{quakeLine(quake)}</span>
-                </span>
-              </label>
-            )}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {HAZARDS.map((h, i) => (
-                <label
-                  key={h}
-                  className="flex min-h-14 items-center gap-3 rounded-lg border border-malam-3 px-4 font-semibold hover:border-redup has-checked:border-langit has-checked:bg-malam-2 has-focus-visible:outline-2 has-focus-visible:outline-langit"
-                >
-                  <input type="radio" name="hazard" value={h} defaultChecked={!quake && i === 0} className="size-4 shrink-0 accent-langit" />
-                  {HAZARD_LABEL[h]}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <p className="max-w-[60ch] text-lg leading-relaxed text-redup">
-            {school ? (
-              <>
-                Situasi disusun untuk <strong className="text-pasir">{school.name}</strong>: {school.floors} lantai,{" "}
-                {school.material.replaceAll("_", " ")}, {fmt(school.coast_km)} km dari pantai.
-              </>
-            ) : (
-              <>
-                Akunmu belum terhubung ke sekolah, jadi situasinya memakai sekolah umum dan hasilnya tidak masuk dasbor sekolah mana pun.
-              </>
-            )}
-          </p>
-          {failure}
-          <button
-            type="submit"
-            disabled={busy}
-            className="inline-flex min-h-14 items-center rounded-md bg-laut px-8 text-lg font-bold text-white hover:bg-laut-terang active:translate-y-px disabled:opacity-60"
-          >
-            {busy ? "Menyiapkan situasi…" : "Mulai gladi"}
-          </button>
-        </form>
-        <aside aria-labelledby="cara" className="lg:border-l lg:border-malam-3 lg:pl-8">
-          <h2 id="cara" className="text-xl font-bold">
-            Cara kerja
-          </h2>
-          <ol className="mt-4 list-decimal space-y-3 pl-5 leading-relaxed text-redup marker:font-bold marker:text-langit">
-            <li>AI menjadi pengendali latihan dan memberi {STEPS} situasi berurutan, disesuaikan dengan sekolahmu.</li>
-            <li>Setiap keputusanmu dinilai dengan pedoman sekolah aman bencana. Situasi berikutnya adalah akibatnya.</li>
-            <li>Di akhir, AI menyusun rencana tindak lanjut yang tersimpan sebagai skor kesiapan sekolah di dasbor.</li>
-          </ol>
-        </aside>
-      </div>
-    );
-  }
-
-  const turns = run.kind === "live" ? run.state.done : run.done;
-  const pending = run.kind === "live" ? run.state.pending : null;
-  const seed = run.kind === "live" ? run.state.seed : null;
   return (
-    <div className="mt-8 max-w-3xl space-y-8">
-      <Progress turns={turns} current={run.kind === "live"} />
-      {seed?.quake && <p className="text-redup">Berdasarkan gempa BMKG {quakeLine(seed.quake)}.</p>}
-      <ol>
-        {turns.map((t) => (
-          <Step key={t.inject.clock + t.answer} inject={t.inject}>
-            <Answered answer={t.answer} feedback={t.feedback} />
-          </Step>
-        ))}
-        {pending && (
-          <Step inject={pending}>
-            {answer ? (
-              <Answered answer={answer} waiting={busy} />
-            ) : (
-              <form
-                className="mt-5 space-y-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  decide(draft);
-                }}
-              >
-                <div role="group" aria-label="Pilihan keputusan" className="space-y-2">
-                  {pending.options.map((o) => (
+    <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-start">
+      <div className="sticky top-0 z-10 space-y-3 bg-malam py-2 lg:top-4 lg:py-0">
+        {stage === "siap" && (
+          // Each campus is its own page load: the engine fixes its grid when the page opens.
+          <nav aria-label="Kampus" className="flex flex-wrap gap-2">
+            {campuses.map((id) =>
+              id === MAP.id ? (
+                <span key={id} aria-current="page" className="inline-flex min-h-11 items-center rounded-md bg-laut px-4 font-semibold text-white">
+                  {MAPS[id]!.name}
+                </span>
+              ) : (
+                <a key={id} href={`/gladi?peta=${id}`} className="inline-flex min-h-11 items-center rounded-md border border-malam-3 px-4 font-semibold hover:border-redup">
+                  {MAPS[id]!.name}
+                </a>
+              ),
+            )}
+          </nav>
+        )}
+        <div className="overflow-hidden rounded-xl border border-malam-3 bg-malam shadow-[0_30px_80px_-30px_rgb(0_0_0/0.7)]">
+          <Board
+            hazard={hazard}
+            risks={board.risks}
+            hazards={p.hazards}
+            reveal={!!sweep || stage === "selesai"}
+            mode={stage === "gedung" ? "gedung" : stage === "kumpul" ? "kumpul" : "idle"}
+            from={sweep}
+            options={options}
+            safe={board.safe}
+            selected={go?.move.target ?? null}
+            route={go?.route ?? previewRoute?.route ?? null}
+            best={go && go.move.best !== go.move.target ? go.bestRoute : null}
+            pin={pin}
+            onPick={onPick}
+            onPreview={setPreview}
+          />
+          <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-malam-3 px-4 py-3 text-sm">
+            {[
+              ["#34c47c", "Risiko < 30%"],
+              ["#f0b429", "30–59%"],
+              ["#ff6b6b", "≥ 60%"],
+            ].map(([c, l]) => (
+              <span key={l} className="inline-flex items-center gap-2">
+                <span aria-hidden="true" className="size-3.5 rounded-sm opacity-80" style={{ background: c }} />
+                {l}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true" className="size-3.5 rounded-sm opacity-60" style={{ background: HAZARD_FILL[hazard] }} />
+              Bahaya {HAZARD_LABEL[hazard].toLowerCase()}
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true" className="h-1 w-6 rounded-full bg-fajar" />
+              Rute
+            </span>
+            {go && go.move.best !== go.move.target && (
+              <span className="inline-flex items-center gap-2">
+                <span aria-hidden="true" className="h-1 w-6 rounded-full bg-langit" />
+                Rute terbaik
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <section aria-label="Log gladi" className="rounded-xl border border-malam-3 bg-malam-2 p-5">
+        {stage === "siap" ? (
+          <form
+            className="space-y-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              send({ hazard: pick, board });
+            }}
+          >
+            <fieldset className="space-y-2">
+              <legend className="mb-3 text-xl font-bold">Skenario</legend>
+              {quake && (
+                <label className="flex items-start gap-3 rounded-lg border border-malam-3 bg-malam p-3 hover:border-redup has-checked:border-langit has-focus-visible:outline-2 has-focus-visible:outline-langit">
+                  <input type="radio" name="hazard" checked={pick === "bmkg"} onChange={() => setPick("bmkg")} className="mt-1.5 size-4 shrink-0 accent-langit" />
+                  <span className="leading-relaxed">
+                    <strong>Gempa terkini BMKG</strong> <span className="text-redup">{quakeLine(quake)}</span>
+                  </span>
+                </label>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                {disasters.map((h) => (
+                  <label
+                    key={h}
+                    className="flex min-h-12 items-center gap-3 rounded-lg border border-malam-3 bg-malam px-3 font-semibold hover:border-redup has-checked:border-langit has-focus-visible:outline-2 has-focus-visible:outline-langit"
+                  >
+                    <input type="radio" name="hazard" checked={pick === h} onChange={() => setPick(h)} className="size-4 shrink-0 accent-langit" />
+                    {HAZARD_LABEL[h]}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <p className="leading-relaxed text-redup">
+              Peta di samping sudah dihitung mesin simulasi untuk{" "}
+              <strong className="text-pasir">{me.school?.name ?? "sekolah umum"}</strong>. Langkah 1 dan 4 disusun AI; langkah 2 dan 3 kamu putuskan langsung di peta.
+            </p>
+            {error && <p role="alert" className="text-bahaya">{error}</p>}
+            <button
+              type="submit"
+              disabled={busy}
+              className="inline-flex min-h-12 w-full items-center justify-center rounded-md bg-laut px-6 text-lg font-bold text-white hover:bg-laut-terang active:translate-y-px disabled:opacity-60"
+            >
+              {busy ? "AI menyusun situasi…" : "Mulai gladi"}
+            </button>
+          </form>
+        ) : (
+          <div>
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="text-4xl font-extrabold tabular-nums text-langit">{CLOCKS[Math.min(steps.length, 3)]}</span>
+              <ol aria-label="Langkah gladi" className="flex flex-1 gap-1.5">
+                {CLOCKS.map((c, i) => (
+                  <li key={c} className="h-1.5 flex-1 rounded-full bg-malam-3">
+                    <span className={`block h-full rounded-full ${steps[i] ? VERDICT[steps[i].feedback.verdict].bar : i === steps.length ? "animate-pulse bg-langit" : ""}`} />
+                    <span className="sr-only">
+                      Langkah {i + 1}: {steps[i] ? VERDICT[steps[i].feedback.verdict].label : "belum"}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div className="mt-2">{status}</div>
+            <ol className="mt-3">
+              {steps.map((s, i) => (
+                <Entry key={i} i={i} step={s} />
+              ))}
+            </ol>
+
+            {(stage === "aksi" || stage === "susulan") && pending && (
+              <div className="border-t border-malam-3 pt-4">
+                <div className="flex items-center gap-2 text-sm text-redup">
+                  <span className="font-bold tabular-nums text-langit">{CLOCKS[steps.length]}</span>
+                  <Sparkles aria-hidden="true" className="size-3.5" />
+                  <span>dari pengendali AI</span>
+                </div>
+                <p className="mt-1.5 text-lg leading-relaxed">{pending.situation}</p>
+                <p className="mt-2 text-lg font-bold">{pending.question}</p>
+                {answer ? (
+                  <>
+                    <p className="mt-3 font-semibold">{answer}</p>
+                    {busy && (
+                      <p role="status" className="mt-2 flex items-center gap-2 text-redup">
+                        <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-langit" />
+                        AI menilai keputusan…
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <Choices key={steps.length} inject={pending} busy={busy} onDecide={decide} />
+                )}
+              </div>
+            )}
+
+            {(stage === "gedung" || stage === "kumpul") && (
+              <div className="border-t border-malam-3 pt-4">
+                <div className="flex items-center gap-2 text-sm text-redup">
+                  <span className="font-bold tabular-nums text-langit">{CLOCKS[steps.length]}</span>
+                  <Cpu aria-hidden="true" className="size-3.5" />
+                  <span>keputusan di peta</span>
+                </div>
+                <p className="mt-1.5 text-lg leading-relaxed">{ask?.situation}</p>
+                <p className="mt-2 text-lg font-bold">{ask?.question}</p>
+                <p className="mt-3 text-redup">Klik di peta, atau pilih:</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {(stage === "gedung" ? Object.keys(BUILDINGS) : options.map((t) => t.id)).map((id) => (
                     <button
-                      key={o}
+                      key={id}
                       type="button"
-                      disabled={busy}
-                      onClick={() => decide(o)}
-                      className="block min-h-12 w-full rounded-lg border border-malam-3 px-4 py-3 text-left leading-snug hover:border-laut hover:bg-malam-2 active:translate-y-px disabled:opacity-60"
+                      onClick={() => onPick(id)}
+                      onPointerEnter={() => setPreview(id)}
+                      onPointerLeave={() => setPreview(null)}
+                      onFocus={() => setPreview(id)}
+                      onBlur={() => setPreview(null)}
+                      className="min-h-11 rounded-lg border border-malam-3 bg-malam px-3 py-2 text-left font-semibold leading-snug hover:border-laut"
                     >
-                      {o}
+                      {nameIn(MAP.id, id)}
                     </button>
                   ))}
                 </div>
-                <label htmlFor="sendiri" className="block pt-3 font-semibold">
-                  Atau tulis keputusanmu sendiri
-                </label>
-                <div className="flex gap-2">
-                  <textarea
-                    id="sendiri"
-                    rows={2}
-                    maxLength={400}
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        decide(draft);
-                      }
-                    }}
-                    className="block min-h-12 w-full resize-y rounded-lg border border-malam-3 bg-malam-2 px-4 py-3 placeholder:text-redup hover:border-redup focus-visible:border-langit"
-                  />
-                  <button
-                    type="submit"
-                    disabled={busy || !draft.trim()}
-                    className="min-h-12 shrink-0 self-end rounded-lg bg-laut px-5 font-semibold text-white hover:bg-laut-terang active:translate-y-px disabled:opacity-60"
-                  >
-                    Kirim
-                  </button>
-                </div>
-              </form>
+                {previewRoute?.route && (
+                  <p role="status" className="mt-3 tabular-nums text-langit">
+                    {previewRoute.meters} m, sekitar {Math.round(previewRoute.meters / 1.5)} detik berjalan
+                  </p>
+                )}
+              </div>
             )}
-          </Step>
+
+            {stage === "lanjut" && (
+              <div className="border-t border-malam-3 pt-4">
+                {error ? null : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => live && go && send({ state: live.state, token: live.token, moves: [{ target: sweep }, go.move] })}
+                    className="inline-flex min-h-12 w-full items-center justify-center rounded-md bg-laut px-6 font-bold text-white hover:bg-laut-terang disabled:opacity-60"
+                  >
+                    {busy ? "AI menyusun kejadian berikutnya…" : "Lanjut"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {error && (
+              <div role="alert" className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-bahaya">
+                {error}
+                <button
+                  type="button"
+                  onClick={() => last.current && send(last.current)}
+                  disabled={busy}
+                  className="min-h-11 rounded-md border border-bahaya/60 px-4 font-semibold hover:border-bahaya disabled:opacity-60"
+                >
+                  Coba lagi
+                </button>
+              </div>
+            )}
+
+            {finished && <Debrief a={finished.debrief} saved={finished.saved} />}
+          </div>
         )}
-      </ol>
-      {failure}
-      {run.kind === "done" && <Debrief a={run.debrief} saved={run.saved} onAgain={again} />}
+      </section>
     </div>
   );
 }
 
 export default function Gladi({ quake }: { quake: Quake | null }) {
-  return <RequireAuth>{(me) => <Exercise me={me} quake={quake} />}</RequireAuth>;
+  return <RequireAuth>{(me) => <Table me={me} quake={quake} />}</RequireAuth>;
 }
