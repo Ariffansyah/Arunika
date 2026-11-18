@@ -22,7 +22,7 @@ import {
   trackDrill,
   useDrill,
 } from "./drillStore";
-import { closedDoors, findPrompt, interact } from "./interact";
+import { closedDoors, findPrompt, interact, wardenSpot } from "./interact";
 import { play, splash } from "./sound";
 import { MAP, SITE_D, SITE_W, TILE, elevationAt, surfaceAt } from "@/lib/campus";
 
@@ -210,6 +210,12 @@ export default function Player({ look: character, name }: { look: Look; name: st
     if (len > 0 || input.crouch || input.jump) lobby.current = false;
     const [ox, oz] = [player.x, player.z];
     const frozen = s.chatOpen || s.mapOpen || (running && t < 0);
+    // Talking to the warden: turn to face them, and swing the camera round behind so both faces show.
+    if (s.chatOpen) {
+      const [wx, wz] = wardenSpot();
+      player.heading = Math.atan2(wx - player.x, wz - player.z);
+      look.yaw += wrap(player.heading + Math.PI - look.yaw) * (1 - Math.exp(-dt * 4));
+    }
     const v = vault.current;
     const jumpPressed = input.jump;
     input.jump = false;

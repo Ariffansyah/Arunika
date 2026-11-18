@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
+import CharacterPicker from "@/components/CharacterPicker";
 import DebriefingTrail from "./DebriefingTrail";
 import { ASSEMBLY, ASSEMBLY_NAMES, H, MAP, TILE, W, shortName, tileAt } from "@/lib/campus";
 import { PLAN } from "@/lib/floorplan";
@@ -186,6 +187,7 @@ function objective(kind: Scenario["kind"], t: number, report: boolean): { messag
   const after = kind === "gempa" && aftershockAt(t);
   const storm = within(wind, t);
   const sliding = slide !== null && t >= slide;
+  const goals = [...new Set(run.goals.map((g) => ASSEMBLY_NAMES[tileAt(...g)]))].join(" atau ");
   const message =
     kind === "gempa"
       ? shaking
@@ -194,7 +196,7 @@ function objective(kind: Scenario["kind"], t: number, report: boolean): { messag
           ? "Gempa susulan! Merunduk di tempat terbuka dan lindungi kepala (C)."
           : report
             ? "Sudah di titik kumpul. Lapor ke petugas (E)."
-            : "Guncangan berhenti. Keluar dengan tertib, jangan berlari, menuju titik kumpul."
+            : `Sirene evakuasi. Keluar tertib, jangan berlari, ikuti rambu ke ${goals}.`
       : kind === "angin"
         ? storm
           ? "Angin melintas! Jauhi jendela, merunduk dan lindungi kepala (C)."
@@ -208,12 +210,12 @@ function objective(kind: Scenario["kind"], t: number, report: boolean): { messag
             ? "Sudah di titik kumpul. Lapor ke petugas (E)."
             : sliding
               ? "Longsor! Jauhi lereng, menuju titik kumpul di lapangan."
-              : "Hujan deras di lereng. Periksa tanda longsor dari jauh (E), bunyikan kentongan, lalu menjauh ke lapangan."
+              : `Hujan deras dan sirene berbunyi. Kenali tanda longsor dari jauh (E), lalu menjauh dari lereng ke ${goals}.`
           : report
             ? "Sudah di tempat aman. Lapor (E)."
             : player.wading
               ? "Air setinggi lutut. Cari jalan yang lebih tinggi."
-              : "Air naik. Matikan listrik bila sempat, lalu naik ke bukit atau lantai 2 Gedung Kelas A.";
+              : `Sirene banjir. Tinggalkan barang, berjalan ke ${goals}${run.upstairs ? " atau lantai 2 Gedung Kelas A" : ""}.`;
   return { message, tone: shaking || after || storm || (sliding && !report) ? "danger" : report ? "done" : "info" };
 }
 
@@ -537,6 +539,7 @@ function TouchPad() {
 }
 
 export default function Hud({
+  me,
   room,
   peers,
   status,
@@ -544,6 +547,7 @@ export default function Hud({
   onStart,
   onGuided,
 }: {
+  me: { id: string; avatar: number; onAvatar: (i: number) => void };
   room: string;
   peers: Peer[];
   status: "connecting" | "online" | "offline";
@@ -553,7 +557,7 @@ export default function Hud({
 }) {
   const phase = useDrill((s) => s.phase);
   const guided = useDrill((s) => s.guided);
-  const [tab, setTab] = useState<"belajar" | "simulasi">("belajar");
+  const [tab, setTab] = useState<"belajar" | "simulasi" | "karakter">("belajar");
   const [muted, setMutedState] = useState(isMuted);
   const scenario = useDrill((s) => s.scenario);
   const startAt = useDrill((s) => s.startAt);
@@ -629,8 +633,8 @@ export default function Hud({
                 Ganti peta
               </a>
             </div>
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-malam-2 p-1">
-              {(["belajar", "simulasi"] as const).map((k) => (
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-malam-2 p-1">
+              {(["belajar", "simulasi", "karakter"] as const).map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -638,7 +642,7 @@ export default function Hud({
                   onClick={() => setTab(k)}
                   className="min-h-10 rounded-md font-semibold text-redup hover:text-pasir aria-pressed:bg-malam-3 aria-pressed:text-pasir"
                 >
-                  {k === "belajar" ? "Belajar" : "Simulasi"}
+                  {k === "belajar" ? "Belajar" : k === "simulasi" ? "Simulasi" : "Karakter"}
                 </button>
               ))}
             </div>
@@ -646,8 +650,10 @@ export default function Hud({
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-5">
             {tab === "belajar" ? (
               <Learn onGuided={() => onGuided(scenario)} onStart={() => onStart(scenario)} />
-            ) : (
+            ) : tab === "simulasi" ? (
               <ScenarioPicker onStart={onStart} />
+            ) : (
+              <CharacterPicker profileId={me.id} value={me.avatar} onChange={me.onAvatar} cols="grid-cols-4" />
             )}
           </div>
           <RoomInfo room={room} peers={peers} status={status} school={school} />

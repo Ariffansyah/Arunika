@@ -249,7 +249,7 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
 
       <fieldset>
         <legend className={label}>Karakter</legend>
-        <div className="mt-2 grid grid-cols-6 gap-2">
+        <div className="mt-2 grid grid-cols-7 gap-1.5">
           {AVATARS.map((look, i) => (
             <label key={look} className="relative">
               <input type="radio" name="avatar" value={i} defaultChecked={i === 0} className="peer sr-only" />

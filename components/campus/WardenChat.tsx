@@ -2,16 +2,27 @@
 
 import { Mic, Send, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { authHeader } from "@/lib/supabase";
-import { setState, useDrill } from "./drillStore";
+import { MAP, tileAt } from "@/lib/campus";
+import { HAZARD_LABEL } from "@/lib/gladi";
+import { buildingAt } from "@/lib/nav";
+import { authHeader, type School } from "@/lib/supabase";
+import type { WardenContext } from "@/lib/warden";
+import { getState, player, predict, setState, useDrill, warden } from "./drillStore";
 
 type Msg = { role: "user" | "model"; text: string };
 
-const SUGGESTIONS = [
-  "Apa yang harus kulakukan kalau gempa terjadi saat di kelas?",
-  "Bagaimana menolong teman yang lututnya lecet?",
-  "Apa saja isi tas siaga bencana?",
-];
+// What the warden should know about this school and this student; the server checks every id against the maps.
+function context(school: School | null): WardenContext {
+  const s = getState();
+  const r = s.result;
+  return {
+    peta: MAP.id,
+    kind: s.scenario.kind,
+    goals: predict(s.scenario, school, new Date().getFullYear()).goals.map((g) => tileAt(...g)),
+    near: buildingAt(player.x, player.z),
+    last: r && !r.guided ? { kind: r.scenario.kind, score: r.score, reached: r.reached, missed: r.checks.filter((c) => !c.ok).map((c) => c.label) } : null,
+  };
+}
 
 type Recognition = { lang: string; start(): void; onresult: ((e: { results: { 0: { transcript: string } }[] }) => void) | null; onend: (() => void) | null };
 const getRecognition = (): (new () => Recognition) | undefined =>
@@ -24,13 +35,17 @@ function speak(text: string) {
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "id-ID";
+  warden.talking = true;
+  u.onend = u.onerror = () => (warden.talking = false);
   const voice = speechSynthesis.getVoices().find((v) => v.lang.startsWith("id"));
   if (voice) u.voice = voice;
   speechSynthesis.speak(u);
 }
 
-export default function WardenChat() {
+export default function WardenChat({ school, name }: { school: School | null; name: string }) {
   const open = useDrill((s) => s.chatOpen);
+  const kind = useDrill((s) => s.scenario.kind);
+  const result = useDrill((s) => s.result);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,12 +85,13 @@ export default function WardenChat() {
     setText("");
     setBusy(true);
     setError(null);
+    warden.talking = true;
     let reply = "";
     try {
       const res = await fetch("/api/warden", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history, context: context(school) }),
       });
       if (!res.ok || !res.body) throw new Error((await res.text()) || `HTTP ${res.status}`);
       const reader = res.body.getReader();
@@ -92,6 +108,8 @@ export default function WardenChat() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      // A reply being read aloud keeps the warden talking until the voice ends.
+      if (!("speechSynthesis" in window) || !(speechSynthesis.speaking || speechSynthesis.pending)) warden.talking = false;
     }
   }
 
@@ -107,6 +125,13 @@ export default function WardenChat() {
   }
 
   if (!open) return null;
+  const hazard = HAZARD_LABEL[kind].toLowerCase();
+  const suggestions = [
+    ...(result && !result.guided ? ["Apa yang kurang dari latihanku tadi?"] : []),
+    `Ke mana aku harus pergi kalau ${hazard}?`,
+    `Apa yang pertama kulakukan saat ${hazard}?`,
+    "Apa saja isi tas siaga bencana?",
+  ].slice(0, 3);
 
   return (
     <aside
@@ -144,11 +169,11 @@ export default function WardenChat() {
       <div ref={listRef} aria-live="polite" className="flex-1 space-y-3 overflow-y-auto p-3 text-sm leading-relaxed">
         {msgs.length === 0 && (
           <div className="space-y-2">
-            <p className="text-redup">
-              Tanyakan apa saja soal evakuasi, pertolongan pertama, atau bangunan sekolah yang aman. Untuk keadaan darurat
-              nyata, hubungi 112.
+            <p className="mr-4 rounded-md bg-malam-2 px-3 py-2">
+              Halo, {name}. Aku petugas keselamatan {school?.name ?? "sekolah ini"}. Tanya apa saja soal evakuasi di sini,
+              pertolongan pertama, atau latihanmu. Kalau ada keadaan darurat sungguhan, hubungi 112.
             </p>
-            {SUGGESTIONS.map((s) => (
+            {suggestions.map((s) => (
               <button
                 key={s}
                 type="button"

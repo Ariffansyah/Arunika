@@ -76,8 +76,8 @@ const model: Tracked = {
   aftershockS: 4,
   aftershockCoverS: 4,
   aftershockIndoorS: 0,
-  powerOff: true,
-  alarm: true,
+  leftAt: 4,
+  runWaterS: 0,
   deepWaterS: 0,
   sheltered: true,
   windS: 15,
@@ -101,10 +101,18 @@ test("earthquake checklist: a model drill scores 1000+, ducking in the open scor
   assert.equal(scoreDrill({ ...base, reached: false, checks: grade("gempa", { ...model, reached: false }) }), 0);
 });
 
-test("flood checklist totals 1000 and marks power left on and deep wading", () => {
+test("flood checklist totals 1000 and marks a slow start, running in water and deep wading", () => {
   assert.equal(grade("banjir", model).reduce((sum, c) => sum + c.max, 0), 1000);
-  assert.equal(grade("banjir", { ...model, powerOff: false }).filter((c) => !c.ok).length, 1);
+  const slow = grade("banjir", { ...model, leftAt: 25 })[0];
+  assert.ok(!slow.ok && slow.got === 75);
+  assert.equal(grade("banjir", { ...model, leftAt: -1 })[0].pending, true);
+  assert.equal(grade("banjir", { ...model, runWaterS: 3 }).filter((c) => !c.ok).length, 1);
   assert.equal(grade("banjir", { ...model, deepWaterS: 10 }).filter((c) => !c.ok).length, 1);
+});
+
+test("landslide checklist totals 1000 and asks nothing of the player but reading the slope and leaving it", () => {
+  assert.equal(grade("longsor", model).reduce((sum, c) => sum + c.max, 0), 1000);
+  assert.equal(grade("longsor", { ...model, signSeen: false }).filter((c) => !c.ok).length, 1);
 });
 
 test("bigger quakes shake longer, and a seed gives every player the same aftershock", () => {

@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { CanvasTexture, SRGBColorSpace, Shape, ShapeGeometry, Vector2 } from "three";
-import { GATE, MAP, TILE, elevationAt, findTiles } from "@/lib/campus";
+import { CanvasTexture, SRGBColorSpace } from "three";
+import { ASSEMBLY, GATE, MAP, TILE, elevationAt, findTiles, tileCenter } from "@/lib/campus";
 import type { Rect } from "@/lib/maps";
 import { evacuationSigns } from "@/lib/sim";
 
@@ -195,69 +195,162 @@ function WaterTower({ x, z }: { x: number; z: number }) {
 }
 
 const SIGNS = evacuationSigns();
+const GREEN = "#0f8a4a";
 
-// White on green, as on Indonesian evacuation signs.
-function signLabel() {
+function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void) {
   const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 48;
+  canvas.width = w;
+  canvas.height = h;
   const g = canvas.getContext("2d")!;
-  g.fillStyle = "#108a4a";
-  g.fillRect(0, 0, 256, 48);
-  g.fillStyle = "#ffffff";
-  g.font = "bold 30px sans-serif";
-  g.textAlign = "center";
-  g.textBaseline = "middle";
-  g.fillText("JALUR EVAKUASI", 128, 26);
+  g.fillStyle = GREEN;
+  g.fillRect(0, 0, w, h);
+  Object.assign(g, { fillStyle: "#ffffff", strokeStyle: "#ffffff", lineCap: "round", lineJoin: "round" });
+  draw(g);
   const texture = new CanvasTexture(canvas);
   texture.colorSpace = SRGBColorSpace;
+  texture.anisotropy = 4;
   return texture;
 }
 
-const HEAD = new ShapeGeometry(new Shape([new Vector2(0.18, 0), new Vector2(0.04, 0.12), new Vector2(0.04, -0.12)]));
+// The running figure of the evacuation sign, heading out through a doorway on its right; `flip` turns it left.
+function runner(g: CanvasRenderingContext2D, x: number, y: number, flip: boolean) {
+  g.save();
+  g.translate(x, y);
+  g.scale(flip ? -1 : 1, 1);
+  g.lineWidth = 7;
+  g.strokeRect(30, -62, 46, 124);
+  g.beginPath();
+  g.arc(-4, -44, 12, 0, Math.PI * 2);
+  g.fill();
+  g.lineWidth = 15;
+  const limb = (...pts: number[]) => {
+    g.beginPath();
+    g.moveTo(pts[0], pts[1]);
+    for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
+    g.stroke();
+  };
+  limb(-10, -24, -22, 10);
+  limb(-12, -20, 6, -8, 18, -24);
+  limb(-12, -20, -30, -6, -42, -16);
+  limb(-22, 10, -2, 26, -2, 54);
+  limb(-22, 10, -34, 34, -54, 38);
+  g.restore();
+}
 
-// A shaft along +x ending in a solid head, turned to `angle` on the panel.
-function Arrow({ angle, z }: { angle: number; z: number }) {
+// A block arrow pointing along `angle`, 0 to the right and π/2 straight up.
+function arrow(g: CanvasRenderingContext2D, x: number, y: number, size: number, angle: number) {
+  g.save();
+  g.translate(x, y);
+  g.rotate(-angle);
+  g.beginPath();
+  for (const [px, py] of [[1, 0], [0.1, -0.62], [0.1, -0.24], [-1, -0.24], [-1, 0.24], [0.1, 0.24], [0.1, 0.62]]) g.lineTo(px * size, py * size);
+  g.fill();
+  g.restore();
+}
+
+// Evacuation route sign faces, one per arrow: figure and arrow above, the words below, the figure running the arrow's way.
+const signFaces = new Map<number, CanvasTexture>();
+function signFace(angle: number) {
+  if (!signFaces.has(angle)) {
+    const left = angle > Math.PI / 2 + 0.1;
+    signFaces.set(
+      angle,
+      canvasTexture(384, 256, (g) => {
+        g.lineWidth = 6;
+        g.strokeRect(8, 8, 368, 240);
+        runner(g, left ? 262 : 122, 98, left);
+        arrow(g, left ? 96 : 288, 98, 58, angle);
+        g.font = "bold 36px sans-serif";
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.fillText("JALUR EVAKUASI", 192, 212);
+      }),
+    );
+  }
+  return signFaces.get(angle)!;
+}
+
+// The assembly point sign: four people round a point, arrows pointing in, and its name.
+function assemblyFace() {
+  return canvasTexture(320, 400, (g) => {
+    g.lineWidth = 8;
+    g.strokeRect(10, 10, 300, 380);
+    g.lineWidth = 7;
+    g.strokeRect(40, 40, 240, 240);
+    for (const [x, y] of [[90, 90], [230, 90], [90, 230], [230, 230]]) {
+      g.beginPath();
+      g.arc(x, y - 22, 13, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.roundRect(x - 16, y - 4, 32, 44, 10);
+      g.fill();
+    }
+    for (const [x, y, a] of [[160, 82, -Math.PI / 2], [160, 238, Math.PI / 2], [82, 160, 0], [238, 160, Math.PI]]) arrow(g, x, y, 26, a);
+    g.font = "bold 46px sans-serif";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText("TITIK", 160, 318);
+    g.fillText("KUMPUL", 160, 362);
+  });
+}
+
+function Post({ height }: { height: number }) {
   return (
-    <group position={[0, 0.06, z]} rotation-z={angle}>
-      <mesh position={[-0.05, 0, 0]}>
-        <planeGeometry args={[0.2, 0.07]} />
-        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.35} />
-      </mesh>
-      <mesh geometry={HEAD}>
-        <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.35} />
-      </mesh>
-    </group>
+    <mesh position={[0, height / 2, -0.06]} castShadow>
+      <cylinderGeometry args={[0.04, 0.04, height, 6]} />
+      <meshStandardMaterial color="#cfd6de" />
+    </mesh>
   );
 }
 
-// The back of a post sign is bare metal, as on real ones: the route is signed one way.
+// A panel of `w` by `h` on its metal backing, the face lit a little so the retroreflective sheet reads in shade.
+function Panel({ w, h, face, back }: { w: number; h: number; face: CanvasTexture; back?: boolean }) {
+  return (
+    <>
+      <mesh position={[0, 0, -0.02]} castShadow>
+        <boxGeometry args={[w + 0.02, h + 0.02, 0.02]} />
+        <meshStandardMaterial color="#9aa3ad" metalness={0.5} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0, 0.001]}>
+        <planeGeometry args={[w, h]} />
+        <meshStandardMaterial map={face} emissiveMap={face} emissive="#ffffff" emissiveIntensity={0.3} />
+      </mesh>
+      {back && (
+        <mesh position={[0, 0, -0.041]} rotation-y={Math.PI}>
+          <planeGeometry args={[w, h]} />
+          <meshStandardMaterial map={face} emissiveMap={face} emissive="#ffffff" emissiveIntensity={0.3} />
+        </mesh>
+      )}
+    </>
+  );
+}
+
+// The back of a route sign is bare metal, as on real ones: the route is signed one way.
 function EvacuationSigns() {
-  const label = useMemo(() => signLabel(), []);
   return SIGNS.map((s, i) => (
     <group key={i} position={[s.x, at(s.x, s.z), s.z]} rotation-y={s.ry}>
-      <mesh position={[0, 1.2, -0.08]} castShadow>
-        <cylinderGeometry args={[0.04, 0.04, 2.4, 6]} />
-        <meshStandardMaterial color="#cfd6de" />
-      </mesh>
-      <group position={[0, 2.15, 0]}>
-        <mesh position={[0, 0, -0.025]} castShadow>
-          <boxGeometry args={[0.68, 0.52, 0.02]} />
-          <meshStandardMaterial color="#9aa3ad" metalness={0.5} roughness={0.5} />
-        </mesh>
-        <mesh>
-          <boxGeometry args={[0.66, 0.5, 0.03]} />
-          {/* Sign faces are retroreflective, so they stay readable in shade. */}
-          <meshStandardMaterial color="#108a4a" emissive="#108a4a" emissiveIntensity={0.35} />
-        </mesh>
-        <Arrow angle={s.arrow} z={0.017} />
-        <mesh position={[0, -0.17, 0.017]}>
-          <planeGeometry args={[0.62, 0.116]} />
-          <meshStandardMaterial map={label} emissiveMap={label} emissive="#ffffff" emissiveIntensity={0.35} />
-        </mesh>
+      <Post height={2.5} />
+      <group position={[0, 2.2, 0]}>
+        <Panel w={0.72} h={0.48} face={signFace(s.arrow)} />
       </group>
     </group>
   ));
+}
+
+// Beside every assembly point, readable from both sides since people arrive from all round.
+function AssemblySigns() {
+  const face = useMemo(() => assemblyFace(), []);
+  return ASSEMBLY.map(([x, z]) => {
+    const [cx, cz] = tileCenter(x, z);
+    return (
+      <group key={`${x}-${z}`} position={[cx, at(cx, cz - 5.1), cz - 5.1]}>
+        <Post height={2.9} />
+        <group position={[0, 2.35, 0]}>
+          <Panel w={0.64} h={0.8} face={face} back />
+        </group>
+      </group>
+    );
+  });
 }
 
 export default function Decor() {
@@ -275,6 +368,7 @@ export default function Decor() {
         <Bins key={`${x}-${z}`} x={x} z={z} />
       ))}
       <EvacuationSigns />
+      <AssemblySigns />
     </>
   );
 }

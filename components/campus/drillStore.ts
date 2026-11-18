@@ -6,6 +6,7 @@ import {
   NONE,
   SLIDE_S,
   campusRisks,
+  blankTracked,
   grade,
   hazardTiles,
   inLane,
@@ -19,7 +20,6 @@ import {
   type Scenario,
   type Site,
   type Structure,
-  type Tracked,
 } from "@/lib/sim";
 import { fallenBox, outdoors, situation, type Situation } from "@/lib/situation";
 import type { School } from "@/lib/supabase";
@@ -50,7 +50,6 @@ type State = {
   vaultAt: { x: number; y: number; z: number } | null;
   closedDoors: string[];
   power: boolean;
-  gas: boolean;
   mapOpen: boolean;
   // A practice run: the route is shown, there is no time limit, and nothing is scored or shared.
   guided: boolean;
@@ -118,7 +117,6 @@ let state: State = {
   vaultAt: null,
   closedDoors: [],
   power: true,
-  gas: true,
   mapOpen: false,
   guided: false,
   npc: savedNpc(),
@@ -193,33 +191,9 @@ export const input = { up: false, down: false, left: false, right: false, crouch
 export const net = { send: null as ((event: string, payload: Record<string, unknown>) => void) | null };
 // yaw 0 puts the camera south of the player, looking north. cine is how far the camera is into its aerial shot, 0 to 1.
 export const look = { yaw: 0, camPitch: 0.38, eyePitch: -0.05, cine: 1 };
+// Set by the chat while an answer streams in or is read aloud, so the warden's mouth moves only then.
+export const warden = { talking: false };
 export const remotes = new Map<string, { x: number; z: number; layer: number; anim: Anim; at: number }>();
-const blankTrack = (): Tracked => ({
-  reached: false,
-  shakeS: 0,
-  coverS: 0,
-  deskS: 0,
-  shakeMoved: 0,
-  nearFallS: 0,
-  runIndoorS: 0,
-  reentered: false,
-  debrisS: 0,
-  aftershockS: 0,
-  aftershockCoverS: 0,
-  aftershockIndoorS: 0,
-  powerOff: false,
-  alarm: false,
-  deepWaterS: 0,
-  sheltered: false,
-  windS: 0,
-  windCoverS: 0,
-  windWindowS: 0,
-  windExposedS: 0,
-  leftShelter: false,
-  signSeen: false,
-  caught: false,
-  slopeS: 0,
-});
 
 export const run = {
   hazards: new Set<number>(),
@@ -243,7 +217,7 @@ export const run = {
   falls: new Map<number, number>(),
   breaks: new Map<number, number>(),
   outsideS: 0,
-  track: blankTrack(),
+  track: blankTracked(),
   // Which of the map's slide lanes gives way in a landslide drill.
   lane: 0,
   situation: null as Situation | null,
@@ -272,7 +246,7 @@ export const fallenAt = () => {
   return f.at === "shake" ? (run.timeline.shake?.[1] ?? 0) * 0.6 : (run.timeline.wind?.[1] ?? Infinity);
 };
 
-const SIGN_LABELS = ["Periksa retakan tanah", "Periksa pohon miring", "Periksa air keruh"];
+const SIGN_LABELS = ["Kenali retakan tanah", "Kenali pohon miring", "Kenali air keruh"];
 // Warning signs on the slope before a landslide, in the order they appear.
 export const landslideSigns = () => (MAP.runouts[run.lane]?.signs ?? []).map(([x, z], i) => ({ x, z, label: SIGN_LABELS[i] }));
 
@@ -315,6 +289,8 @@ const nearStructure = () => {
 export const inShelter = () =>
   run.shelters.some((r) => r.floor === player.layer && player.x >= r.x0 && player.x <= r.x1 && player.z >= r.z0 && player.z <= r.z1);
 
+const POWER_CUT_S = 20;
+
 // Called every frame of a running drill with the distance just walked and the water depth at the player.
 export function trackDrill(dt: number, t: number, moved: number, depth: number) {
   const tr = run.track;
@@ -343,7 +319,11 @@ export function trackDrill(dt: number, t: number, moved: number, depth: number) 
       if (inside) tr.aftershockIndoorS += dt;
     }
   }
+  if (tr.leftAt < 0 && run.walked > 5) tr.leftAt = t;
+  if (depth >= 0.1 && player.running) tr.runWaterS += dt;
   if (depth >= 0.5) tr.deepWaterS += dt;
+  // In a flood the school's staff cut the mains at the panel once water is in the yard; the lamps go dark.
+  if (getState().scenario.kind === "banjir" && t >= POWER_CUT_S && getState().power) setState({ power: false });
   const tl = run.timeline;
   if (tl.wind) {
     if (t >= tl.wind[0] && !run.arrived) {
@@ -537,7 +517,7 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     falls,
     breaks,
     outsideS: 0,
-    track: blankTrack(),
+    track: blankTracked(),
     lane: sit.lane,
     situation: sit,
     mates,
@@ -559,7 +539,6 @@ export function startDrill(scenario: Scenario, school: School | null, delayMs = 
     mapOpen: false,
     closedDoors: locked,
     power: true,
-    gas: true,
     guided,
   });
 }
@@ -573,13 +552,13 @@ export function showHint() {
 // The checklist as it stands mid-drill, for the guided practice.
 export const liveChecks = () => {
   const s = getState();
-  return grade(s.scenario.kind, { ...run.track, powerOff: !s.power }, !!run.situation && outdoors(run.situation));
+  return grade(s.scenario.kind, run.track, !!run.situation && outdoors(run.situation));
 };
 
 export function finishDrill(reached: boolean) {
   const s = getState();
   if (s.phase !== "running") return;
-  const tracked = { ...run.track, reached, powerOff: !s.power };
+  const tracked = { ...run.track, reached };
   const stats: DrillStats = {
     scenario: s.scenario,
     reached,

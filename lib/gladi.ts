@@ -320,7 +320,7 @@ ${describeBoard(seed.hazard, seed.board)}
 
 Acuan tindakan yang benar, dari pedoman sekolah aman bencana:
 ${steps}
-- Tim siaga membunyikan tanda bahaya, memimpin evakuasi, menghitung siswa di titik kumpul, memberi pertolongan pertama, memeriksa gedung sebelum dimasuki lagi, dan memberi kabar resmi ke orang tua, BPBD, atau 112.
+- Tim siaga membunyikan sirene atau bel tanda bahaya (bukan kentongan), memadamkan listrik di panel saat air masuk, memimpin evakuasi, menghitung siswa di titik kumpul, memberi pertolongan pertama, memeriksa gedung sebelum dimasuki lagi, dan memberi kabar resmi ke orang tua, BPBD, atau 112.
 
 Aturan:
 - Bahasa Indonesia yang lugas. Pakai nama gedung dan titik kumpul persis seperti di atas, dan angka dari mesin bila relevan.

@@ -11,7 +11,7 @@ export const LESSONS: Record<Scenario["kind"], Lesson> = {
       { title: "Merunduk, berlindung, bertahan.", why: "Masuk ke bawah meja, lindungi kepala dan leher, pegang kaki meja sampai guncangan berhenti." },
       { title: "Jauhi jendela, lemari, dan rak.", why: "Kaca pecah dan perabot tinggi yang roboh paling sering melukai orang di dalam kelas." },
       { title: "Tetap di tempat selama guncangan.", why: "Kebanyakan cedera terjadi saat orang berpindah ketika lantai masih bergerak." },
-      { title: "Keluar tertib setelah guncangan berhenti.", why: "Berjalan, jangan berlari, ikuti jalur evakuasi, dan jangan kembali ke dalam gedung." },
+      { title: "Keluar tertib saat sirene evakuasi berbunyi.", why: "Berjalan, jangan berlari, ikuti rambu jalur evakuasi, dan jangan kembali ke dalam gedung." },
       { title: "Di luar, jauhi gedung, pohon, dan tiang listrik.", why: "Bila ada gempa susulan, merunduk di tempat terbuka dan lindungi kepala." },
       { title: "Lapor ke petugas di titik kumpul.", why: "Petugas menghitung siapa yang sudah selamat dan siapa yang masih dicari." },
     ],
@@ -38,18 +38,19 @@ export const LESSONS: Record<Scenario["kind"], Lesson> = {
   },
   banjir: {
     steps: [
-      { title: "Matikan listrik di panel.", why: "Listrik yang masih menyala di genangan bisa menyengat siapa pun yang menyentuh air." },
-      { title: "Bunyikan kentongan.", why: "Bunyi cepat tanpa henti memberi tahu kelas lain dan warga untuk mengungsi." },
+      { title: "Bergerak begitu sirene berbunyi.", why: "Tinggalkan tas dan buku, lalu ikuti guru keluar kelas; barang bisa diganti, waktu sebelum air tinggi tidak." },
+      { title: "Jauhi stop kontak, kabel, dan tiang listrik.", why: "Listrik di genangan bisa menyengat. Panel listrik sekolah dipadamkan petugas, bukan siswa." },
+      { title: "Berjalan, jangan berlari di genangan.", why: "Lantai licin, dan selokan atau lubang yang tertutup air membuat orang terjatuh." },
       { title: "Jangan melewati air setinggi lutut.", why: "Air berarus setinggi lutut bisa menjatuhkan orang dan menyembunyikan lubang atau selokan." },
       { title: "Naik ke tempat tinggi.", why: "Bukit atau lantai atas gedung yang kokoh, lewat jalan yang paling tinggi." },
       { title: "Lapor dan tunggu sampai air surut.", why: "Jangan kembali mengambil barang; air bisa naik lagi dengan cepat." },
     ],
     quiz: [
       {
-        q: "Air mulai masuk ke sekolah. Apa yang dilakukan lebih dulu?",
-        options: ["Mematikan listrik di panel", "Menyelamatkan buku di rak bawah", "Bermain air di halaman"],
+        q: "Sirene banjir berbunyi saat kamu di kelas. Apa yang dilakukan lebih dulu?",
+        options: ["Meninggalkan barang dan mengikuti guru keluar", "Menyelamatkan buku di rak bawah", "Melihat air dari jendela"],
         answer: 0,
-        why: "Genangan yang teraliri listrik berbahaya bagi semua orang di dalamnya.",
+        why: "Air bisa naik cepat; menunda untuk barang membuat jalan keluar keburu tergenang.",
       },
       {
         q: "Jalan menuju tempat tinggi tergenang setinggi lutut. Apa yang tepat?",
@@ -97,10 +98,9 @@ export const LESSONS: Record<Scenario["kind"], Lesson> = {
   longsor: {
     steps: [
       { title: "Kenali tanda longsor.", why: "Retakan baru di tanah, pohon atau tiang yang miring, air keruh atau mata air baru di lereng." },
-      { title: "Periksa dari jauh.", why: "Jangan naik ke lereng untuk melihat lebih dekat; lihat dari tepi, lalu menjauh." },
-      { title: "Bunyikan kentongan.", why: "Tanda bahaya membuat semua orang di sekitar lereng ikut menjauh." },
+      { title: "Lihat dari jauh.", why: "Jangan naik ke lereng untuk melihat lebih dekat; lihat dari tepi, lalu menjauh." },
       { title: "Menjauh dari lereng sebelum longsor.", why: "Pergi ke tempat terbuka yang jauh dari jalur longsoran, bukan ke bukit." },
-      { title: "Lapor di titik kumpul aman.", why: "Petugas memastikan tidak ada yang tertinggal di dekat lereng." },
+      { title: "Lapor di titik kumpul aman.", why: "Ceritakan tanda yang kamu lihat ke petugas, supaya tidak ada yang kembali ke dekat lereng." },
     ],
     quiz: [
       {
@@ -111,7 +111,7 @@ export const LESSONS: Record<Scenario["kind"], Lesson> = {
       },
       {
         q: "Kamu melihat tanda longsor. Apa yang dilakukan?",
-        options: ["Naik ke lereng untuk memeriksa", "Membunyikan kentongan lalu menjauh", "Menunggu di gedung di kaki bukit"],
+        options: ["Naik ke lereng untuk memeriksa", "Memberi tahu guru lalu menjauh dari lereng", "Menunggu di gedung di kaki bukit"],
         answer: 1,
         why: "Waktu antara tanda pertama dan longsor bisa sangat singkat.",
       },

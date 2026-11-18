@@ -227,7 +227,7 @@ function DoorLeaf({ d }: { d: Door }) {
 }
 
 function SpotMesh({ s }: { s: Spot }) {
-  const on = useDrill((st) => (s.kind === "mcb" ? st.power : s.kind === "gas" ? st.gas : true));
+  const on = useDrill((st) => (s.kind === "mcb" ? st.power : true));
   return (
     <group position={[s.x, s.y, s.z]} rotation-y={s.ry}>
       {s.kind === "peta" && (
@@ -251,26 +251,6 @@ function SpotMesh({ s }: { s: Spot }) {
           <mesh position={[0, on ? 0.08 : -0.08, 0.13]}>
             <boxGeometry args={[0.2, 0.06, 0.03]} />
             <meshStandardMaterial color={on ? "#1d2229" : "#d9483b"} />
-          </mesh>
-        </>
-      )}
-      {s.kind === "kentongan" && (
-        <>
-          <mesh position={[0, 1.47, -0.085]}>
-            <boxGeometry args={[0.05, 0.05, 0.2]} />
-            <meshStandardMaterial color="#4b3a2a" />
-          </mesh>
-          <mesh position={[0, 1.2, 0]}>
-            <cylinderGeometry args={[0.012, 0.012, 0.5, 4]} />
-            <meshStandardMaterial color="#4b3a2a" />
-          </mesh>
-          <mesh position={[0, 0.5, 0]} castShadow>
-            <cylinderGeometry args={[0.13, 0.13, 0.9, 12]} />
-            <meshStandardMaterial color="#8a5a33" />
-          </mesh>
-          <mesh position={[0, 0.5, 0.125]}>
-            <boxGeometry args={[0.04, 0.6, 0.02]} />
-            <meshStandardMaterial color="#2a1c12" />
           </mesh>
         </>
       )}

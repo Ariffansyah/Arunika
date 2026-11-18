@@ -62,7 +62,7 @@ export type Item = { model: Furniture; b: string; floor: number; x: number; y: n
 export type Seat = { room: string; x: number; z: number; ry: number };
 // Height runs linearly from y0 at c0 to y1 at c1 along `axis`; a walker on it is on `layer`.
 export type Ramp = { b: string; layer: 0 | 1; x0: number; x1: number; z0: number; z1: number; axis: "x" | "z"; c0: number; c1: number; y0: number; y1: number };
-export type Spot = { kind: "peta" | "mcb" | "gas" | "kentongan"; b: string; floor: number; x: number; y: number; z: number; ry: number };
+export type Spot = { kind: "peta" | "mcb" | "gas"; b: string; floor: number; x: number; y: number; z: number; ry: number };
 export type Plan = {
   parts: Part[];
   rooms: Room[];
@@ -294,7 +294,7 @@ function kantor(plan: Plan, F: Frame, b: string, y00: number) {
   const vIn = CORRIDOR + WALL;
   const s = new Storey(plan, F, b, 0, y00, y00 + CEILING);
   s.room("selasar", "Selasar", 0, L, 0, CORRIDOR);
-  const posts = s.columns(L, 0, 0.3);
+  s.columns(L, 0, 0.3);
   s.wall("u", 0, L, D - WALL, D, [win(2), win(6), win(10), win(15), win(21)]);
   s.wall("v", CORRIDOR, D - WALL, 0, WALL);
   s.wall("v", CORRIDOR, D - WALL, L - WALL, L);
@@ -328,10 +328,6 @@ function kantor(plan: Plan, F: Frame, b: string, y00: number) {
   for (const u of [20.4, 21.6]) s.item("chair", u, 6.4, 0, 1, [0.45, 0.85, 0.45], false);
   s.item("bookcaseClosedDoors", 22.6, D - WALL - 0.25, 0, -1, [1.1, 1.9, 0.45]);
   s.item("pottedPlant", 23.3, 3.2, 0, 1, [0.5, 1.1, 0.5], false);
-
-  // Hung on the yard side of a corridor column, at the end away from the hill and out of a landslide's reach:
-  // seen from the yard, and rung from there or from the corridor.
-  s.spot("kentongan", posts[1], -0.17, 0, -1, 0.85);
 }
 
 function perpustakaan(plan: Plan, F: Frame, b: string, y00: number) {

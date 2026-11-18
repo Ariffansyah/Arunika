@@ -62,7 +62,7 @@ const KEYBOARD: [string[], string][] = [
   [["↑", "←", "↓", "→"], "Bergerak, sama seperti W A S D"],
   [["Shift"], "Tahan untuk berlari"],
   [["C"], "Tahan untuk merunduk dan melindungi kepala"],
-  [["E"], "Aksi: berlindung di bawah meja, buka pintu, matikan listrik, lapor ke petugas"],
+  [["E"], "Aksi: berlindung di bawah meja, buka pintu, lihat peta evakuasi, tanya atau lapor ke petugas"],
   [["Spasi"], "Lompati rintangan saat tanda lompat muncul"],
   [["M"], "Buka atau tutup peta evakuasi"],
   [["V"], "Ganti kamera orang pertama atau ketiga"],

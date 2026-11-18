@@ -4,10 +4,10 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
 import { MAP, SITE_D, SITE_W } from "@/lib/campus";
 import { INTENSITY, type Scenario } from "@/lib/sim";
-import { supabase, type School } from "@/lib/supabase";
+import { AVATARS, supabase, type School } from "@/lib/supabase";
 import { ANIMS } from "@/components/Character";
 import { net, player, remotes, startDrill } from "./drillStore";
-import { isDoor, raiseAlarm, setDoor } from "./interact";
+import { isDoor, setDoor } from "./interact";
 
 export type Peer = { id: string; name: string; avatar: number };
 type Status = "connecting" | "online" | "offline";
@@ -50,7 +50,7 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
         .map(([id, metas]) => ({
           id,
           name: String(metas[0]?.name ?? "Tamu").slice(0, 40),
-          avatar: num(metas[0]?.avatar, 0, 5) ?? 0,
+          avatar: num(metas[0]?.avatar, 0, AVATARS.length - 1) ?? 0,
         }));
       for (const id of remotes.keys()) if (!list.some((p) => p.id === id)) remotes.delete(id);
       setPeers(list);
@@ -67,7 +67,6 @@ export function useRoom(room: string, me: { id: string; name: string; avatar: nu
       .on("broadcast", { event: "door" }, ({ payload }) => {
         if (typeof payload?.id === "string" && isDoor(payload.id)) setDoor(payload.id, payload.open === true, false);
       })
-      .on("broadcast", { event: "alarm" }, () => raiseAlarm(false))
       .on("broadcast", { event: "drill" }, ({ payload }) => {
         const s = parseScenario(payload?.scenario);
         const seed = num(payload?.seed, 0, 2 ** 31);

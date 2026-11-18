@@ -1,16 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import CharacterPicker from "@/components/CharacterPicker";
 import { HAZARD_ICON } from "@/components/hazards";
+import type { Me } from "@/components/RequireAuth";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
 import { HAZARD_LABEL } from "@/lib/gladi";
 import { MAPS, type Setting } from "@/lib/maps";
-import type { School } from "@/lib/supabase";
+import { avatarOf } from "@/lib/supabase";
+
+const CharacterStage = dynamic(() => import("./CharacterStage"), { ssr: false });
 
 // The level select: one school per card, keys 1 to 3 as in a game menu. Plain links and full page loads, not client
 // routes: the engine fixes its map when the page opens.
-export default function MapMenu({ school, search }: { school: School | null; search: string }) {
+export default function MapMenu({ me, search }: { me: Me; search: string }) {
+  const [avatar, setAvatar] = useState(me.profile.avatar);
   const href = (id: Setting) => {
     const q = new URLSearchParams(search);
     q.set("peta", id);
@@ -35,7 +41,7 @@ export default function MapMenu({ school, search }: { school: School | null; sea
           <img src="/arunika-mark.svg" alt="" width={24} height={27} className="h-7 w-auto" />
           Arunika
         </Link>
-        <span className="ml-auto truncate text-redup">{school?.name ?? "Sekolah contoh"}</span>
+        <span className="ml-auto truncate text-redup">{me.school?.name ?? "Sekolah contoh"}</span>
       </header>
       <section aria-labelledby="menu-title" className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 pt-6 pb-12 sm:px-6">
         <h1 id="menu-title" className="animate-rise text-5xl font-extrabold tracking-[-0.03em] sm:text-7xl">
@@ -73,6 +79,17 @@ export default function MapMenu({ school, search }: { school: School | null; sea
             </li>
           ))}
         </ul>
+        <section aria-labelledby="karakter-title" className="mt-14 animate-rise [animation-delay:340ms]">
+          <h2 id="karakter-title" className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Karakter
+          </h2>
+          <div className="mt-6 grid gap-5 rounded-xl border border-malam-3 bg-malam-2 p-4 sm:p-5 md:grid-cols-[16rem_minmax(0,1fr)] md:items-center">
+            <div className="h-72 overflow-hidden rounded-lg bg-[radial-gradient(ellipse_at_50%_85%,#1b3461,#071530_70%)] md:h-80">
+              <CharacterStage look={avatarOf(avatar)} />
+            </div>
+            <CharacterPicker profileId={me.profile.id} value={avatar} onChange={setAvatar} cols="grid-cols-4 sm:grid-cols-7 md:grid-cols-4 lg:grid-cols-7" />
+          </div>
+        </section>
       </section>
     </div>
   );

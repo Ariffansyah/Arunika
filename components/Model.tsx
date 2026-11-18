@@ -18,7 +18,6 @@ export const M = {
   houses: ["a", "c", "e", "g", "k", "n"].map((f) => `/models/suburban/building-type-${f}.glb`),
   tent: "/models/survival/tent-canvas.glb",
   tentFrame: "/models/survival/tent.glb",
-  sign: "/models/survival/signpost-single.glb",
   crate: "/models/survival/box-large.glb",
   barrel: "/models/survival/barrel.glb",
   ambulance: "/models/cars/ambulance.glb",

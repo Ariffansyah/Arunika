@@ -17,7 +17,7 @@
 ### 1. Simulasi Sekolah 3D Interaktif (`/sekolah`)
 * **3 Ragam Topografi Indonesia:** dipilih dari menu peta sebelum masuk: Sekolah Pesisir (ancaman rob & bukit evakuasi), Pegunungan (lereng rawan longsor), dan Kawasan Perkotaan (kawasan padat gedung bertingkat).
 * **4 Skenario Bencana Utama:** Gempa Bumi (*Drop, Cover, Hold on*), Banjir/Rob (air meninggi, arus, bahaya listrik), Angin Puting Beliung, dan Tanah Longsor.
-* **Multiplayer Real-time (Supabase Channels & Presence):** Siswa dan guru dapat masuk ke dalam ruang simulasi yang sama, melihat pergerakan avatar teman, membunyikan kentongan/alarm bersama, dan melakukan evakuasi serentak.
+* **Multiplayer Real-time (Supabase Channels & Presence):** Siswa dan guru dapat masuk ke dalam ruang simulasi yang sama, melihat pergerakan avatar teman, mendengar sirene sekolah yang sama, dan melakukan evakuasi serentak.
 * **Visual Debriefing Trail:** Menampilkan visualisasi peta jejak langkah aktual siswa dibandingkan dengan rute evakuasi ideal, lengkap dengan perhitungan efisiensi rute dan catatan evaluasi.
 * **Petugas Keselamatan Virtual (AI Warden):** Asisten AI interaktif dengan respon *streaming* untuk menjawab pertanyaan evakuasi, isi tas siaga, dan P3K.
 

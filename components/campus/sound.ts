@@ -153,26 +153,6 @@ export function rumble(seconds: number) {
   src.start();
 }
 
-// A kentongan (bamboo slit drum) beaten fast and without pause is the village call to evacuate.
-export function kentongan(knocks = 10) {
-  if (!ctx || !master) return;
-  const now = ctx.currentTime;
-  for (let i = 0; i < knocks; i++) {
-    const at = now + i * 0.17;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(420, at);
-    osc.frequency.exponentialRampToValueAtTime(260, at + 0.12);
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(0.35, at + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.14);
-    osc.connect(gain).connect(master);
-    osc.start(at);
-    osc.stop(at + 0.15);
-  }
-}
-
 // Background sound, every layer from one looping noise buffer shaped by a filter.
 export type Ambience = { rain: number; wind: number; waves: number; city: number; water: number; birds: number };
 type Layer = { gain: GainNode; level: number };

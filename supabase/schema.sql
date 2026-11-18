@@ -20,7 +20,7 @@ create table if not exists public.schools (
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null check (char_length(display_name) between 2 and 40),
-  avatar int not null default 0 check (avatar between 0 and 5),
+  avatar int not null default 0 check (avatar between 0 and 6),
   school_id uuid references public.schools (id),
   role text not null default 'siswa' check (role in ('siswa', 'guru', 'kepala_sekolah', 'pemda'))
 );
@@ -50,6 +50,10 @@ create table if not exists public.assessments (
 );
 
 -- Databases created before the whirlwind and landslide drills still carry the old two-scenario check.
+-- A seventh character (siswa-c) joined the picker on 2026-11-18.
+alter table public.profiles drop constraint if exists profiles_avatar_check;
+alter table public.profiles add constraint profiles_avatar_check check (avatar between 0 and 6);
+
 alter table public.drill_results drop constraint if exists drill_results_scenario_check;
 alter table public.drill_results add constraint drill_results_scenario_check check (scenario in ('gempa', 'banjir', 'angin', 'longsor'));
 

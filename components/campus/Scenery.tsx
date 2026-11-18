@@ -6,9 +6,9 @@ import type { Group } from "three";
 import Model, { Instances, M, preloadModels, type Placement } from "@/components/Model";
 import Decor from "./Decor";
 import Horizon from "./Horizon";
-import { ASSEMBLY, GATE, MAP, SITE_D, SITE_W, TILE, elevationAt, findTiles, surfaceAt, tileAt, tileCenter } from "@/lib/campus";
+import { GATE, MAP, SITE_D, SITE_W, TILE, elevationAt, findTiles, surfaceAt, tileAt, tileCenter } from "@/lib/campus";
 
-preloadModels([...M.palms, ...M.trees, ...M.pines, ...M.bushes, ...M.grass, ...M.flowers, ...M.houses, M.tent, M.tentFrame, M.sign, M.crate, M.barrel, M.ambulance, M.police, M.cone]);
+preloadModels([...M.palms, ...M.trees, ...M.pines, ...M.bushes, ...M.grass, ...M.flowers, ...M.houses, M.tent, M.tentFrame, M.crate, M.barrel, M.ambulance, M.police, M.cone]);
 
 // Deterministic scatter so the surroundings are identical on every load and for every player.
 const rand = (i: number) => {
@@ -144,13 +144,6 @@ function Camp() {
   });
 }
 
-function Signs() {
-  return ASSEMBLY.map(([x, z]) => {
-    const [cx, cz] = tileCenter(x, z);
-    return <Model key={`${x}-${z}`} src={M.sign} fit={{ height: 2.2 }} position={[cx, elevationAt(cx, cz - 5.1), cz - 5.1]} />;
-  });
-}
-
 function Flag() {
   const flag = useRef<Group>(null);
   useFrame(({ clock }) => {
@@ -192,7 +185,6 @@ export default function Scenery() {
         <Spots spots={FLOWERS} by="height" />
         <Responders />
         <Camp />
-        <Signs />
       </Suspense>
     </>
   );

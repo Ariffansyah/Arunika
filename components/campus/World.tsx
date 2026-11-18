@@ -45,7 +45,7 @@ import Avatar from "./Avatar";
 import { Buildings } from "./Building";
 import { Beacons, Classmates, DoorRubble, FloodDebris, GlassShards, Landslide, QuakeDebris, Rain, Vortex } from "./Effects";
 import { fadeTo, hides } from "./fade";
-import { TIER, drillTime, fallenAt, getState, lowerQuality, player, predict, run, setState, useDrill } from "./drillStore";
+import { TIER, drillTime, fallenAt, getState, lowerQuality, player, predict, run, setState, useDrill, warden } from "./drillStore";
 import { wardenSpot } from "./interact";
 import Player from "./Player";
 import Scenery from "./Scenery";
@@ -471,15 +471,16 @@ function Warden() {
     if (!g || !o) return;
     const [x, z] = wardenSpot();
     o.position.set(x, elevationAt(x, z), z);
-    const id = getState().prompt?.id;
-    const target = id === "warden" || id === "lapor" ? Math.atan2(player.x - x, player.z - z) : Math.PI / 4;
+    // Anyone walking up, talking or reporting gets looked at; otherwise the warden watches over the yard.
+    const near = player.layer === 0 && Math.hypot(player.x - x, player.z - z) < 6;
+    const target = getState().chatOpen || near ? Math.atan2(player.x - x, player.z - z) : Math.PI / 4;
     const d = Math.atan2(Math.sin(target - g.rotation.y), Math.cos(target - g.rotation.y));
     g.rotation.y += d * (1 - Math.exp(-dt * 7));
   });
   return (
     <group ref={outer}>
       <group ref={ref} rotation-y={Math.PI / 4}>
-        <Avatar look="petugas" name="Petugas Keselamatan" height={1.7} anim={() => (getState().chatOpen ? "talk" : "idle")} />
+        <Avatar look="petugas" name="Petugas Keselamatan" height={1.7} anim={() => (warden.talking ? "talk" : "idle")} />
       </group>
     </group>
   );

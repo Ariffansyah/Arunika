@@ -2,7 +2,6 @@ import {
   ASSEMBLY,
   BLOCKED_CHARS,
   BUILDINGS,
-  GRID,
   H,
   MAP,
   TILE,
@@ -10,6 +9,7 @@ import {
   buildingRects,
   idx,
   isBlocked,
+  surfaceAt,
   tileAt,
   tileCenter,
   tileElevation,
@@ -235,33 +235,130 @@ export function entranceTile(id: string): Tile {
   return side === "S" ? [mx, r.z1 + 1] : side === "N" ? [mx, r.z0 - 1] : side === "E" ? [r.x1 + 1, mz] : [r.x0 - 1, mz];
 }
 
+// Walking distance to the nearest assembly point from every tile, with the same moves as bestRoute.
+// One field for every building, so two routes that meet never disagree about the way on.
+function safetyField() {
+  const dist = new Float64Array(W * H).fill(Infinity);
+  const queue: [number, number, number][] = ASSEMBLY.map(([x, z]) => ((dist[idx(x, z)] = 0), [x, z, 0]));
+  while (queue.length) {
+    queue.sort((p, q) => q[2] - p[2]);
+    const [x, z, d] = queue.pop()!;
+    if (d > dist[idx(x, z)]) continue;
+    for (const [dx, dz, step] of DIRS) {
+      const [nx, nz] = [x + dx, z + dz];
+      if (isBlocked(nx, nz) || (dx && dz && (isBlocked(x + dx, z) || isBlocked(x, z + dz)))) continue;
+      if (d + step < dist[idx(nx, nz)]) {
+        dist[idx(nx, nz)] = d + step;
+        queue.push([nx, nz, d + step]);
+      }
+    }
+  }
+  return dist;
+}
+
+// Downhill on the field from a tile to an assembly point; straight steps win ties, so routes keep to the paths.
+function walkField(dist: Float64Array, start: Tile): Tile[] {
+  const path: Tile[] = [start];
+  for (let [x, z] = start; dist[idx(x, z)] > 0 && path.length < W * H; ) {
+    let best: Tile | null = null;
+    let bestD = dist[idx(x, z)];
+    for (const [dx, dz, step] of DIRS) {
+      const [nx, nz] = [x + dx, z + dz];
+      if (isBlocked(nx, nz) || (dx && dz && (isBlocked(x + dx, z) || isBlocked(x, z + dz)))) continue;
+      if (dist[idx(nx, nz)] + step < bestD + 1e-9 && dist[idx(nx, nz)] < dist[idx(x, z)]) {
+        best = [nx, nz];
+        bestD = dist[idx(nx, nz)] + step - 1e-6;
+      }
+    }
+    if (!best) break;
+    path.push(best);
+    [x, z] = best;
+  }
+  return path;
+}
+
+// A straight line between tile centres that stays on open ground.
+function clearLine([ax, az]: Tile, [bx, bz]: Tile) {
+  const n = Math.ceil(Math.hypot(bx - ax, bz - az) * 4);
+  for (let i = 1; i < n; i++) {
+    const [x, z] = [ax + 0.5 + ((bx - ax) * i) / n, az + 0.5 + ((bz - az) * i) / n];
+    // Not too close to a wall corner either, or the leg would shave past a building.
+    for (const [ox, oz] of [[0.3, 0.3], [-0.3, 0.3], [0.3, -0.3], [-0.3, -0.3]]) {
+      if (isBlocked(Math.floor(x + ox), Math.floor(z + oz))) return false;
+    }
+  }
+  return true;
+}
+
+// The route as the straight legs someone would actually walk, corner to corner.
+function legs(path: Tile[]): Tile[] {
+  const out = [path[0]];
+  let from = 0;
+  for (let i = 2; i < path.length; i++) {
+    if (!clearLine(path[from], path[i])) {
+      out.push(path[i - 1]);
+      from = i - 1;
+    }
+  }
+  out.push(path[path.length - 1]);
+  return out;
+}
+
 export type EvacSign = { x: number; z: number; tile: Tile; ry: number; arrow: number };
 
-// Permanent signs from every building's entrance to the nearest assembly point, as a school would post them.
-// Each panel faces whoever walks up the route; "up" on it means straight on. `ry` turns the panel about y,
-// `arrow` turns the arrow on its face.
+const EIGHTH = Math.PI / 4;
+// Signs stop where the assembly point's own sign takes over, and never stand on a sports field or court.
+const NEAR_GOAL = 4;
+const REPEAT = 7;
+const noPost = (x: number, z: number) => tileAt(x, z) === "g" || surfaceAt(x, z) === "court";
+
+// Permanent signs from every building's entrance to the nearest assembly point, as a school would post them: at the
+// exit, at every turn, and again along a long straight. Each panel faces whoever walks up the route; its arrow is
+// one of the five a real sign carries (left, half left, straight on, half right, right). `ry` turns the panel about
+// y; `arrow` turns the arrow on its face, 0 pointing right and π/2 straight on.
 export function evacuationSigns(): EvacSign[] {
+  const dist = safetyField();
   const out: EvacSign[] = [];
+  const unit = ([x, z]: [number, number]) => [x / Math.hypot(x, z), z / Math.hypot(x, z)];
+  const place = (at: Tile, into: number[], next: number[]) => {
+    const [px, pz] = at;
+    if (noPost(px, pz) || ASSEMBLY.some(([gx, gz]) => Math.hypot(gx - px, gz - pz) < NEAR_GOAL)) return;
+    const [ax, az] = into;
+    // The walker's right hand.
+    const [rx, rz] = [-az, ax];
+    const turn = Math.atan2(next[0] * ax + next[1] * az, next[0] * rx + next[1] * rz);
+    const arrow = Math.min(Math.PI, Math.max(0, Math.round(turn / EIGHTH) * EIGHTH));
+    // The post stands on the side away from the turn, so it is ahead of the walker and out of the way round the corner.
+    const away = arrow > Math.PI / 2 + 0.1 ? 1 : -1;
+    const [cx, cz] = tileCenter(px, pz);
+    const side = [away, -away].find((k) => {
+      const [x, z] = [cx + k * rx * 1.2, cz + k * rz * 1.2];
+      return !isBlocked(Math.floor(x / TILE), Math.floor(z / TILE)) && !noPost(Math.floor(x / TILE), Math.floor(z / TILE));
+    });
+    if (side === undefined) return;
+    const [x, z] = [cx + side * rx * 1.2, cz + side * rz * 1.2];
+    const ry = Math.atan2(-ax, -az);
+    // One sign is enough for walkers coming the same way; a junction can carry one per approach.
+    if (out.some((o) => Math.hypot(o.x - x, o.z - z) < 2 || (Math.hypot(o.x - x, o.z - z) < 2 * TILE && Math.abs(Math.sin((o.ry - ry) / 2)) < 0.2))) return;
+    out.push({ x, z, tile: at, ry, arrow });
+  };
+  const exitDir = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
   for (const id of Object.keys(BUILDINGS)) {
     const start = entranceTile(id);
-    if (isBlocked(...start)) continue;
-    const path = bestRoute(GRID, start, ASSEMBLY, new Set()) ?? [];
-    for (let i = 1; i + 2 < path.length; i += 5) {
-      const [px, pz] = path[i];
-      const unit = (x: number, z: number) => [x / Math.hypot(x, z), z / Math.hypot(x, z)];
-      const [ax, az] = unit(px - path[i - 1][0], pz - path[i - 1][1]);
-      const [nx, nz] = unit(path[i + 2][0] - px, path[i + 2][1] - pz);
-      // The walker's right hand; the post stands there, or on the left if that tile is built on.
-      const [rx, rz] = [-az, ax];
-      const [cx, cz] = tileCenter(px, pz);
-      const side = [1, -1].find((k) => !isBlocked(Math.floor((cx + k * rx * 1.3) / TILE), Math.floor((cz + k * rz * 1.3) / TILE)));
-      if (side === undefined) continue;
-      const [x, z] = [cx + side * rx * 1.3, cz + side * rz * 1.3];
-      if (out.some((o) => Math.hypot(o.x - x, o.z - z) < 7)) continue;
-      const right = nx * rx + nz * rz;
-      const ahead = nx * ax + nz * az;
-      out.push({ x, z, tile: [px, pz], ry: Math.atan2(-ax, -az), arrow: Math.atan2(ahead, right) });
-    }
+    if (isBlocked(...start) || !Number.isFinite(dist[idx(...start)])) continue;
+    const corners = legs(walkField(dist, start));
+    const dirs = corners.slice(1).map((c, i) => unit([c[0] - corners[i][0], c[1] - corners[i][1]]));
+    // At the doors: the way out of the building to the first leg.
+    if (dirs.length) place(start, exitDir[BUILDINGS[id].entrance], dirs[0]);
+    for (let i = 1; i < corners.length - 1; i++) place(corners[i], dirs[i - 1], dirs[i]);
+    // Along a long leg, a sign every REPEAT tiles, short of the corner it leads to.
+    corners.slice(0, -1).forEach((c, i) => {
+      const len = Math.hypot(corners[i + 1][0] - c[0], corners[i + 1][1] - c[1]);
+      for (let k = REPEAT; k < len - 3; k += REPEAT) {
+        const at: Tile = [Math.round(c[0] + dirs[i][0] * k), Math.round(c[1] + dirs[i][1] * k)];
+        if (!isBlocked(...at)) place(at, dirs[i], dirs[i]);
+      }
+    });
   }
   return out;
 }
@@ -363,8 +460,9 @@ export type Tracked = {
   aftershockS: number;
   aftershockCoverS: number;
   aftershockIndoorS: number;
-  powerOff: boolean;
-  alarm: boolean;
+  // Seconds into the drill when the player first walked 5 m, or -1 until then.
+  leftAt: number;
+  runWaterS: number;
   deepWaterS: number;
   sheltered: boolean;
   windS: number;
@@ -376,6 +474,33 @@ export type Tracked = {
   caught: boolean;
   slopeS: number;
 };
+
+export const blankTracked = (): Tracked => ({
+  reached: false,
+  shakeS: 0,
+  coverS: 0,
+  deskS: 0,
+  shakeMoved: 0,
+  nearFallS: 0,
+  runIndoorS: 0,
+  reentered: false,
+  debrisS: 0,
+  aftershockS: 0,
+  aftershockCoverS: 0,
+  aftershockIndoorS: 0,
+  leftAt: -1,
+  runWaterS: 0,
+  deepWaterS: 0,
+  sheltered: false,
+  windS: 0,
+  windCoverS: 0,
+  windWindowS: 0,
+  windExposedS: 0,
+  leftShelter: false,
+  signSeen: false,
+  caught: false,
+  slopeS: 0,
+});
 
 // `pending` marks a step that has not come up yet in a drill still running, such as a report not yet made.
 export type Check = { label: string; ok: boolean; got: number; max: number; pending: boolean };
@@ -418,16 +543,16 @@ export function grade(kind: Scenario["kind"], t: Tracked, outside = false): Chec
   }
   if (kind === "longsor") {
     return [
-      check("Memeriksa tanda longsor di lereng", 150, t.signSeen ? 1 : 0, undefined, !t.signSeen),
-      check("Membunyikan kentongan", 150, t.alarm ? 1 : 0, undefined, !t.alarm),
+      check("Mengenali tanda longsor dari jauh", 200, t.signSeen ? 1 : 0, undefined, !t.signSeen),
       check("Menjauh dari lereng sebelum longsor", 300, t.caught ? 0 : 1),
-      check("Tidak naik ke bukit atau mendekati lereng", 200, t.slopeS < 2 ? 1 : 0),
-      check("Lapor di titik kumpul aman", 200, t.reached ? 1 : 0, undefined, !t.reached),
+      check("Tidak naik ke bukit atau mendekati lereng", 250, t.slopeS < 2 ? 1 : 0),
+      check("Lapor di titik kumpul aman", 250, t.reached ? 1 : 0, undefined, !t.reached),
     ];
   }
   return [
-    check("Mematikan listrik di panel", 150, t.powerOff ? 1 : 0, undefined, !t.powerOff),
-    check("Membunyikan kentongan", 150, t.alarm ? 1 : 0, undefined, !t.alarm),
+    // Full marks for setting off within 10 s of the siren, none after 40 s.
+    check("Segera bergerak saat sirene berbunyi", 150, t.leftAt < 0 ? 0 : 1 - Math.max(0, t.leftAt - 10) / 30, undefined, t.leftAt < 0),
+    check("Berjalan, tidak berlari di genangan", 150, t.runWaterS < 1 ? 1 : 0),
     check("Tidak melewati air setinggi lutut", 300, 1 - t.deepWaterS / 20, t.deepWaterS < 3),
     check("Naik ke tempat tinggi dan lapor", 400, t.reached ? 1 : 0, undefined, !t.reached),
   ];

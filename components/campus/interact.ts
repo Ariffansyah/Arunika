@@ -20,18 +20,14 @@ import {
   shakingAt,
   type Prompt,
 } from "./drillStore";
-import { falloff, kentongan, play } from "./sound";
+import { falloff, play } from "./sound";
 
 const REACH = 1.4;
 // Desks and tables are cover; a desk's id is its index in PLAN.items.
 const COVER = PLAN.items.flatMap((it, i) => (it.model === "desk" || it.model === "table" ? [i] : []));
 const DOORS = new Map(PLAN.doors.map((d) => [d.id, d]));
-const SPOT_LABEL = {
-  peta: () => "Lihat peta evakuasi",
-  mcb: () => (getState().power ? "Matikan listrik" : "Nyalakan listrik"),
-  gas: () => (getState().gas ? "Tutup katup gas" : "Buka katup gas"),
-  kentongan: () => "Bunyikan kentongan",
-};
+// The mains panel and the canteen's gas are staff jobs in a school's emergency plan, so students only read the map.
+const MAPS_ON_WALL = PLAN.spots.flatMap((sp, i) => (sp.kind === "peta" ? [{ sp, i }] : []));
 
 export const isDoor = (id: string) => DOORS.has(id);
 // Jammed only for the drill that jammed it.
@@ -44,12 +40,6 @@ export function setDoor(id: string, open: boolean, tell = true) {
   const d = DOORS.get(id)!;
   play(open ? "door-open" : "door-close", 0.7 * falloff(Math.hypot(d.x - player.x, d.z - player.z)));
   if (tell) net.send?.("door", { id, open });
-}
-
-export function raiseAlarm(tell = true) {
-  kentongan();
-  if (getState().phase === "running") run.track.alarm = true;
-  if (tell) net.send?.("alarm", {});
 }
 
 // A closed door, or one buried in rubble, fills its opening like the wall around it, up to the door's height.
@@ -129,7 +119,7 @@ export function findPrompt(): Prompt | null {
   for (const d of PLAN.doors) {
     if (!run.blocked.includes(d.id)) consider(d.id, jammed(d.id) ? "Pintu macet" : s.closedDoors.includes(d.id) ? "Buka pintu" : "Tutup pintu", d.x, d.z, d.y, 1.7);
   }
-  PLAN.spots.forEach((sp, i) => consider(`${sp.kind}-${i}`, SPOT_LABEL[sp.kind](), sp.x, sp.z, groundY(sp.x, sp.z, sp.floor), 1.9));
+  MAPS_ON_WALL.forEach(({ sp, i }) => consider(`peta-${i}`, "Lihat peta evakuasi", sp.x, sp.z, groundY(sp.x, sp.z, sp.floor), 1.9));
   // Landslide signs are read from afar, off the slope: the one looked at most directly, up to 16 m away.
   if (running && !best) {
     let aim = 0.35;
@@ -166,10 +156,5 @@ export function interact() {
     return;
   }
   if (isDoor(p.id)) return setDoor(p.id, getState().closedDoors.includes(p.id));
-  const kind = p.id.split("-")[0];
-  if (kind === "mcb" || kind === "gas") play("switch", 0.6);
-  if (kind === "mcb") setState({ power: !getState().power });
-  else if (kind === "gas") setState({ gas: !getState().gas });
-  else if (kind === "kentongan") raiseAlarm();
-  else if (kind === "peta") setState({ mapOpen: true });
+  if (p.id.startsWith("peta-")) setState({ mapOpen: true });
 }
