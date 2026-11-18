@@ -7,7 +7,7 @@ import { NPC_COUNTS, QUALITIES, setNpc, setQuality, setState, useDrill, type Qua
 
 export const panel = "rounded-lg border border-malam-3 bg-malam/92 p-4 shadow-lg";
 export const btn =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 font-semibold active:translate-y-px disabled:opacity-60";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 font-semibold transition-colors active:translate-y-px disabled:opacity-60";
 export const primary = `${btn} bg-laut text-white hover:bg-laut-terang`;
 export const ghost = `${btn} border border-malam-3 text-pasir hover:border-redup`;
 // Icon buttons in the HUD toolbar; the name shows as a tooltip on hover or keyboard focus.
@@ -42,7 +42,7 @@ export function ToolButton({
 }
 
 export const radio =
-  "flex min-h-11 items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold has-checked:border-langit has-checked:text-langit has-focus-visible:outline-2 has-focus-visible:outline-langit";
+  "flex min-h-11 cursor-pointer items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold transition-colors hover:border-redup has-checked:border-langit has-checked:bg-langit/10 has-checked:text-langit has-focus-visible:outline-2 has-focus-visible:outline-langit";
 
 // The disasters this map can have; picking one here picks it for both learning and the drill.
 export function KindPicker({ legend }: { legend: string }) {

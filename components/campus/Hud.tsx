@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import DebriefingTrail from "./DebriefingTrail";
-import { H, MAP, TILE, W } from "@/lib/campus";
+import { ASSEMBLY, ASSEMBLY_NAMES, H, MAP, TILE, W, shortName, tileAt } from "@/lib/campus";
 import { PLAN } from "@/lib/floorplan";
+import { num } from "@/lib/format";
 import { INTENSITY, SCENARIO_LABEL, waterLevel, within, type Scenario } from "@/lib/sim";
 import { supabase, type School } from "@/lib/supabase";
 import { aftershockAt, fallenAt, finishDrill, input, liveChecks, player, run, setState, shakingAt, showHint, useDrill, type DrillResult } from "./drillStore";
@@ -67,7 +68,23 @@ function MapOverlay() {
       <div className={`${panel} w-full max-w-2xl space-y-3`} onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold">Peta evakuasi</h2>
         <div className="overflow-hidden rounded-md border border-malam-3">
-          <CampusPlan label="Peta evakuasi sekolah dengan titik kumpul dan posisi kamu">
+          <CampusPlan labels={1.1} label="Peta evakuasi sekolah dengan nama gedung, titik kumpul, dan posisi kamu">
+            {ASSEMBLY.map(([x, z]) => (
+              <text
+                key={`${x}-${z}`}
+                x={x + 0.5}
+                y={z - 1.1}
+                textAnchor="middle"
+                fontSize={0.9}
+                fontWeight={700}
+                fill="#34c47c"
+                stroke="#071530"
+                strokeWidth={0.3}
+                paintOrder="stroke"
+              >
+                {shortName(ASSEMBLY_NAMES[tileAt(x, z)])}
+              </text>
+            ))}
             <circle ref={dot} r={0.9} fill="#ff8a3d" stroke="#071530" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
           </CampusPlan>
         </div>
@@ -84,8 +101,12 @@ function Minimap() {
   const dot = useYouDot();
   const route = useDrill((s) => (s.showRoute ? s.route : null));
   return (
-    <div className="hidden w-44 overflow-hidden rounded-lg border border-malam-3 shadow-lg sm:block lg:w-52">
-      <CampusPlan path={route?.map(([x, , z]) => [x / TILE, z / TILE])} label="Peta mini sekolah dengan posisi kamu">
+    <div className="hidden w-52 overflow-hidden rounded-lg border border-malam-3 shadow-lg sm:block lg:w-64">
+      <CampusPlan labels={1.9} path={route?.map(([x, , z]) => [x / TILE, z / TILE])} label="Peta mini sekolah dengan nama gedung dan posisi kamu">
+        {/* North is up on every plan; the 3D camera turns, so say so. */}
+        <text x={W - 1.4} y={2.1} textAnchor="middle" fontSize={1.5} fontWeight={800} fill="#a6b9de">
+          U
+        </text>
         <circle ref={dot} r={0.8} fill="#eaf1ff" stroke="#071530" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
       </CampusPlan>
     </div>
@@ -109,7 +130,7 @@ function ScenarioPicker({ onStart }: { onStart: (s: Scenario) => void }) {
       <NpcPicker />
       <GraphicsPicker />
       <label className="block text-sm font-semibold" htmlFor="intensity">
-        {`${meta.label}: ${scenario.intensity.toFixed(meta.step < 1 ? 1 : 0)} ${meta.unit}`.trim()}
+        {`${meta.label}: ${num(scenario.intensity, meta.step < 1 ? 1 : 0)} ${meta.unit}`.trim()}
         <input
           id="intensity"
           type="range"
@@ -222,8 +243,8 @@ function DrillSide({ t }: { t: number }) {
     <div className="contents md:flex md:flex-col md:items-start md:gap-2 md:[grid-area:left]">
       <p className="pointer-events-auto rounded-lg border border-malam-3 bg-malam/90 px-3 py-2 text-sm font-semibold tabular-nums shadow-lg [grid-area:status] justify-self-start">
         <span className="max-sm:hidden">{SCENARIO_LABEL[scenario.kind]} · </span>
-        {t.toFixed(1)} dtk
-        {scenario.kind === "banjir" && <> · Tinggi air {waterLevel(scenario, t, run.timeline.rise).toFixed(2)} m</>}
+        {num(t, 1)} dtk
+        {scenario.kind === "banjir" && <> · Tinggi air {num(waterLevel(scenario, t, run.timeline.rise), 2)} m</>}
         {wind && t < wind[0] && <> · Angin tiba {Math.ceil(wind[0] - t)} dtk</>}
       </p>
       <div className="pointer-events-auto flex flex-wrap gap-2 [grid-area:acts]">
@@ -346,8 +367,8 @@ function Results({ result, room, schoolId }: { result: DrillResult; room: string
 
   const lines: [string, string][] = [
     ["Skenario", SCENARIO_LABEL[result.scenario.kind]],
-    ["Waktu", `${result.timeS.toFixed(1)} dtk`],
-    ["Jarak", `${result.walked.toFixed(0)} m, jalur terbaik ${result.optimalLen.toFixed(0)} m`],
+    ["Waktu", `${num(result.timeS, 1)} dtk`],
+    ["Jarak", `${num(result.walked)} m, jalur terbaik ${num(result.optimalLen)} m`],
     ["Jalur AI", result.hintUsed ? "Dipakai (−150)" : "Tidak dipakai"],
   ];
 
@@ -629,7 +650,7 @@ export default function Hud({
               <ScenarioPicker onStart={onStart} />
             )}
           </div>
-          <RoomInfo room={room} peers={peers} status={status} />
+          <RoomInfo room={room} peers={peers} status={status} school={school} />
         </section>
       )}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 [grid-template-areas:'status_tools'_'goal_goal'_'acts_acts'_'list_list'] md:grid-cols-[minmax(0,1fr)_minmax(0,36rem)_minmax(0,1fr)] md:[grid-template-areas:'left_goal_tools']">
@@ -687,16 +708,19 @@ export default function Hud({
 }
 
 // Who is in the room and how to bring others in, folded away under the menu until needed.
-function RoomInfo({ room, peers, status }: { room: string; peers: Peer[]; status: "connecting" | "online" | "offline" }) {
+function RoomInfo({ room, peers, status, school }: { room: string; peers: Peer[]; status: "connecting" | "online" | "offline"; school: School | null }) {
   const router = useRouter();
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
   return (
     <details className="group border-t border-malam-3 px-4 py-2 sm:px-5">
       <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
-        <span>
-          Ruang <strong>{room.length > 12 ? `${room.slice(0, 8)}…` : room}</strong> ·{" "}
-          <span className={status === "online" ? "text-aman" : status === "offline" ? "text-bahaya" : "text-redup"}>
-            {status === "online" ? `${peers.length + 1} orang` : status === "offline" ? "terputus" : "menyambung…"}
+        <span className="flex min-w-0 gap-1.5">
+          {/* A school's own room is named by its id, which means nothing to read. */}
+          <span className="truncate">
+            Ruang <strong>{room === school?.id ? school.name : room}</strong>
+          </span>
+          <span className={`shrink-0 ${status === "online" ? "text-aman" : status === "offline" ? "text-bahaya" : "text-redup"}`}>
+            · {status === "online" ? `${peers.length + 1} orang` : status === "offline" ? "terputus" : "menyambung…"}
           </span>
         </span>
         <ChevronUp aria-hidden="true" className="size-4 text-redup transition-transform group-open:rotate-180" />

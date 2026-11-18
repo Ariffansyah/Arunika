@@ -7,7 +7,7 @@ import CampusPlan from "@/components/CampusPlan";
 import { predict } from "@/components/campus/drillStore";
 import RequireAuth, { type Me } from "@/components/RequireAuth";
 import { COST_LABEL, LEVEL_LABEL, PRIORITY_LABEL, type Assessment } from "@/lib/assessment";
-import { ASSEMBLY, BUILDINGS, MAP, buildingRects, tileAt, type Tile } from "@/lib/campus";
+import { ASSEMBLY, BUILDINGS, MAP, buildingRects, shortName, tileAt, type Tile } from "@/lib/campus";
 import {
   CLOCKS,
   HAZARD_LABEL,
@@ -37,7 +37,7 @@ const VERDICT = {
   berbahaya: { label: "Berbahaya", Icon: OctagonX, tone: "text-bahaya", bar: "bg-bahaya" },
 };
 const HAZARD_FILL: Record<Hazard, string> = { gempa: "#ff6b6b", banjir: "#22ccee", longsor: "#c9874a", angin: "#7fd18b" };
-const short = (id: string) => nameIn(MAP.id, id).replace(/^Gedung |^Titik Kumpul /, "").replace(" Guru & TU", "");
+const short = (id: string) => shortName(nameIn(MAP.id, id));
 const RECTS = buildingRects();
 const center = (id: string): [number, number] => {
   const r = RECTS[id];
@@ -485,7 +485,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
                 {disasters.map((h) => (
                   <label
                     key={h}
-                    className="flex min-h-12 items-center gap-3 rounded-lg border border-malam-3 bg-malam px-3 font-semibold hover:border-redup has-checked:border-langit has-focus-visible:outline-2 has-focus-visible:outline-langit"
+                    className="flex min-h-12 items-center gap-3 rounded-lg border border-malam-3 bg-malam px-3 py-2 leading-snug font-semibold transition-colors hover:border-redup has-checked:border-langit has-focus-visible:outline-2 has-focus-visible:outline-langit"
                   >
                     <input type="radio" name="hazard" checked={pick === h} onChange={() => setPick(h)} className="size-4 shrink-0 accent-langit" />
                     {HAZARD_LABEL[h]}
@@ -494,7 +494,7 @@ function Table({ me, quake }: { me: Me; quake: Quake | null }) {
               </div>
             </fieldset>
             <p className="leading-relaxed text-redup">
-              Peta di samping sudah dihitung mesin simulasi untuk{" "}
+              Peta ini sudah dihitung mesin simulasi untuk{" "}
               <strong className="text-pasir">{me.school?.name ?? "sekolah umum"}</strong>. Langkah 1 dan 4 disusun AI; langkah 2 dan 3 kamu putuskan langsung di peta.
             </p>
             {error && <p role="alert" className="text-bahaya">{error}</p>}

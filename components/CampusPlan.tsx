@@ -1,4 +1,4 @@
-import { ASSEMBLY, GRID, H, W, buildingRects, surfaceAt, type Tile } from "@/lib/campus";
+import { ASSEMBLY, BUILDINGS, GRID, H, W, buildingRects, shortName, surfaceAt, type Tile } from "@/lib/campus";
 
 const FILL: Record<string, string> = { h: "#163f4f", g: "#17485a", "=": "#2a4677" };
 const SURFACE_FILL = { paving: "#123060", court: "#1a4486", trail: "#33394d" };
@@ -8,6 +8,7 @@ export default function CampusPlan({
   path,
   hazards,
   hazardColor = "#3b82c4",
+  labels,
   label,
   children,
 }: {
@@ -16,6 +17,8 @@ export default function CampusPlan({
   path?: [number, number][];
   hazards?: Set<number>;
   hazardColor?: string;
+  // Largest font size for building names, in tile widths; none when left out. Small plans need larger type.
+  labels?: number;
   label: string;
   children?: React.ReactNode;
 }) {
@@ -51,6 +54,37 @@ export default function CampusPlan({
       {ASSEMBLY.map(([x, z]) => (
         <circle key={`a${x}`} cx={x + 0.5} cy={z + 0.5} r={0.8} fill="none" stroke="#34c47c" strokeWidth={0.25} />
       ))}
+      {labels &&
+        Object.entries(rects).map(([id, r]) => {
+          const w = r.x1 - r.x0 + 1;
+          const h = r.z1 - r.z0 + 1;
+          const text = shortName(BUILDINGS[id].name);
+          // Tall narrow blocks read sideways, the way names run along a street on a map.
+          const upright = h > w * 1.4;
+          const [along, across] = upright ? [h, w] : [w, h];
+          // Never below 70% of the largest size: a name too long for a small block spills over it on a halo instead.
+          const size = Math.max(labels * 0.7, Math.min(labels, (along - 0.6) / (text.length * 0.6), across * 0.55));
+          const [cx, cz] = [r.x0 + w / 2, r.z0 + h / 2];
+          return (
+            <text
+              key={`l${id}`}
+              x={cx}
+              y={cz}
+              fontSize={size}
+              fontWeight={700}
+              fill="#071530"
+              stroke="#afc4ec"
+              strokeWidth={size * 0.45}
+              strokeLinejoin="round"
+              paintOrder="stroke"
+              textAnchor="middle"
+              dominantBaseline="central"
+              transform={upright ? `rotate(-90 ${cx} ${cz})` : undefined}
+            >
+              {text}
+            </text>
+          );
+        })}
       {(route || path) && (
         <polyline
           points={(path ?? route!.map(([x, z]) => [x + 0.5, z + 0.5])).map(([x, z]) => `${x},${z}`).join(" ")}

@@ -4,9 +4,9 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import CampusPlan from "@/components/CampusPlan";
 import { predict } from "@/components/campus/drillStore";
 import { ASSEMBLY_NAMES, GRID, SPAWN, tileAt } from "@/lib/campus";
+import { num } from "@/lib/format";
 import { INTENSITY, SCENARIO_LABEL, bestRoute, pathLength, type Scenario } from "@/lib/sim";
 
-const fmt = (n: number) => n.toLocaleString("id-ID", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const HAZARD_COLOR = { banjir: "#22ccee", gempa: "#ff6b6b" };
 const never = () => () => {};
 const thisYear = () => new Date().getFullYear();
@@ -56,7 +56,7 @@ export default function PlanDemo() {
             </div>
           </fieldset>
           <label htmlFor="demo-intensity" className="block text-lg font-semibold">
-            {meta.label} <span className="tabular-nums text-langit">{`${fmt(scenario.intensity)} ${meta.unit}`.trim()}</span>
+            {meta.label} <span className="tabular-nums text-langit">{`${num(scenario.intensity, 1)} ${meta.unit}`.trim()}</span>
             <input
               id="demo-intensity"
               type="range"
@@ -83,10 +83,11 @@ export default function PlanDemo() {
         </div>
         <figure className="self-start overflow-hidden rounded-xl border border-malam-3 bg-malam shadow-[0_30px_80px_-30px_rgb(0_0_0/0.7)]">
           <CampusPlan
+            labels={1.2}
             route={route ?? undefined}
             hazards={hazards}
             hazardColor={HAZARD_COLOR[scenario.kind]}
-            label={`Denah sekolah, ${SCENARIO_LABEL[scenario.kind]} ${fmt(scenario.intensity)} ${meta.unit}`.trim() + ", dengan jalur evakuasi"}
+            label={`Denah sekolah, ${SCENARIO_LABEL[scenario.kind]} ${num(scenario.intensity, 1)} ${meta.unit}`.trim() + ", dengan jalur evakuasi"}
           />
           <figcaption className="flex flex-wrap gap-x-6 gap-y-1 border-t border-malam-3 px-4 py-3 text-sm">
             <span className="inline-flex items-center gap-2">

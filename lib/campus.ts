@@ -23,6 +23,8 @@ export type Soil = "keras" | "sedang" | "lunak";
 
 export const BUILDINGS = MAP.buildings;
 export const ASSEMBLY_NAMES = MAP.assemblyNames;
+// What fits on a plan: "Gedung Kelas A" is Kelas A, "Titik Kumpul Bukit" is Bukit.
+export const shortName = (name: string) => name.replace(/^(Gedung|Titik Kumpul) /, "").replace(" Guru & TU", "");
 
 export const BLOCKED_CHARS = "=-|TW123456";
 
