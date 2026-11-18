@@ -105,7 +105,7 @@ function InstancedPart({ part, items, size, turn, tilt, shadows }: { part: Part;
     });
     if (moved) write();
   });
-  return <instancedMesh ref={ref} args={[part.geometry, part.material, items.length]} castShadow={shadows} receiveShadow={shadows} />;
+  return <instancedMesh ref={ref} args={[part.geometry, part.material, items.length]} castShadow={shadows} receiveShadow />;
 }
 
 // Every copy of a model as one InstancedMesh per mesh in it: a few hundred desks stay a handful of draw calls.

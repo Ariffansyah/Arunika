@@ -15,7 +15,7 @@ import { aftershockAt, fallenAt, finishDrill, input, liveChecks, player, run, se
 import SimControls from "./Controls";
 import { interact } from "./interact";
 import Learn from "./Learn";
-import { KindPicker, NpcPicker, ToolButton, ghost, panel, primary, radio } from "./ui";
+import { GraphicsPicker, KindPicker, NpcPicker, ToolButton, ghost, panel, primary, radio } from "./ui";
 import { falloff, isMuted, play, rumble, setMuted, siren } from "./sound";
 import type { Peer } from "./useRoom";
 
@@ -126,6 +126,7 @@ function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario
       </fieldset>
       <KindPicker legend="Skenario" />
       <NpcPicker />
+      <GraphicsPicker />
       <label className="block text-sm font-semibold" htmlFor="intensity">
         {`${meta.label}: ${scenario.intensity.toFixed(meta.step < 1 ? 1 : 0)} ${meta.unit}`.trim()}
         <input
@@ -612,9 +613,11 @@ export default function Hud({
           className="pointer-events-auto absolute inset-x-0 bottom-0 flex max-h-[62dvh] flex-col rounded-t-xl border-t border-malam-3 bg-malam/95 text-sm shadow-lg sm:inset-y-0 sm:right-auto sm:max-h-none sm:w-[25rem] sm:rounded-none sm:border-t-0 sm:border-r"
         >
           <div className="space-y-4 p-4 sm:p-5">
-            <div className="flex items-baseline gap-3">
-              <Link href="/" className="text-xl font-extrabold text-pasir">
-                Arunika<span className="text-fajar">.</span>
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex min-h-11 items-center gap-2 font-extrabold tracking-wider text-pasir uppercase">
+                {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, nothing to optimise */}
+                <img src="/arunika-mark.svg" alt="" width={20} height={23} className="h-6 w-auto" />
+                Arunika
               </Link>
               <span className="truncate text-redup">
                 {school?.name ?? "Kampus contoh"} · {MAP.name}

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { LESSONS } from "@/lib/lessons";
 import { useDrill } from "./drillStore";
 import { play } from "./sound";
-import { KindPicker, NpcPicker, ghost, primary } from "./ui";
+import { GraphicsPicker, KindPicker, NpcPicker, ghost, primary } from "./ui";
 
 function Quiz({ kind }: { kind: keyof typeof LESSONS }) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -82,6 +82,7 @@ export default function Learn({ onGuided, onStart }: { onGuided: () => void; onS
         <Quiz key={kind} kind={kind} />
       </section>
       <NpcPicker />
+      <GraphicsPicker />
       <div className="grid gap-2">
         <button type="button" className={primary} onClick={onGuided}>
           Latihan terpandu

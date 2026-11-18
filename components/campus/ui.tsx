@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { MAP } from "@/lib/campus";
 import { INTENSITY, SCENARIO_LABEL } from "@/lib/sim";
-import { NPC_COUNTS, setNpc, setState, useDrill } from "./drillStore";
+import { NPC_COUNTS, QUALITIES, setNpc, setQuality, setState, useDrill, type Quality } from "./drillStore";
 
 export const panel = "rounded-lg border border-malam-3 bg-malam/92 p-4 shadow-lg";
 export const btn =
@@ -81,6 +81,31 @@ export function NpcPicker() {
           <label key={n} className={radio}>
             <input type="radio" name="npc" className="sr-only" checked={npc === n} onChange={() => setNpc(n)} />
             {NPC_LABEL[i]}
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+const QUALITY_LABEL: Record<Quality, string> = { ringan: "Ringan", seimbang: "Seimbang", tinggi: "Tinggi" };
+
+// Automatic picks a tier for the device and steps down if frames drop; a fixed tier stays put.
+export function GraphicsPicker() {
+  const quality = useDrill((s) => s.quality);
+  const auto = useDrill((s) => s.qualityAuto);
+  return (
+    <fieldset>
+      <legend className="text-sm font-semibold">Grafis</legend>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className={radio}>
+          <input type="radio" name="grafis" className="sr-only" checked={auto} onChange={() => setQuality(null)} />
+          {auto ? `Otomatis: ${QUALITY_LABEL[quality].toLowerCase()}` : "Otomatis"}
+        </label>
+        {QUALITIES.map((q) => (
+          <label key={q} className={radio}>
+            <input type="radio" name="grafis" className="sr-only" checked={!auto && quality === q} onChange={() => setQuality(q)} />
+            {QUALITY_LABEL[q]}
           </label>
         ))}
       </div>

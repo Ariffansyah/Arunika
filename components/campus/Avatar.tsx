@@ -3,6 +3,7 @@
 import Html from "@/components/Html";
 import { Suspense } from "react";
 import Character, { type Anim, type Look } from "@/components/Character";
+import { TIER, useDrill } from "./drillStore";
 
 export default function Avatar({
   look,
@@ -19,10 +20,11 @@ export default function Avatar({
   label?: boolean;
   height?: number;
 }) {
+  const cast = TIER[useDrill((s) => s.quality)].shadows;
   return (
     <>
       <Suspense fallback={null}>
-        <Character look={look} anim={anim} height={height} />
+        <Character look={look} anim={anim} height={height} shadow={cast ? "cast" : "blob"} />
       </Suspense>
       {label && (
         <Html position={[0, height + 0.3, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>

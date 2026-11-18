@@ -9,7 +9,7 @@ import { ASSEMBLY, MAP, TILE, W, elevationAt, findTiles, surfaceAt, tileCenter, 
 import { PLAN, STOREY, classrooms } from "@/lib/floorplan";
 import { distanceAt, free, groundY, layerAt, nextStep } from "@/lib/nav";
 import { SLIDE_S, WALK_SPEED, random, vortexAt, waterLevel, within } from "@/lib/sim";
-import { CLASSMATE_SEATS, aftershockAt, drillTime, getState, landslideSigns, roomSeats, run, shakingAt, useDrill } from "./drillStore";
+import { CLASSMATE_SEATS, TIER, aftershockAt, drillTime, getState, landslideSigns, roomSeats, run, shakingAt, useDrill } from "./drillStore";
 import { closedDoors, openDoorsNear } from "./interact";
 
 const wading = (x: number, z: number, layer = 0) => {
@@ -38,6 +38,7 @@ function arrivalSpot(x: number, z: number, layer: number, i: number): { at: [num
 
 // Drills teach walking briskly, not running: classmates model that, ducking first when the ground shakes.
 function Classmate({ i, count }: { i: number; count: number }) {
+  const npcShadows = TIER[useDrill((s) => s.quality)].npcShadows;
   const ref = useRef<Group>(null);
   const me = useRef({
     x: 0,
@@ -139,7 +140,12 @@ function Classmate({ i, count }: { i: number; count: number }) {
 
   return (
     <group ref={ref}>
-      <Character look={LOOKS[i]} height={height} anim={() => (me.current.anim === "walk" ? ["walk", me.current.rate] : me.current.anim)} />
+      <Character
+        look={LOOKS[i]}
+        height={height}
+        shadow={npcShadows ? "cast" : "blob"}
+        anim={() => (me.current.anim === "walk" ? ["walk", me.current.rate] : me.current.anim)}
+      />
     </group>
   );
 }

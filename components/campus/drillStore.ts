@@ -56,16 +56,49 @@ type State = {
   guided: boolean;
   // How many classmates walk the campus; each player's own choice, not shared with the room.
   npc: number;
+  // Graphics tier, and whether it was picked for this device rather than by the player.
+  quality: Quality;
+  qualityAuto: boolean;
 };
+
+export type Quality = "ringan" | "seimbang" | "tinggi";
+export const QUALITIES: Quality[] = ["ringan", "seimbang", "tinggi"];
+// Pixel ratio is the biggest lever on phones with 3x screens; then the shadow pass, which draws every caster
+// a second time; then the hundreds of grass tufts and trees past the fence.
+export const TIER: Record<
+  Quality,
+  { dpr: [number, number]; shadows: boolean; shadowSize: number; furnitureShadows: boolean; npcShadows: boolean; trees: number; grass: boolean; far: number }
+> = {
+  ringan: { dpr: [1, 1], shadows: false, shadowSize: 0, furnitureShadows: false, npcShadows: false, trees: 0.25, grass: false, far: 650 },
+  seimbang: { dpr: [1, 1.5], shadows: true, shadowSize: 1024, furnitureShadows: false, npcShadows: false, trees: 0.55, grass: true, far: 1000 },
+  tinggi: { dpr: [1, 2], shadows: true, shadowSize: 2048, furnitureShadows: true, npcShadows: true, trees: 1, grass: true, far: 1500 },
+};
+
+// A first guess from what the browser says about the device; the frame-rate monitor lowers it if it was too hopeful.
+export function detectQuality(): Quality {
+  if (typeof navigator === "undefined") return "seimbang";
+  const memory = (navigator as { deviceMemory?: number }).deviceMemory ?? 8;
+  const cores = navigator.hardwareConcurrency ?? 8;
+  const touch = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
+  if (memory <= 4 || cores <= 4) return "ringan";
+  if (touch || memory <= 6 || cores < 8) return "seimbang";
+  return "tinggi";
+}
+
+const saved = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const savedQuality = saved("arunika:grafis") as Quality | null;
+const quality = savedQuality && QUALITIES.includes(savedQuality) ? savedQuality : detectQuality();
 
 export const NPC_COUNTS = [0, 4, 12];
 const savedNpc = () => {
-  try {
-    const v = localStorage.getItem("arunika:npc");
-    return v !== null && NPC_COUNTS.includes(Number(v)) ? Number(v) : 12;
-  } catch {
-    return 12;
-  }
+  const v = saved("arunika:npc");
+  return v !== null && NPC_COUNTS.includes(Number(v)) ? Number(v) : quality === "ringan" ? 4 : 12;
 };
 
 let state: State = {
@@ -87,6 +120,8 @@ let state: State = {
   mapOpen: false,
   guided: false,
   npc: savedNpc(),
+  quality,
+  qualityAuto: !savedQuality,
 };
 
 const listeners = new Set<() => void>();
@@ -110,6 +145,24 @@ export function setNpc(n: number) {
   } catch {
     // Private windows can refuse storage; the choice still holds for this visit.
   }
+}
+
+// `null` goes back to the device's own tier.
+export function setQuality(q: Quality | null) {
+  setState({ quality: q ?? detectQuality(), qualityAuto: q === null });
+  try {
+    if (q) localStorage.setItem("arunika:grafis", q);
+    else localStorage.removeItem("arunika:grafis");
+  } catch {
+    // Private windows can refuse storage; the choice still holds for this visit.
+  }
+}
+
+// The frame-rate monitor steps an automatic tier down; a tier the player chose is left alone.
+export function lowerQuality() {
+  if (!state.qualityAuto) return;
+  const i = QUALITIES.indexOf(state.quality);
+  if (i > 0) setState({ quality: QUALITIES[i - 1] });
 }
 
 // Per-frame values live outside React so 60 fps updates never re-render the HUD.
