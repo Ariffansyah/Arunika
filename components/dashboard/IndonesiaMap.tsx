@@ -1,8 +1,8 @@
 "use client";
 
 import { OrbitControls } from "@react-three/drei";
-import { Canvas } from "@react-three/fiber";
-import { useEffect, useMemo, useState } from "react";
+import { Canvas, useThree } from "@react-three/fiber";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { ExtrudeGeometry, Shape, Vector2 } from "three";
 import Html from "@/components/Html";
 import "@/components/threeConsole";
@@ -31,7 +31,7 @@ function Land() {
   // Shapes are drawn in lon/lat (x/y); turning them flat maps latitude onto -z, matching `at`.
   return (
     <mesh geometry={geometry} rotation-x={-Math.PI / 2} receiveShadow>
-      <meshStandardMaterial color="#2c4466" />
+      <meshStandardMaterial color="#3d5f8f" />
     </mesh>
   );
 }
@@ -77,6 +77,20 @@ function Column({ s, selected, onSelect }: { s: MapSchool; selected: boolean; on
   );
 }
 
+// The archipelago, with room for the columns at either end, is about twice as wide as it is deep; on a narrower canvas the camera backs off so it still fits.
+const FIT_ASPECT = 2;
+const pull = (aspect: number) => Math.min(2.2, Math.max(1, FIT_ASPECT / aspect));
+
+function View() {
+  const camera = useThree((s) => s.camera);
+  const k = pull(useThree((s) => s.size.width / s.size.height));
+  useLayoutEffect(() => {
+    camera.position.set(0, 26 * k, 22 * k);
+    camera.lookAt(0, 0, 0);
+  }, [camera, k]);
+  return <OrbitControls enablePan={false} minDistance={12} maxDistance={45 * k} minPolarAngle={0.2} maxPolarAngle={1.2} target={[0, 0, 0]} />;
+}
+
 export default function IndonesiaMap({
   schools,
   selected,
@@ -87,26 +101,21 @@ export default function IndonesiaMap({
   onSelect: (id: string) => void;
 }) {
   return (
-    <Canvas shadows="percentage" dpr={[1, 2]} camera={{ position: [0, 26, 22], fov: 40 }} aria-label="Peta sekolah di Indonesia">
+    // Flat: the navy sea and land keep the page's colours instead of being tone-mapped to grey.
+    <Canvas flat shadows="percentage" dpr={[1, 2]} camera={{ position: [0, 26, 22], fov: 40 }} aria-label="Peta sekolah di Indonesia">
+      <View />
       <color attach="background" args={["#071530"]} />
-      <hemisphereLight args={["#ffe2c2", "#071530", 1.1]} />
-      <directionalLight position={[20, 30, -10]} color="#ffc48a" intensity={1.8} castShadow />
-      <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]} receiveShadow>
-        <planeGeometry args={[80, 40]} />
-        <meshStandardMaterial color="#132640" />
+      <hemisphereLight args={["#d6e7ff", "#071530", 1.2]} />
+      <directionalLight position={[20, 30, -10]} intensity={1.4} castShadow />
+      <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}>
+        <planeGeometry args={[400, 300]} />
+        {/* Unlit, so the sea stays the page's navy under any light. */}
+        <meshBasicMaterial color="#0b1e3f" />
       </mesh>
       <Land />
       {schools.map((s) => (
         <Column key={s.id} s={s} selected={s.id === selected} onSelect={() => onSelect(s.id)} />
       ))}
-      <OrbitControls
-        enablePan={false}
-        minDistance={12}
-        maxDistance={45}
-        minPolarAngle={0.2}
-        maxPolarAngle={1.2}
-        target={[0, 0, 0]}
-      />
     </Canvas>
   );
 }

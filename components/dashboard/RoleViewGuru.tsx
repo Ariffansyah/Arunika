@@ -4,6 +4,7 @@ import { Check, CircleCheck, Copy, OctagonX } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Me } from "@/components/RequireAuth";
+import { num } from "@/lib/format";
 import { SCENARIO_LABEL, type Scenario } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import { Facts, primaryBtn, secondaryBtn } from "./ui";
@@ -97,7 +98,7 @@ export default function RoleViewGuru({ me, school, drills }: { me: Me; school: S
         <Facts
           items={[
             ["Guru", me.profile.display_name],
-            ["Rata-rata skor", avgScore === null ? "Belum ada" : `${avgScore} dari 1200`],
+            ["Rata-rata skor", avgScore === null ? "Belum ada" : `${num(avgScore)} dari ${num(1200)}`],
             ["Batas lulus", `${PASS} poin`],
           ]}
         />
@@ -109,13 +110,13 @@ export default function RoleViewGuru({ me, school, drills }: { me: Me; school: S
           <p className="mt-3 text-redup">Bagikan tautan ruang di atas agar latihan siswa tercatat di sini.</p>
         ) : (
           <div className="mt-4 overflow-x-auto rounded-lg border border-malam-3">
-            <table className="w-full min-w-[36rem] text-left">
+            <table className="w-full text-left sm:min-w-[36rem]">
               <thead className="border-b border-malam-3 text-redup">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-medium">Siswa</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Skenario</th>
+                  <th scope="col" className="px-4 py-3 font-medium max-sm:hidden">Skenario</th>
                   <th scope="col" className="px-4 py-3 text-right font-medium">Skor</th>
-                  <th scope="col" className="px-4 py-3 text-right font-medium">Waktu</th>
+                  <th scope="col" className="px-4 py-3 text-right font-medium max-sm:hidden">Waktu</th>
                   <th scope="col" className="px-4 py-3 font-medium">Hasil</th>
                 </tr>
               </thead>
@@ -123,9 +124,9 @@ export default function RoleViewGuru({ me, school, drills }: { me: Me; school: S
                 {drills.slice(0, 10).map((d) => (
                   <tr key={d.id}>
                     <th scope="row" className="px-4 py-3 font-semibold">{d.user_name}</th>
-                    <td className="px-4 py-3 text-redup">{SCENARIO_LABEL[d.scenario]}</td>
+                    <td className="px-4 py-3 text-redup max-sm:hidden">{SCENARIO_LABEL[d.scenario]}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{d.score}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-redup">{d.time_s.toFixed(1)} dtk</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-redup max-sm:hidden">{num(d.time_s, 1)} dtk</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-1.5">
                         {d.reached ? (

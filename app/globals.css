@@ -18,11 +18,18 @@
   --color-bahaya: #ff6b6b;
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-grow: grow 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 
   @keyframes rise {
     from {
       opacity: 0;
       transform: translateY(16px);
+    }
+  }
+
+  @keyframes grow {
+    from {
+      transform: scaleX(0);
     }
   }
 }

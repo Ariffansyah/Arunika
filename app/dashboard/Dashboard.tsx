@@ -67,9 +67,11 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
   return (
     <section aria-labelledby="detail-title" className="space-y-5 rounded-lg border border-malam-3 bg-malam-2 p-5">
       <h2 id="detail-title" className="text-xl font-bold">
-        {row.name} <span className="font-normal text-redup">· {row.region}</span>
+        {row.name}
       </h2>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+        <dt className="text-redup">Wilayah</dt>
+        <dd>{row.region}</dd>
         <dt className="text-redup">Status</dt>
         <dd>
           <StatusLabel readiness={row.readiness} />
@@ -77,9 +79,7 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
         <dt className="text-redup">Ancaman</dt>
         <dd>{row.hazards.join(", ")}</dd>
         <dt className="text-redup">Latihan</dt>
-        <dd className="tabular-nums">
-          {row.drills ?? 0} kali oleh {row.participants ?? 0} peserta
-        </dd>
+        <dd className="tabular-nums">{row.drills ? `${row.drills} kali oleh ${row.participants ?? 0} peserta` : "Belum ada"}</dd>
       </dl>
       <div className="space-y-4">
         <Meter label="Indeks kesiapan" value={row.readiness} max={100} />
@@ -278,7 +278,7 @@ function Board({ me }: { me: Me }) {
                 {ROLE_LABEL[r]}
                 {currentProfileRole === r && (
                   <>
-                    <span aria-hidden="true" className="size-1.5 rounded-full bg-langit" />
+                    <span aria-hidden="true" title="Peran di profilmu" className="size-1.5 rounded-full bg-langit" />
                     <span className="sr-only">(peran di profilmu)</span>
                   </>
                 )}
@@ -363,7 +363,7 @@ function Board({ me }: { me: Me }) {
                   {s.label}
                 </span>
               ))}
-              <span className="text-redup">Tinggi kolom: paparan risiko. Seret untuk memutar.</span>
+              <span className="text-redup">Tinggi kolom: paparan risiko. Seret untuk memutar, klik kolom untuk memilih.</span>
             </div>
           </div>
           <Detail key={current.row.id} row={current.row} exp={current.exp} />
@@ -374,15 +374,15 @@ function Board({ me }: { me: Me }) {
             Urutan prioritas intervensi
           </h3>
           <div className="mt-4 overflow-x-auto rounded-lg border border-malam-3">
-            <table className="w-full min-w-[40rem] text-left">
+            <table className="w-full text-left sm:min-w-[40rem]">
               <thead className="border-b border-malam-3 text-redup">
                 <tr>
                   <th scope="col" className={`${cell} font-medium`}>Sekolah</th>
-                  <th scope="col" className={`${cell} font-medium`}>Wilayah</th>
+                  <th scope="col" className={`${cell} font-medium max-sm:hidden`}>Wilayah</th>
                   <th scope="col" className={`${cell} font-medium`}>Status</th>
                   <th scope="col" className={`${cell} text-right font-medium`}>Kesiapan</th>
-                  <th scope="col" className={`${cell} text-right font-medium`}>Paparan</th>
-                  <th scope="col" className={`${cell} text-right font-medium`}>Latihan</th>
+                  <th scope="col" className={`${cell} text-right font-medium max-sm:hidden`}>Paparan</th>
+                  <th scope="col" className={`${cell} text-right font-medium max-sm:hidden`}>Latihan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-malam-3">
@@ -395,18 +395,18 @@ function Board({ me }: { me: Me }) {
                           type="button"
                           aria-pressed={active}
                           onClick={() => setSelected(row.id)}
-                          className={`${cell} block min-h-11 w-full text-left hover:text-fajar`}
+                          className={`${cell} block min-h-11 w-full text-left transition-colors hover:text-langit`}
                         >
                           {row.name}
                         </button>
                       </th>
-                      <td className={`${cell} text-redup`}>{row.region}</td>
+                      <td className={`${cell} text-redup max-sm:hidden`}>{row.region}</td>
                       <td className={cell}>
                         <StatusLabel readiness={row.readiness} />
                       </td>
                       <td className={`${cell} text-right tabular-nums`}>{row.readiness ?? "–"}</td>
-                      <td className={`${cell} text-right tabular-nums`}>{exp}</td>
-                      <td className={`${cell} text-right tabular-nums`}>{row.drills ?? 0}</td>
+                      <td className={`${cell} text-right tabular-nums max-sm:hidden`}>{exp}</td>
+                      <td className={`${cell} text-right tabular-nums max-sm:hidden`}>{row.drills ?? 0}</td>
                     </tr>
                   );
                 })}
@@ -416,10 +416,11 @@ function Board({ me }: { me: Me }) {
                   <th scope="row" className={`${cell} font-semibold`}>
                     {filteredSchools.length} sekolah
                   </th>
-                  <td className={cell} colSpan={2} />
-                  <td className={`${cell} text-right tabular-nums`}>{avgReadiness ?? "–"}</td>
+                  <td className={`${cell} max-sm:hidden`} />
                   <td className={cell} />
-                  <td className={`${cell} text-right tabular-nums`}>{totalDrills}</td>
+                  <td className={`${cell} text-right tabular-nums`}>{avgReadiness ?? "–"}</td>
+                  <td className={`${cell} max-sm:hidden`} />
+                  <td className={`${cell} text-right tabular-nums max-sm:hidden`}>{totalDrills}</td>
                 </tr>
               </tfoot>
             </table>

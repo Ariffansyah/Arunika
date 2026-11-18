@@ -4,6 +4,7 @@ import { CircleCheck, CircleDashed, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { Me } from "@/components/RequireAuth";
+import { num } from "@/lib/format";
 import { SCENARIO_LABEL, type Scenario } from "@/lib/sim";
 import type { School } from "@/lib/supabase";
 import { Facts, PrintSheet, primaryBtn, secondaryBtn } from "./ui";
@@ -38,7 +39,7 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
     ["Predikat", title],
     ["Sekolah", school?.name ?? "Belum terhubung"],
     ["Latihan selesai", `${drills.length} kali`],
-    ["Rata-rata skor", average === null ? "Belum ada" : `${average} dari 1200`],
+    ["Rata-rata skor", average === null ? "Belum ada" : `${num(average)} dari ${num(1200)}`],
   ];
 
   return (
@@ -59,14 +60,16 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="overflow-x-auto rounded-lg border border-malam-3">
-          <table className="w-full min-w-[32rem] text-left">
+          <table className="w-full text-left sm:min-w-[32rem]">
             <caption className="sr-only">Rapor latihan per skenario</caption>
             <thead className="border-b border-malam-3 text-redup">
               <tr>
                 <th scope="col" className="px-4 py-3 font-medium">Skenario</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Skor terbaik</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Waktu</th>
-                <th scope="col" className="px-4 py-3 font-medium">Status (lulus ≥ {PASS})</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-3 text-right font-medium">Skor terbaik</th>
+                <th scope="col" className="px-4 py-3 text-right font-medium max-sm:hidden">Waktu</th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Status<span className="max-sm:hidden"> (lulus ≥ {PASS})</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-malam-3">
@@ -74,7 +77,7 @@ export default function RoleViewSiswa({ me, school, drills }: { me: Me; school: 
                 <tr key={s.kind}>
                   <th scope="row" className="px-4 py-3 font-semibold">{SCENARIO_LABEL[s.kind]}</th>
                   <td className="px-4 py-3 text-right tabular-nums">{s.best?.score ?? "–"}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-redup">{s.best ? `${s.best.time_s.toFixed(1)} dtk` : "–"}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-redup max-sm:hidden">{s.best ? `${num(s.best.time_s, 1)} dtk` : "–"}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5">
                       {s.passed ? (

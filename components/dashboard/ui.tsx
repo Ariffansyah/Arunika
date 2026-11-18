@@ -1,9 +1,10 @@
 import { CircleCheck, CircleDashed, OctagonAlert, TriangleAlert } from "lucide-react";
+import { num } from "@/lib/format";
 
 export const primaryBtn =
-  "inline-flex min-h-11 items-center gap-2 rounded-md bg-laut px-5 font-semibold text-white hover:bg-laut-terang active:translate-y-px disabled:opacity-50";
+  "inline-flex min-h-11 items-center gap-2 rounded-md bg-laut px-5 font-semibold text-white transition-colors hover:bg-laut-terang active:translate-y-px disabled:opacity-50";
 export const secondaryBtn =
-  "inline-flex min-h-11 items-center gap-2 rounded-md border border-malam-3 px-5 font-semibold text-pasir hover:border-redup active:translate-y-px disabled:opacity-50";
+  "inline-flex min-h-11 items-center gap-2 rounded-md border border-malam-3 px-5 font-semibold text-pasir transition-colors hover:border-redup hover:bg-malam-2 active:translate-y-px disabled:opacity-50";
 
 // Status colours always ship with an icon and a label, never colour alone.
 export const STATUS = [
@@ -43,10 +44,10 @@ export function Meter({ label, value, max, href }: { label: string; value: numbe
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <span className="text-redup">{label}</span>
-        <span className="font-semibold tabular-nums">{value === null ? href ?? "Belum ada" : `${value} / ${max}`}</span>
+        <span className="font-semibold tabular-nums">{value === null ? href ?? "Belum ada" : `${num(value)} / ${num(max)}`}</span>
       </div>
       <div className="mt-1.5 h-2 rounded-full bg-malam-3" aria-hidden="true">
-        {value !== null && <div className="h-full rounded-full bg-langit" style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />}
+        {value !== null && <div className="h-full origin-left rounded-full bg-langit motion-safe:animate-grow" style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />}
       </div>
     </div>
   );

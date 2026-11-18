@@ -6,7 +6,7 @@ const LINKS = [
   { href: "/dashboard", label: "Dasbor" },
 ];
 
-export default function SiteHeader({ overlay = false }: { overlay?: boolean }) {
+export default function SiteHeader({ overlay = false, current }: { overlay?: boolean; current?: string }) {
   return (
     <header className={overlay ? "absolute inset-x-0 top-0 z-10" : "border-b border-malam-3"}>
       <nav
@@ -22,7 +22,8 @@ export default function SiteHeader({ overlay = false }: { overlay?: boolean }) {
           <Link
             key={l.href}
             href={l.href}
-            className={`flex min-h-11 items-center text-sm font-medium hover:text-pasir active:text-fajar ${overlay ? "text-pasir/85" : "text-redup"}`}
+            aria-current={l.href === current ? "page" : undefined}
+            className={`flex min-h-11 items-center text-sm font-medium transition-colors hover:text-pasir active:text-fajar aria-[current=page]:text-pasir aria-[current=page]:underline aria-[current=page]:decoration-langit aria-[current=page]:decoration-2 aria-[current=page]:underline-offset-8 ${overlay ? "text-pasir/85" : "text-redup"}`}
           >
             {l.label}
           </Link>
