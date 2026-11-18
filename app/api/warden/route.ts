@@ -1,4 +1,4 @@
-import { CHAT_MODEL, groq, rateLimit, requestUser, text } from "@/lib/server";
+import { CHAT_MODEL, groq, ipRateLimit, rateLimit, requestUser, text } from "@/lib/server";
 import { contextFacts, parseContext } from "@/lib/warden";
 
 const SYSTEM = `Kamu adalah Petugas Keselamatan virtual di sebuah sekolah di daerah rawan bencana di Indonesia.
@@ -37,6 +37,8 @@ function parse(body: unknown): Msg[] | null {
 }
 
 export async function POST(req: Request) {
+  const crowded = await ipRateLimit(req, "warden", 100, 10 * 60);
+  if (crowded) return crowded;
   const user = await requestUser(req);
   if (!user) return text("Masuk terlebih dahulu.", 401);
   const raw = await req.json().catch(() => null);

@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import Groq from "groq-sdk";
 
@@ -38,14 +39,10 @@ export async function requestUser(req: Request) {
 export const text = (body: string, status: number, headers: Record<string, string> = {}) =>
   new Response(body, { status, headers: { "Content-Type": "text/plain; charset=utf-8", ...headers } });
 
-export async function rateLimit(userId: string, bucket: string, limit: number, windowS: number) {
+// A fixed-window counter in Postgres: null while the caller is within the limit, else the reply to send.
+async function hit(fn: "hit_rate_limit" | "hit_ip_rate_limit", args: Record<string, unknown>, windowS: number) {
   try {
-    const { data, error } = await adminDb().rpc("hit_rate_limit", {
-      p_user: userId,
-      p_bucket: bucket,
-      p_limit: limit,
-      p_window_s: windowS,
-    });
+    const { data, error } = await adminDb().rpc(fn, args);
     if (error) throw error;
     if (data === true) return null;
     const retry = windowS - (Math.floor(Date.now() / 1000) % windowS);
@@ -54,7 +51,21 @@ export async function rateLimit(userId: string, bucket: string, limit: number, w
     });
   } catch (e) {
     // Fail closed: the limit exists to cap AI spend, so an unreachable counter must not mean unlimited calls.
-    console.error("rate limit", e);
+    console.error("rate limit", fn, e);
     return text("Layanan sedang sibuk. Coba lagi sebentar lagi.", 503);
   }
+}
+
+export const rateLimit = (userId: string, bucket: string, limit: number, windowS: number) =>
+  hit("hit_rate_limit", { p_user: userId, p_bucket: bucket, p_limit: limit, p_window_s: windowS }, windowS);
+
+// The caller's address as the hosting proxy reports it. Vercel overwrites x-forwarded-for, so a client cannot forge
+// it there; any other host needs a proxy in front that does the same.
+const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(",")[0].trim() || req.headers.get("x-real-ip") || "unknown";
+
+// Guest accounts cost nothing to make, so a per-user cap alone does not cap AI spend: this one counts per address.
+// A whole school can share one address, so its limits are wide. Addresses are stored only as salted hashes.
+export function ipRateLimit(req: Request, bucket: string, limit: number, windowS: number) {
+  const ip = createHash("sha256").update(`${process.env.SUPABASE_SECRET_KEY}:${clientIp(req)}`).digest("hex");
+  return hit("hit_ip_rate_limit", { p_ip: ip, p_bucket: bucket, p_limit: limit, p_window_s: windowS }, windowS);
 }

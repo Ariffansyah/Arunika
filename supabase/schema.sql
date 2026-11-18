@@ -117,11 +117,38 @@ $$;
 revoke all on function public.hit_rate_limit(uuid, text, int, int) from public, anon, authenticated;
 grant execute on function public.hit_rate_limit(uuid, text, int, int) to service_role;
 
+-- The same counter per client address (2026-11-18): guest accounts cost nothing to make, so per-user limits alone do
+-- not cap AI spend. Addresses arrive as salted SHA-256 hashes, never in the clear.
+create table if not exists public.ip_rate_limits (
+  ip_hash text not null,
+  bucket text not null,
+  window_start timestamptz not null,
+  hits int not null default 0,
+  primary key (ip_hash, bucket, window_start)
+);
+
+create or replace function public.hit_ip_rate_limit(p_ip text, p_bucket text, p_limit int, p_window_s int)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  delete from ip_rate_limits where ip_hash = p_ip and bucket = p_bucket and window_start < now() - interval '1 day';
+  insert into ip_rate_limits as r (ip_hash, bucket, window_start, hits)
+  values (p_ip, p_bucket, to_timestamp(floor(extract(epoch from now()) / p_window_s) * p_window_s), 1)
+  on conflict (ip_hash, bucket, window_start) do update set hits = r.hits + 1
+  returning hits <= p_limit;
+$$;
+
+revoke all on function public.hit_ip_rate_limit(text, text, int, int) from public, anon, authenticated;
+grant execute on function public.hit_ip_rate_limit(text, text, int, int) to service_role;
+
 alter table public.schools enable row level security;
 alter table public.profiles enable row level security;
 alter table public.drill_results enable row level security;
 alter table public.assessments enable row level security;
 alter table public.rate_limits enable row level security;
+alter table public.ip_rate_limits enable row level security;
 
 drop policy if exists "schools readable" on public.schools;
 create policy "schools readable" on public.schools for select to authenticated using (true);

@@ -19,7 +19,7 @@ import {
   type Seed,
   type State,
 } from "@/lib/gladi";
-import { GLADI_MODEL, adminDb, groq, rateLimit, requestUser, text } from "@/lib/server";
+import { GLADI_MODEL, adminDb, groq, ipRateLimit, rateLimit, requestUser, text } from "@/lib/server";
 import type { School } from "@/lib/supabase";
 
 // The browser carries the exercise between steps. The signature keeps it from rewriting an inject or a verdict,
@@ -71,6 +71,8 @@ async function schoolOf(userId: string): Promise<School | null> {
 }
 
 export async function POST(req: Request) {
+  const crowded = await ipRateLimit(req, "gladi", 120, 60 * 60);
+  if (crowded) return crowded;
   const user = await requestUser(req);
   if (!user) return text("Masuk terlebih dahulu.", 401);
   if (!process.env.SUPABASE_SECRET_KEY) return text("SUPABASE_SECRET_KEY belum diatur di server.", 500);
