@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import CharacterPicker from "@/components/CharacterPicker";
 import { HAZARD_ICON } from "@/components/hazards";
 import type { Me } from "@/components/RequireAuth";
+import ThemeToggle from "@/components/ThemeToggle";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
 import { HAZARD_LABEL } from "@/lib/gladi";
 import { MAPS, type Setting } from "@/lib/maps";
@@ -34,7 +35,7 @@ export default function MapMenu({ me, search }: { me: Me; search: string }) {
 
   return (
     // The survey grid of the landing page's plan demo: this is the site plan the drill is played on.
-    <div className="flex flex-1 flex-col bg-[linear-gradient(rgb(175_196_236/0.05)_1px,transparent_1px),linear-gradient(90deg,rgb(175_196_236/0.05)_1px,transparent_1px)] bg-[size:32px_32px]">
+    <div className="survey flex flex-1 flex-col">
       <header className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-2 sm:px-6">
         <Link href="/" className="flex min-h-11 items-center gap-2.5 text-lg font-extrabold tracking-wider text-pasir uppercase">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, nothing to optimise */}
@@ -42,6 +43,7 @@ export default function MapMenu({ me, search }: { me: Me; search: string }) {
           Arunika
         </Link>
         <span className="ml-auto truncate text-redup">{me.school?.name ?? "Sekolah contoh"}</span>
+        <ThemeToggle className="border-malam-3 text-redup hover:border-redup hover:text-pasir" />
       </header>
       <section aria-labelledby="menu-title" className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-4 pt-6 pb-12 sm:px-6">
         <h1 id="menu-title" className="animate-rise text-5xl font-extrabold tracking-[-0.03em] sm:text-7xl">
@@ -55,7 +57,7 @@ export default function MapMenu({ me, search }: { me: Me; search: string }) {
                 className="track group flex items-center gap-4 rounded-lg border border-malam-3 bg-malam-2 p-3 shadow-edge transition-[border-color,background-color,translate] duration-300 ease-crisp hover:-translate-y-1 hover:border-malam-3 hover:bg-malam-3/60 sm:flex-col sm:items-stretch sm:p-4"
               >
                 <span className="relative w-28 shrink-0 sm:w-full">
-                  <SitePlan id={id} className="block h-auto w-full rounded-md bg-malam" />
+                  <SitePlan id={id} className="block h-auto w-full rounded-md bg-peta" />
                   <span className="absolute bottom-2 left-2 hidden gap-2.5 rounded-md bg-malam/90 px-2.5 py-2 text-langit shadow-lg sm:flex">
                     {MAPS[id]!.disasters.map((k) => {
                       const Icon = HAZARD_ICON[k];
@@ -84,7 +86,7 @@ export default function MapMenu({ me, search }: { me: Me; search: string }) {
             Karakter
           </h2>
           <div className="mt-6 grid gap-5 rounded-lg border border-malam-3 bg-malam-2 p-4 shadow-edge sm:p-5 md:grid-cols-[16rem_minmax(0,1fr)] md:items-center">
-            <div className="h-72 overflow-hidden rounded-md bg-[radial-gradient(ellipse_at_50%_85%,#1b3461,#071530_70%)] md:h-80">
+            <div className="h-72 overflow-hidden rounded-md bg-radial-[at_50%_85%] from-malam-3 to-malam to-70% md:h-80">
               <CharacterStage look={avatarOf(avatar)} />
             </div>
             <CharacterPicker profileId={me.profile.id} value={avatar} onChange={setAvatar} cols="grid-cols-4 sm:grid-cols-7 md:grid-cols-4 lg:grid-cols-7" />

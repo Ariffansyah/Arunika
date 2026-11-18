@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import StillScene from "@/components/landing/StillScene";
+import ThemeToggle from "@/components/ThemeToggle";
 import { AVATARS } from "@/lib/supabase";
 import LoginFlow from "./LoginFlow";
 
@@ -20,11 +21,11 @@ export default function MasukPage() {
         <StillScene />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgb(7_21_48/0.7),transparent)]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-linear-to-b from-malam/70 to-transparent"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-[linear-gradient(0deg,#071530_10%,rgb(7_21_48/0.75)_50%,transparent)]"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-linear-to-t from-malam from-10% via-malam/75 via-50% to-transparent"
         />
         <Link href="/" className={`absolute top-4 left-8 ${logo}`}>
           {mark}
@@ -45,10 +46,13 @@ export default function MasukPage() {
         </div>
       </div>
       <div className="flex flex-col px-4 py-6 sm:px-10">
-        <Link href="/" className={`${logo} self-start lg:hidden`}>
-          {mark}
-          Arunika
-        </Link>
+        <div className="flex items-center justify-between gap-4">
+          <Link href="/" className={`${logo} lg:invisible`}>
+            {mark}
+            Arunika
+          </Link>
+          <ThemeToggle className="border-malam-3 text-redup hover:border-redup hover:text-pasir" />
+        </div>
         <div className="m-auto w-full max-w-sm py-10">
           <Suspense>
             <LoginFlow />

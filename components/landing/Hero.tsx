@@ -34,11 +34,11 @@ export default function Hero() {
       </div>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-28 bg-[linear-gradient(180deg,rgb(7_21_48/0.7),transparent)]"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-28 bg-linear-to-b from-malam/70 to-transparent"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[70%] bg-[linear-gradient(0deg,#071530_15%,rgb(7_21_48/0.8)_45%,transparent)] lg:inset-y-0 lg:left-0 lg:h-auto lg:w-[62%] lg:bg-[linear-gradient(90deg,#071530_0%,rgb(7_21_48/0.86)_40%,rgb(7_21_48/0.4)_70%,transparent)]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[70%] bg-linear-to-t from-malam from-15% via-malam/80 via-45% to-transparent lg:inset-y-0 lg:left-0 lg:h-auto lg:w-[62%] lg:bg-linear-to-r lg:from-0% lg:via-malam/85 lg:via-40%"
       />
       <div className="absolute top-16 right-4 flex animate-rise items-center gap-2 [animation-delay:450ms] sm:right-6">
         <p
@@ -68,11 +68,11 @@ export default function Hero() {
             <li key={id} className="animate-rise" style={{ animationDelay: `${200 + i * 90}ms` }}>
               <Link
                 href={`/sekolah?peta=${id}`}
-                className="group flex min-h-18 items-center gap-4 px-4 py-3 transition-colors duration-300 ease-crisp hover:bg-laut focus-visible:bg-laut sm:px-6 lg:px-5 lg:py-5"
+                className="group flex min-h-18 items-center gap-4 px-4 py-3 transition-colors duration-300 ease-crisp hover:bg-laut hover:text-white focus-visible:bg-laut focus-visible:text-white sm:px-6 lg:px-5 lg:py-5"
               >
-                <SitePlan id={id} className="h-auto w-16 shrink-0 rounded-sm bg-malam-2 xl:w-20" />
+                <SitePlan id={id} className="h-auto w-16 shrink-0 rounded-sm bg-peta xl:w-20" />
                 <span className="flex-1 text-xl leading-tight font-bold">
-                  {MAPS[id]!.name} <span className="font-medium text-redup group-hover:text-pasir/85">{hazard}</span>
+                  {MAPS[id]!.name} <span className="font-medium text-redup group-hover:text-white/85 group-focus-visible:text-white/85">{hazard}</span>
                 </span>
                 <ArrowRight aria-hidden="true" className="size-6 shrink-0 transition-transform duration-300 ease-crisp group-hover:translate-x-1.5" />
               </Link>

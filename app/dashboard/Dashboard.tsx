@@ -309,13 +309,13 @@ function Board({ me }: { me: Me }) {
                 type="button"
                 aria-pressed={activeRole === r}
                 onClick={() => setActiveRole(r)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-md border border-malam-3 px-4 font-semibold transition-colors duration-300 ease-crisp hover:border-redup aria-pressed:border-laut aria-pressed:bg-laut aria-pressed:text-white"
+                className="group inline-flex min-h-11 items-center gap-2 rounded-md border border-malam-3 px-4 font-semibold transition-colors duration-300 ease-crisp hover:border-redup aria-pressed:border-laut aria-pressed:bg-laut aria-pressed:text-white"
               >
                 <Icon className="size-4" aria-hidden="true" />
                 {ROLE_LABEL[r]}
                 {currentProfileRole === r && (
                   <>
-                    <span aria-hidden="true" title="Peran di profilmu" className="size-1.5 rounded-full bg-langit" />
+                    <span aria-hidden="true" title="Peran di profilmu" className="size-1.5 rounded-full bg-langit group-aria-pressed:bg-white" />
                     <span className="sr-only">(peran di profilmu)</span>
                   </>
                 )}
@@ -387,7 +387,7 @@ function Board({ me }: { me: Me }) {
                   lat: row.lat,
                   lon: row.lon,
                   exposure: exp,
-                  color: statusOf(row.readiness).color,
+                  color: statusOf(row.readiness).hex,
                 }))}
                 selected={current.row.id}
                 onSelect={setSelected}

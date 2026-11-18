@@ -57,7 +57,7 @@ export default function Home() {
                 <SitePlan key={id} id={id} className={`h-auto w-[60%] shrink-0 sm:w-[34%] ${i === 1 ? "translate-y-10" : "-translate-y-6"}`} />
               ))}
             </div>
-            <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgb(7_21_48/0.4),#071530_75%)]" />
+            <div aria-hidden="true" className="absolute inset-0 -z-10 bg-radial from-malam/40 to-malam to-75%" />
             <div className="mx-auto flex max-w-6xl flex-col items-start gap-10 px-4 py-28 sm:px-6 lg:py-40">
               <h2 id="ajak" className="max-w-[16ch] text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl">
                 Gempa berikutnya tidak menunggu sekolah <span className="text-fajar">siap</span>.

@@ -16,6 +16,8 @@
   --color-fajar-tua: #e5701f;
   --color-aman: #34c47c;
   --color-bahaya: #ff6b6b;
+  /* The ground of site plans and the 3D map, which read as map displays in either theme. */
+  --color-peta: #0b1e3f;
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --ease-crisp: cubic-bezier(0.16, 1, 0.3, 1);
@@ -48,6 +50,58 @@
   }
 }
 
+/* Tokens outside the utilities: status tones read from inline styles, and the backdrop's line colours. */
+:root {
+  --color-kuning: #f0b429;
+  --color-abu: #7f93b8;
+  --garis: rgb(175 196 236 / 0.05);
+  --kontur: rgb(150 180 240 / 0.13);
+  --butir: #fff;
+  --butir-kuat: 0.035;
+}
+
+/* Morning: the same hues on pale paper, accents darkened until text on it passes 4.5:1. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-malam: #eef3fb;
+  --color-malam-2: #ffffff;
+  --color-malam-3: #d5deee;
+  --color-pasir: #0b1e3f;
+  --color-redup: #4b5f84;
+  --color-laut-terang: #1650c8;
+  --color-langit: #08738f;
+  --color-fajar: #b54a08;
+  --color-fajar-tua: #8f3a06;
+  --color-aman: #117646;
+  --color-bahaya: #c22f2f;
+  --color-kuning: #8a5c00;
+  --color-abu: #5c6a84;
+  --garis: rgb(11 30 63 / 0.06);
+  --kontur: rgb(11 30 63 / 0.1);
+  --butir: #0b1e3f;
+  --butir-kuat: 0.05;
+}
+
+/* The 3D drill keeps the night palette whatever the theme: its HUD is drawn for a lit scene behind it. */
+:root[data-theme="light"] [data-theme="dark"] {
+  color-scheme: dark;
+  /* Text inherits body's colour as already resolved, so it must be resolved again inside the scope. */
+  color: var(--color-pasir);
+  --color-malam: #071530;
+  --color-malam-2: #0b1e3f;
+  --color-malam-3: #1b3461;
+  --color-pasir: #eaf1ff;
+  --color-redup: #a6b9de;
+  --color-laut-terang: #3d7bf5;
+  --color-langit: #22ccee;
+  --color-fajar: #ff8a3d;
+  --color-fajar-tua: #e5701f;
+  --color-aman: #34c47c;
+  --color-bahaya: #ff6b6b;
+  --color-kuning: #f0b429;
+  --color-abu: #7f93b8;
+}
+
 /* Paper grain at a few percent, painted between a band's own background and its content. */
 @utility grain {
   position: relative;
@@ -59,8 +113,9 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    opacity: 0.035;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: var(--butir-kuat);
+    background: var(--butir);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 }
 
@@ -134,10 +189,16 @@
   }
 }
 
+/* The site plan's survey grid. */
+@utility survey {
+  background-image: linear-gradient(var(--garis) 1px, transparent 1px), linear-gradient(90deg, var(--garis) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
 /* Fixed to the viewport, so one sweep crosses every placeholder block together. */
 @utility skeleton {
   border-radius: 0.25rem;
-  background: linear-gradient(90deg, var(--color-malam-2) 30%, rgb(27 52 97 / 0.9) 50%, var(--color-malam-2) 70%) 0 0 / 200% 100% fixed;
+  background: linear-gradient(90deg, var(--color-malam-2) 30%, var(--color-malam-3) 50%, var(--color-malam-2) 70%) 0 0 / 200% 100% fixed;
   animation: var(--animate-shimmer);
 }
 
@@ -153,8 +214,29 @@ html {
 }
 
 body {
-  background: var(--color-malam);
+  background: radial-gradient(ellipse 70% 55% at 85% 0%, var(--color-malam-2), transparent 70%) fixed, var(--color-malam);
   color: var(--color-pasir);
+}
+
+/* Contour lines of a survey map behind every page, fading away from the top corner. Fixed, so the page
+   slides over the terrain. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--kontur);
+  mask:
+    url("/kontur.svg") 0 0 / 720px intersect,
+    radial-gradient(ellipse 120% 100% at 90% 0%, #000 25%, rgb(0 0 0 / 0.3) 100%);
+}
+
+/* The theme switch: the new page is revealed in a circle growing from the button (see ThemeToggle). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
 @layer base {

@@ -76,9 +76,12 @@ export default function CampusClient() {
   const search = params.toString();
   // Without a map in the address, the menu comes first.
   if (!params.has("peta")) return <RequireAuth>{(me) => <MapMenu me={me} search={search} />}</RequireAuth>;
+  // The drill stays dark in the light theme: its HUD is drawn over a lit 3D scene.
   return (
-    <RequireAuth loading={<Loading id={mapFromUrl(search)} />}>
-      {(me) => <Campus me={me} roomParam={params.get("room")} />}
-    </RequireAuth>
+    <div data-theme="dark" className="contents">
+      <RequireAuth loading={<Loading id={mapFromUrl(search)} />}>
+        {(me) => <Campus me={me} roomParam={params.get("room")} />}
+      </RequireAuth>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const LINKS = [
   { href: "/sekolah", label: "Sekolah" },
@@ -16,7 +17,8 @@ export default function SiteHeader({ overlay = false, current }: { overlay?: boo
         <Link href="/" className="mr-auto flex min-h-11 items-center gap-2.5 text-lg font-extrabold tracking-wider text-pasir uppercase">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, nothing to optimise */}
           <img src="/arunika-mark.svg" alt="" width={24} height={27} className="h-7 w-auto" />
-          Arunika
+          {/* Phones keep only the mark, so the links and the theme switch fit on one line. */}
+          <span className="max-[440px]:sr-only">Arunika</span>
         </Link>
         {LINKS.map((l) => (
           <Link
@@ -28,6 +30,7 @@ export default function SiteHeader({ overlay = false, current }: { overlay?: boo
             {l.label}
           </Link>
         ))}
+        <ThemeToggle className={overlay ? "border-pasir/20 bg-malam/70 text-pasir hover:border-pasir" : "border-malam-3 text-redup hover:border-redup hover:text-pasir"} />
       </nav>
     </header>
   );

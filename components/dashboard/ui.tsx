@@ -6,13 +6,14 @@ export const primaryBtn =
 export const secondaryBtn =
   "inline-flex min-h-11 items-center gap-2 rounded-md border border-malam-3 px-5 font-semibold text-pasir transition-colors hover:border-redup hover:bg-malam-2 active:translate-y-px disabled:opacity-50";
 
-// Status colours always ship with an icon and a label, never colour alone.
+// Status colours always ship with an icon and a label, never colour alone. `color` follows the page theme; `hex`
+// is for the 3D map, which keeps its night palette and cannot read CSS variables.
 export const STATUS = [
-  { min: 70, label: "Siap", color: "#34c47c", Icon: CircleCheck },
-  { min: 45, label: "Perlu penguatan", color: "#f0b429", Icon: TriangleAlert },
-  { min: 0, label: "Rawan", color: "#ff6b6b", Icon: OctagonAlert },
+  { min: 70, label: "Siap", color: "var(--color-aman)", hex: "#34c47c", Icon: CircleCheck },
+  { min: 45, label: "Perlu penguatan", color: "var(--color-kuning)", hex: "#f0b429", Icon: TriangleAlert },
+  { min: 0, label: "Rawan", color: "var(--color-bahaya)", hex: "#ff6b6b", Icon: OctagonAlert },
 ];
-export const NO_DATA = { min: -1, label: "Belum ada data", color: "#7f93b8", Icon: CircleDashed };
+export const NO_DATA = { min: -1, label: "Belum ada data", color: "var(--color-abu)", hex: "#7f93b8", Icon: CircleDashed };
 export const statusOf = (r: number | null) => (r === null ? NO_DATA : STATUS.find((s) => r >= s.min)!);
 
 export function StatusLabel({ readiness }: { readiness: number | null }) {
