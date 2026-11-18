@@ -168,14 +168,15 @@ const TASK: Record<Phase, string> = {
   end: `Nilai keputusan terakhir, lalu tutup gladi. summary: 2 kalimat tentang kesiapan tim. observations: paling banyak 4 catatan tentang yang sudah baik dan celahnya. recommendations: paling banyak 5 perbaikan rencana siaga sekolah. Balas hanya JSON: {${FEEDBACK_SHAPE}, "summary": "...", "observations": ["..."], "recommendations": [{"action": "...", "priority": "segera" | "jangka_menengah" | "jangka_panjang", "cost_band": "rendah" | "sedang" | "tinggi"}]}`,
 };
 
+// Answers go in as JSON strings so a typed quote cannot close the quoted block and pose as instructions.
 export function stepPrompt(done: Turn[], pending: Inject | null, answer: string | null) {
   const log = [
     ...done.map(
       (t, i) =>
-        `Langkah ${i + 1}, pukul ${t.inject.clock}. ${t.inject.situation} ${t.inject.question}\nKeputusan peserta: "${t.answer}"\nPenilaian: ${t.feedback.verdict}. ${t.feedback.note}`,
+        `Langkah ${i + 1}, pukul ${t.inject.clock}. ${t.inject.situation} ${t.inject.question}\nKeputusan peserta: ${JSON.stringify(t.answer)}\nPenilaian: ${t.feedback.verdict}. ${t.feedback.note}`,
     ),
     ...(pending && answer !== null
-      ? [`Langkah ${done.length + 1}, pukul ${pending.clock}. ${pending.situation} ${pending.question}\nKeputusan peserta: "${answer}"`]
+      ? [`Langkah ${done.length + 1}, pukul ${pending.clock}. ${pending.situation} ${pending.question}\nKeputusan peserta: ${JSON.stringify(answer)}`]
       : []),
   ];
   const answered = done.length + (answer !== null ? 1 : 0);
