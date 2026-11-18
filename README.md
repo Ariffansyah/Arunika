@@ -1,135 +1,210 @@
-# 🌅 ARUNIKA
-### Platform Simulasi & Evaluasi Kesiapsiagaan Bencana Sekolah Indonesia
+# Arunika
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.4-black?logo=next.js)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.3-blue?logo=react)](https://react.dev/)
-[![Three.js](https://img.shields.io/badge/Three.js-R3F-orange?logo=three.js)](https://threejs.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38bdf8?logo=tailwind-css)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Realtime%20%26%20Postgres-3ecf8e?logo=supabase)](https://supabase.com/)
-[![Groq AI](https://img.shields.io/badge/AI-Groq%20gpt--oss%20%26%20Qwen3-f55036)](https://groq.com/)
+Arunika adalah latihan kesiapsiagaan bencana untuk sekolah di wilayah rawan bencana Indonesia. Siswa berlatih evakuasi bersama di sekolah 3D, tim siaga sekolah menjalankan gladi ruang di atas denah sekolahnya, dan kepala sekolah sampai pemerintah daerah membaca hasilnya di satu dasbor. Urutan tindakan mengikuti panduan Satuan Pendidikan Aman Bencana (SPAB) dari BNPB.
 
-**Arunika** adalah platform berbasis web interaktif 3D dan kecerdasan buatan (*AI*) yang dirancang untuk melatih, mengevaluasi, dan memperkuat kesiapsiagaan warga sekolah di wilayah rawan bencana Indonesia sesuai standar dan pedoman Badan Nasional Penanggulangan Bencana (BNPB).
+Karya untuk IT RUSH 2026, kategori Web Development, subtema **Mitigasi Bencana dan Perubahan Iklim**.
 
----
+| | |
+| --- | --- |
+| Website | https://arunika-gamma.vercel.app |
+| Repositori | https://github.com/Ariffansyah/Arunika |
+| Akun demo | Tercantum di proposal. Tanpa akun, pilih **Coba sebagai tamu** di halaman Masuk. |
 
-## 🌟 Pilar & Fitur Utama
+![Beranda Arunika: sekolah pesisir 3D yang tergenang banjir rob, dengan jalur evakuasi ke titik kumpul](docs/screenshots/beranda.webp)
 
-### 1. Simulasi Sekolah 3D Interaktif (`/sekolah`)
-* **3 Ragam Topografi Indonesia:** dipilih dari menu peta sebelum masuk: Sekolah Pesisir (ancaman rob & bukit evakuasi), Pegunungan (lereng rawan longsor), dan Kawasan Perkotaan (kawasan padat gedung bertingkat).
-* **4 Skenario Bencana Utama:** Gempa Bumi (*Drop, Cover, Hold on*), Banjir/Rob (air meninggi, arus, bahaya listrik), Angin Puting Beliung, dan Tanah Longsor.
-* **Multiplayer Real-time (Supabase Channels & Presence):** Siswa dan guru dapat masuk ke dalam ruang simulasi yang sama, melihat pergerakan avatar teman, mendengar sirene sekolah yang sama, dan melakukan evakuasi serentak.
-* **Visual Debriefing Trail:** Menampilkan visualisasi peta jejak langkah aktual siswa dibandingkan dengan rute evakuasi ideal, lengkap dengan perhitungan efisiensi rute dan catatan evaluasi.
-* **Petugas Keselamatan Virtual (AI Warden):** Asisten AI interaktif dengan respon *streaming* untuk menjawab pertanyaan evakuasi, isi tas siaga, dan P3K.
+## Latar belakang
 
-### 2. Gladi Ruang di Atas Denah Sekolah (`/gladi`)
-Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga: bencana dibahas langkah demi langkah di atas peta sekolah. Siswa berlatih di sekolah 3D; guru dan kepala sekolah berlatih di sini. Mejanya adalah denah sekolah yang sama, dan yang menghitung bahaya adalah mesin simulasi Arunika sendiri, bukan AI.
-* **Peta dihitung mesin simulasi:** risiko runtuh atau rusak tiap gedung (dari material, umur, jenis tanah, dan jarak pantai sekolah), petak tergenang atau rawan reruntuhan, dan titik kumpul yang aman. Peta berubah begitu skenario diganti, sebelum AI dipanggil.
-* **Skenario dari gempa sungguhan:** gempa terkini diambil langsung dari umpan publik **BMKG** (`autogempa.json`). Jarak episentrum ke sekolah dihitung (haversine); bila jauh, gempa yang sama "dipindahkan" ke dekat sekolah. Bisa juga memilih banjir, longsor, atau angin puting beliung, di sekolah pesisir, pegunungan, atau kota.
-* **4 langkah, dua penilai:**
-  1. **AI** menyusun detik-detik pertama di sebuah kelas; peserta memilih atau menulis tindakannya, AI menilai.
-  2. **Di peta:** gedung mana yang dikosongkan lebih dulu. Dinilai mesin dari peringkat risiko.
-  3. **Di peta:** ke mana penghuninya dievakuasi. *Pathfinder* A* menggambar rute, menghitung meter, detik berjalan, dan petak bahaya yang dilewati, lalu membandingkannya dengan rute terbaik.
-  4. **AI** menyusun komplikasi yang lahir dari keputusan di peta (misalnya absen kurang di titik kumpul yang dipilih), lalu menilai tindakan peserta.
-* **Rencana tindak lanjut:** AI menyusun catatan dan perbaikan rencana siaga (prioritas + kelas biaya) yang tersimpan ke dasbor. Skornya rata-rata nilai keempat langkah, bukan angka bebas dari model.
-* **Aman dari manipulasi:** setiap langkah ditandatangani HMAC di server, sehingga peramban tidak bisa mengubah situasi atau putusan AI. Keputusan di peta dinilai ulang di server dengan aturan yang sama, dan jawaban peserta dikirim ke model sebagai data berformat JSON untuk menahan *prompt injection*.
+Banyak sekolah di Indonesia berdiri di wilayah rawan gempa, banjir, longsor, atau angin puting beliung. Di banyak sekolah, simulasi evakuasi hanya digelar sesekali dan hasilnya tidak tercatat: siswa tidak tahu apakah jalurnya sudah tepat, kepala sekolah tidak punya angka untuk RKAS, dan BPBD tidak tahu sekolah mana yang perlu didatangi lebih dulu.
 
-### 3. Dasbor Kesiapsiagaan Multi-Peran (`/dashboard`)
-* **🎓 Siswa:** Rapor mandiri kelulusan 4 skenario BNPB, lencana prestasi, dan cetak kartu bukti prestasi siswa siaga.
-* **🧑‍🏫 Guru:** Generator tautan/kode sesi kelas multiplayer, monitoring nilai dan kepatuhan evakuasi kelas, serta ekspor rekap nilai (CSV).
-* **🏛️ Kepala Sekolah:** Indeks Kesiapan Gabungan (kesiapan siswa dari latihan evakuasi + kesiapan tim siaga dari gladi ruang), rencana tindak lanjut untuk RKAS, serta cetak laporan sekolah.
-* **🏢 Pemda / BPBD:** Peta 3D geospasial Indonesia, filter prioritas intervensi wilayah, dan ekspor data analisis risiko sekolah se-daerah.
+Arunika menjadikan latihan itu bisa diulang kapan saja, dinilai, dan terkumpul. Setiap latihan menghasilkan data yang sama untuk empat peran: siswa, guru, kepala sekolah, dan pemerintah daerah.
 
----
+## Fitur
 
-## 🛠️ Tumpukan Teknologi (*Tech Stack*)
+### Latihan evakuasi di sekolah 3D (`/sekolah`)
 
-* **Framework:** Next.js 16 (App Router, Turbopack, React 19)
-* **3D Visuals & Engine:** Three.js, `@react-three/fiber`, `@react-three/drei`
-* **Styling & Icons:** Tailwind CSS v4, Lucide React
-* **Backend & Database:** Supabase (PostgreSQL, Row Level Security, Realtime Broadcast & Presence)
-* **AI & LLM Services:** Groq SDK: `openai/gpt-oss-120b` dengan *strict structured output* untuk gladi ruang, `qwen/qwen3.8-27b` untuk Petugas AI (*streaming chat*)
-* **Data publik:** BMKG `autogempa.json` (gempa terkini), di-*cache* 1 menit dengan `"use cache"` Next.js
-* **Test Suite:** Native Node.js Test Runner dengan cross-platform suite runner
+![Latihan di sekolah pesisir: panel langkah dan kuis di kiri, peta mini dan titik kumpul di kanan](docs/screenshots/sekolah.webp)
 
----
+- **Tiga sekolah, tiga ancaman.** Sekolah pesisir (banjir rob, bukit evakuasi), pegunungan (lereng rawan longsor), dan kota (gedung bertingkat, rawan gempa). Dipilih dari menu peta sebelum masuk, bersama karakter berseragam SMP.
+- **Empat skenario.** Gempa bumi (merunduk, berlindung, bertahan), banjir dan rob (air naik, arus, bahaya listrik), angin puting beliung, dan tanah longsor.
+- **Belajar sebelum latihan.** Langkah selamat dan kuis per bencana, sama dengan yang diajarkan di beranda.
+- **Satu kelas serentak.** Guru membagikan satu tautan ruang. Siswa di ruang yang sama melihat avatar satu sama lain, mendengar sirene yang sama, dan berevakuasi bersama lewat Supabase Realtime (Broadcast dan Presence).
+- **Dinilai sampai titik kumpul.** Selesai latihan, jejak langkah siswa dibandingkan dengan rute terbaik dari *pathfinder* A*: jarak, waktu, efisiensi rute, dan catatan evaluasi.
+- **Petugas AI.** Asisten keselamatan di dalam latihan, dijawab secara *streaming*. Bisa ditanya lewat suara (Web Speech API) dan menjawab dengan suara.
 
-## 🚀 Memulai Pengembangan Lokal
+### Gladi ruang di atas denah sekolah (`/gladi`)
 
-### Prasyarat
-* [Node.js](https://nodejs.org/) v20+ atau v22+
-* [pnpm](https://pnpm.io/) v10+ (disarankan) atau npm
+![Gladi ruang: denah sekolah dengan risiko tiap gedung, pilihan skenario dari gempa terkini BMKG, dan empat langkah gladi](docs/screenshots/gladi.webp)
 
-### 1. Kloning & Instal Dependensi
+Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga sekolah: bencana dibahas langkah demi langkah di atas peta. Mejanya denah sekolah yang sama dengan latihan 3D, dan yang menghitung bahaya adalah mesin simulasi Arunika, bukan AI.
+
+- **Peta dihitung mesin simulasi.** Risiko runtuh atau rusak tiap gedung (dari material, umur bangunan, jenis tanah, dan jarak ke pantai), petak tergenang atau rawan reruntuhan, dan titik kumpul yang aman. Peta berubah begitu skenario diganti, sebelum AI dipanggil.
+- **Skenario dari gempa sungguhan.** Gempa terkini diambil dari umpan publik BMKG (`autogempa.json`). Jarak episentrum ke sekolah dihitung dengan rumus haversine; bila jauh, gempa yang sama dipindahkan ke dekat sekolah. Banjir, longsor, dan angin puting beliung juga bisa dipilih.
+- **Empat langkah, dua penilai.**
+  1. AI menyusun detik-detik pertama di sebuah kelas. Peserta memilih atau menulis tindakannya, lalu AI menilainya.
+  2. Di peta: gedung mana yang dikosongkan lebih dulu. Dinilai mesin dari peringkat risiko.
+  3. Di peta: ke mana penghuninya dievakuasi. *Pathfinder* A* menggambar rute, menghitung meter, detik berjalan, dan petak bahaya yang dilewati, lalu membandingkannya dengan rute terbaik.
+  4. AI menyusun komplikasi yang lahir dari keputusan di peta (misalnya absen kurang di titik kumpul yang dipilih), lalu menilai tindakan peserta.
+- **Rencana tindak lanjut.** AI menyusun perbaikan rencana siaga sekolah, masing-masing dengan prioritas dan kelas biaya, lalu menyimpannya ke dasbor. Skor gladi adalah rata-rata nilai keempat langkah, bukan angka bebas dari model.
+- **Tahan manipulasi.** Setiap langkah ditandatangani HMAC di server, sehingga peramban tidak bisa mengubah situasi atau putusan AI. Keputusan di peta dinilai ulang di server dengan aturan yang sama, dan jawaban peserta dikirim ke model sebagai data JSON untuk menahan *prompt injection*.
+
+### Dasbor kesiapan sekolah (`/dashboard`)
+
+![Dasbor siswa: rapor empat skenario dan predikat](docs/screenshots/dasbor.webp)
+
+![Peta kesiapan sekolah se-Indonesia dalam 3D dan urutan prioritas intervensi](docs/screenshots/peta.webp)
+
+| Peran | Isi dasbor |
+| --- | --- |
+| Siswa | Rapor kelulusan empat skenario, predikat, dan kartu prestasi yang bisa dicetak. |
+| Guru | Tautan ruang kelas untuk latihan serentak, hasil latihan tiap siswa, dan ekspor rekap nilai (CSV). |
+| Kepala sekolah | Indeks kesiapan gabungan (latihan evakuasi siswa dan gladi ruang tim siaga), rencana tindak lanjut untuk RKAS, dan laporan yang bisa dicetak. |
+| Pemerintah daerah | Peta 3D sekolah se-Indonesia, filter status kesiapan, urutan prioritas intervensi (paparan risiko dikali kesenjangan kesiapan), dan ekspor CSV. |
+
+Sekolah bertanda *(demo)* di dasbor adalah data contoh, bukan data lapangan.
+
+### Beranda dan tampilan
+
+![Denah interaktif di beranda: geser tinggi air, jalur evakuasi dihitung ulang](docs/screenshots/denah.webp)
+
+- **Bisa dicoba tanpa akun.** Beranda memuat langkah selamat dan kuis per bencana, denah yang jalurnya dihitung ulang saat tinggi air atau kekuatan gempa digeser, contoh penilaian jejak evakuasi, contoh jawaban Petugas AI, gladi ruang dari gempa terkini BMKG, dan pratinjau dasbor tiap peran.
+- **Mode gelap dan terang.** Tombol di kepala halaman mengganti tema dengan transisi lingkaran yang tumbuh dari tombol itu ke seluruh halaman. Pilihan tersimpan di peramban. Latihan 3D tetap gelap di kedua tema.
+- **Ponsel sampai desktop.** Latihan 3D punya kontrol sentuh, dan semua halaman menyesuaikan lebar layar.
+
+![Mode terang: kontur peta topografi di latar, langkah selamat gempa, dan kuis](docs/screenshots/terang.webp)
+
+![Beranda di ponsel, mode gelap dan terang](docs/screenshots/ponsel.webp)
+
+## Di mana AI bekerja
+
+AI adalah satu bagian dari fitur, bukan seluruh layar. Bahaya, risiko, rute, dan skor dihitung oleh mesin simulasi Arunika (`lib/`). AI menulis dan menilai bagian yang butuh bahasa.
+
+| Fitur | Model (lewat Groq) | Dikerjakan AI | Dikerjakan mesin Arunika |
+| --- | --- | --- | --- |
+| Petugas AI di latihan 3D | `qwen/qwen3.8-27b`, *streaming* | Menjawab pertanyaan evakuasi, P3K, dan tas siaga, lewat teks atau suara. | Memberi tahu Petugas AI gedung tempat siswa berdiri dan titik kumpul yang aman untuk skenario itu. Hanya id dan label dari peta yang diteruskan, tidak pernah teks bebas. |
+| Gladi ruang | `openai/gpt-oss-120b`, *structured output* | Menulis situasi pembuka dan komplikasi, menilai jawaban bebas peserta, menyusun rencana tindak lanjut. | Risiko tiap gedung, petak bahaya, titik kumpul aman, rute A*, penilaian dua keputusan di peta, dan skor akhir. |
+
+Kedua rute AI (`/api/warden`, `/api/gladi`) hanya melayani pengguna yang masuk, dan dibatasi per pengguna serta per alamat IP. Alamat IP hanya disimpan sebagai *hash* bergaram.
+
+## Teknologi
+
+| Bagian | Yang dipakai |
+| --- | --- |
+| Kerangka web | Next.js 16 (App Router, Turbopack), React 19, TypeScript |
+| 3D | Three.js, React Three Fiber, Drei |
+| Tampilan | Tailwind CSS 4, Lucide (ikon), Plus Jakarta Sans dan JetBrains Mono |
+| Data dan akun | Supabase: PostgreSQL dengan Row Level Security, Auth (termasuk masuk sebagai tamu), Realtime Broadcast dan Presence |
+| AI | Groq SDK dengan `openai/gpt-oss-120b` dan `qwen/qwen3.8-27b` |
+| Data publik | BMKG `autogempa.json`, di-*cache* satu menit dengan `"use cache"` Next.js |
+| Pengujian | Node.js test runner bawaan |
+| Hosting | Vercel |
+
+## Menjalankan secara lokal
+
+Butuh Node.js 20.9 atau lebih baru, pnpm, proyek Supabase, dan kunci API Groq.
+
 ```bash
-git clone https://github.com/username/arunika.git
-cd arunika
+git clone https://github.com/Ariffansyah/Arunika.git
+cd Arunika
 pnpm install
-```
-
-### 2. Konfigurasi Environment Variable
-Salin berkas `.env.example` menjadi `.env.local` dan isi kredensial Supabase serta Groq:
-```bash
 cp .env.example .env.local
 ```
-Variabel yang dibutuhkan:
+
+Isi `.env.local`:
+
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-GROQ_API_KEY=gsk_your_groq_api_key
+NEXT_PUBLIC_SUPABASE_URL=https://<proyek>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SECRET_KEY=sb_secret_...
+GROQ_API_KEY=gsk_...
 ```
 
-### 3. Setup Database
-Jalankan skrip SQL di berkas `supabase/schema.sql` pada SQL Editor Supabase Anda untuk membuat tabel, fungsi *rate limit*, dan data demo awal.
+`SUPABASE_SECRET_KEY` dan `GROQ_API_KEY` hanya dibaca di server; jangan beri awalan `NEXT_PUBLIC_`.
 
-### 4. Jalankan Server Pengembangan
+Siapkan basis data:
+
+1. Jalankan `supabase/schema.sql` di SQL Editor Supabase. Skrip ini membuat tabel, *view* kesiapan sekolah, fungsi pembatas permintaan, dan sekolah contoh.
+2. Agar tombol **Coba sebagai tamu** berfungsi, aktifkan *Anonymous Sign-ins* di Authentication, Sign In / Providers.
+
+Lalu jalankan:
+
 ```bash
 pnpm dev
 ```
-Buka [http://localhost:3000](http://localhost:3000) pada peramban Anda.
 
----
+Buka http://localhost:3000.
 
-## 🧪 Pengujian & Kualitas Kode
+## Pengujian
 
-Platform Arunika dilengkapi dengan suite pengujian otomatis yang menguji logika denah gedung (*floorplan*), *pathfinding/navigation*, fisika rintangan, dan skenario bencana lintas seluruh varian peta sekolah:
+Pengujian mencakup denah gedung, *pathfinding* dan navigasi, rintangan, model risiko, gladi ruang, dan Petugas AI, di ketiga peta sekolah.
 
 ```bash
-# Menjalankan seluruh pengujian unit di semua konfigurasi peta
-pnpm test
-
-# Menjalankan pengujian untuk peta tertentu saja
-node scripts/test.mjs pesisir
-node scripts/test.mjs pegunungan
-node scripts/test.mjs kota
-
-# Pengecekan linter kode
+pnpm test                         # semua peta
+node scripts/test.mjs pesisir     # satu peta: pesisir, pegunungan, atau kota
 pnpm lint
 ```
 
----
-
-## 📂 Struktur Direktori
+## Struktur direktori
 
 ```text
-arunika/
-├── app/                  # Next.js App Router (Halaman & Endpoint API)
-│   ├── gladi/            # Gladi ruang AI untuk tim siaga sekolah
-│   ├── api/              # Route handlers (/api/gladi, /api/warden)
-│   ├── dashboard/        # Dasbor analitik multi-peran & peta 3D Indonesia
-│   ├── sekolah/          # Halaman simulasi sekolah 3D interaktif
-│   └── masuk/            # Alur autentikasi & kelengkapan profil pengguna
-├── components/           # Komponen React UI
-│   ├── campus/           # Engine 3D (World, Player, Hud, Controls, DebriefingTrail)
-│   ├── dashboard/        # Komponen tampilan peran (Siswa, Guru, KS, Pemda) & Peta
-│   └── landing/          # Komponen tampilan beranda (Hero, Scene preview)
-├── lib/                  # Logika inti murni (pathfinding, sim, floorplan, assessments)
-├── public/               # Aset statis (tekstur, audio, karakter sprite)
-├── scripts/              # Skrip runner utilitas & pengujian lintas platform
-└── supabase/             # Skema basis data PostgreSQL & data benih (seed)
+app/
+  api/gladi, api/warden   rute AI di server
+  sekolah/                latihan evakuasi 3D
+  gladi/                  gladi ruang
+  dashboard/              dasbor per peran
+  masuk/                  masuk, daftar, dan profil
+components/
+  campus/                 mesin dan HUD latihan 3D
+  dashboard/              tampilan tiap peran dan peta 3D Indonesia
+  landing/                bagian-bagian beranda
+lib/                      logika murni: denah, navigasi, simulasi, risiko, gladi, Petugas AI
+public/                   model 3D, karakter, suara, data peta
+scripts/                  runner pengujian
+supabase/                 skema basis data dan data contoh
+docs/screenshots/         gambar untuk README ini
 ```
 
----
+## Penggunaan template, pustaka, aset, dan AI
 
-## 📄 Lisensi
-Hak Cipta © 2026 Tim Pengembang Arunika. Dikembangkan untuk kompetisi inovasi digital dan ketahanan bencana Indonesia.
+Daftar ini memenuhi ketentuan IT RUSH 2026 bagian V poin 5.
+
+**Template**
+
+- Proyek dimulai dari Create Next App (`create-next-app`). Kerangka bawaannya sudah diganti seluruhnya.
+
+**Pustaka**
+
+- Next.js, React, React DOM (MIT)
+- Three.js, `@react-three/fiber`, `@react-three/drei` (MIT)
+- `@supabase/supabase-js` (MIT)
+- `groq-sdk` (Apache-2.0)
+- `lucide-react` (ISC)
+- `server-only` (MIT)
+- Tailwind CSS, TypeScript, ESLint dan `eslint-config-next` (alat pengembangan)
+
+**Aset terbuka**
+
+- Karakter: "Ultimate Modular Men Pack" dan "Ultimate Modular Women Pack" oleh Quaternius, lewat poly.pizza, dipadukan dan diwarnai ulang menjadi seragam SMP. Gerakan merunduk, duduk, berlindung, berjalan merunduk, dan melompat dipindahkan dari "Universal Animation Library" oleh Quaternius. CC0.
+- Tumbuhan: "Ultimate Stylized Nature Pack" oleh Quaternius, lewat poly.pizza. CC0.
+- Model 3D: Car Kit, Furniture Kit, Nature Kit, City Kit Suburban, dan Survival Kit oleh Kenney. CC0.
+- Suara: "Impact Sounds", "RPG Audio", dan "Interface Sounds" oleh Kenney. CC0. Sirene, gemuruh, hujan, angin, ombak, dan air banjir disintesis di peramban (`components/campus/sound.ts`).
+- Fon: Plus Jakarta Sans dan JetBrains Mono dari Google Fonts (SIL Open Font License).
+- Model 3D dan karakter dikompresi dengan glTF Transform (MIT), memakai meshopt dan tekstur WebP.
+- Rincian lisensi tiap aset ada di `LICENSE.txt` pada folder `public/characters`, `public/sounds`, dan `public/models/*`.
+
+**Data dan pedoman**
+
+- Gempa terkini dari umpan publik BMKG (`https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json`).
+- Urutan tindakan evakuasi mengikuti panduan Satuan Pendidikan Aman Bencana (SPAB) BNPB.
+- Garis pantai Indonesia untuk peta 3D dasbor: `public/data/indonesia.json`.
+
+**Model AI di dalam fitur**
+
+- `openai/gpt-oss-120b` dan `qwen/qwen3.8-27b`, keduanya model *open-weight* yang dijalankan lewat API Groq.
+
+**Asisten AI untuk menulis kode**
+
+- Claude Code (Anthropic) dipakai selama pengembangan untuk menulis dan meninjau kode, merancang tampilan, membuat skrip konversi aset, dan menulis dokumentasi. Ide, arah fitur, pengujian di peramban, dan keputusan akhir ada pada tim.
+
+## Lisensi
+
+Hak cipta 2026 Tim Arunika. Aset pihak ketiga mengikuti lisensinya masing-masing seperti tercantum di atas.
