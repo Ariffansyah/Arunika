@@ -8,7 +8,7 @@ import { NPC_COUNTS, setNpc, setState, useDrill } from "./drillStore";
 export const panel = "rounded-lg border border-malam-3 bg-malam/92 p-4 shadow-lg";
 export const btn =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 font-semibold active:translate-y-px disabled:opacity-60";
-export const primary = `${btn} bg-fajar text-malam hover:bg-fajar-tua`;
+export const primary = `${btn} bg-laut text-white hover:bg-laut-terang`;
 export const ghost = `${btn} border border-malam-3 text-pasir hover:border-redup`;
 // Icon buttons in the HUD toolbar; the name shows as a tooltip on hover or keyboard focus.
 export function ToolButton({
@@ -31,7 +31,7 @@ export function ToolButton({
       aria-pressed={pressed}
       aria-haspopup={dialog ? "dialog" : undefined}
       onClick={onClick}
-      className="group relative flex size-10 items-center justify-center rounded-md text-pasir hover:bg-malam-3 aria-pressed:bg-fajar aria-pressed:text-malam [&_svg]:size-5"
+      className="group relative flex size-10 items-center justify-center rounded-md text-pasir hover:bg-malam-3 aria-pressed:bg-laut aria-pressed:text-white [&_svg]:size-5"
     >
       {children}
       <span className="pointer-events-none absolute top-full right-0 z-10 mt-2 whitespace-nowrap rounded-md bg-pasir px-2 py-1 text-xs font-semibold text-malam opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
@@ -42,7 +42,7 @@ export function ToolButton({
 }
 
 export const radio =
-  "flex min-h-11 items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold has-checked:border-fajar has-checked:text-fajar has-focus-visible:outline-2 has-focus-visible:outline-fajar";
+  "flex min-h-11 items-center justify-center rounded-md text-center border border-malam-3 px-3 text-sm font-semibold has-checked:border-langit has-checked:text-langit has-focus-visible:outline-2 has-focus-visible:outline-langit";
 
 // The disasters this map can have; picking one here picks it for both learning and the drill.
 export function KindPicker({ legend }: { legend: string }) {

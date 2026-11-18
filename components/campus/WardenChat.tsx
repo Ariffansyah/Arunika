@@ -209,7 +209,7 @@ export default function WardenChat() {
           type="submit"
           disabled={busy || !text.trim()}
           aria-label="Kirim"
-          className="flex size-11 items-center justify-center rounded-md bg-fajar text-malam hover:bg-fajar-tua disabled:opacity-60"
+          className="flex size-11 items-center justify-center rounded-md bg-laut text-white hover:bg-laut-terang disabled:opacity-60"
         >
           <Send aria-hidden="true" />
         </button>

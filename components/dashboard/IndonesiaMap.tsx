@@ -88,8 +88,8 @@ export default function IndonesiaMap({
 }) {
   return (
     <Canvas shadows="percentage" dpr={[1, 2]} camera={{ position: [0, 26, 22], fov: 40 }} aria-label="Peta sekolah di Indonesia">
-      <color attach="background" args={["#0d1828"]} />
-      <hemisphereLight args={["#ffe2c2", "#0d1828", 1.1]} />
+      <color attach="background" args={["#071530"]} />
+      <hemisphereLight args={["#ffe2c2", "#071530", 1.1]} />
       <directionalLight position={[20, 30, -10]} color="#ffc48a" intensity={1.8} castShadow />
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]} receiveShadow>
         <planeGeometry args={[80, 40]} />

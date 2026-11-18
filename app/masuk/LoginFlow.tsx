@@ -7,9 +7,9 @@ import { AVATARS, ROLE_LABEL, supabase, type Role, type School } from "@/lib/sup
 
 const label = "block text-sm font-medium";
 const field =
-  "mt-1.5 block min-h-12 w-full rounded-md border border-malam-3 bg-malam-2 px-3 text-pasir placeholder:text-redup hover:border-redup focus-visible:border-fajar";
+  "mt-1.5 block min-h-12 w-full rounded-md border border-malam-3 bg-malam-2 px-3 text-pasir placeholder:text-redup hover:border-redup focus-visible:border-langit";
 const primary =
-  "inline-flex min-h-12 w-full items-center justify-center rounded-md bg-fajar px-5 font-semibold text-malam hover:bg-fajar-tua active:translate-y-px disabled:opacity-60";
+  "inline-flex min-h-12 w-full items-center justify-center rounded-md bg-laut px-5 font-semibold text-white hover:bg-laut-terang active:translate-y-px disabled:opacity-60";
 const secondary =
   "inline-flex min-h-12 w-full items-center justify-center rounded-md border border-malam-3 px-5 font-semibold hover:border-redup active:translate-y-px disabled:opacity-60";
 
@@ -91,7 +91,7 @@ export default function LoginFlow() {
           {(["masuk", "daftar"] as const).map((m) => (
             <label
               key={m}
-              className="relative pb-2 text-4xl font-extrabold tracking-tight text-redup hover:text-pasir has-checked:text-pasir has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-fajar"
+              className="relative pb-2 text-4xl font-extrabold tracking-tight text-redup hover:text-pasir has-checked:text-pasir has-focus-visible:outline-2 has-focus-visible:outline-offset-4 has-focus-visible:outline-langit"
             >
               <input
                 type="radio"
@@ -105,7 +105,7 @@ export default function LoginFlow() {
                 }}
               />
               {m === "masuk" ? "Masuk" : "Daftar"}
-              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 rounded-full bg-fajar opacity-0 peer-checked:opacity-100" />
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 rounded-full bg-langit opacity-0 peer-checked:opacity-100" />
             </label>
           ))}
         </div>
@@ -259,12 +259,12 @@ function ProfileForm({ onDone }: { onDone: () => void }) {
                 alt={`Karakter ${i + 1}`}
                 width={64}
                 height={64}
-                className="aspect-square w-full rounded-md border-2 border-malam-3 bg-malam-2 hover:border-redup peer-checked:border-fajar peer-checked:bg-malam-3 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fajar"
+                className="aspect-square w-full rounded-md border-2 border-malam-3 bg-malam-2 hover:border-redup peer-checked:border-laut peer-checked:bg-malam-3 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-langit"
               />
               <Check
                 aria-hidden="true"
                 strokeWidth={3}
-                className="pointer-events-none absolute top-1 right-1 size-4 rounded-full bg-fajar p-0.5 text-malam opacity-0 peer-checked:opacity-100"
+                className="pointer-events-none absolute top-1 right-1 size-4 rounded-full bg-laut p-0.5 text-white opacity-0 peer-checked:opacity-100"
               />
             </label>
           ))}

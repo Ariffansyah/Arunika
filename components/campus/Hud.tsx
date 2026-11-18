@@ -69,7 +69,7 @@ function MapOverlay() {
         <h2 className="text-lg font-bold">Peta evakuasi</h2>
         <div className="overflow-hidden rounded-md border border-malam-3">
           <CampusPlan label="Peta evakuasi kampus dengan titik kumpul dan posisi kamu">
-            <circle ref={dot} r={0.9} fill="#ff8a3d" stroke="#0d1828" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
+            <circle ref={dot} r={0.9} fill="#ff8a3d" stroke="#071530" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
           </CampusPlan>
         </div>
         <p className="text-redup">Hijau titik kumpul, jingga posisi kamu.</p>
@@ -87,7 +87,7 @@ function Minimap() {
   return (
     <div className="hidden w-44 overflow-hidden rounded-lg border border-malam-3 shadow-lg sm:block lg:w-52">
       <CampusPlan path={route?.map(([x, , z]) => [x / TILE, z / TILE])} label="Peta mini kampus dengan posisi kamu">
-        <circle ref={dot} r={0.8} fill="#f4ecdc" stroke="#0d1828" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
+        <circle ref={dot} r={0.8} fill="#eaf1ff" stroke="#071530" strokeWidth={0.3} cx={W / 2} cy={H / 2} />
       </CampusPlan>
     </div>
   );
@@ -136,7 +136,7 @@ function ScenarioPicker({ room, onStart }: { room: string; onStart: (s: Scenario
           step={meta.step}
           value={scenario.intensity}
           onChange={(e) => setState({ scenario: { ...scenario, intensity: Number(e.target.value) } })}
-          className="mt-2 block w-full accent-fajar"
+          className="mt-2 block w-full accent-langit"
         />
       </label>
       <button type="submit" className={`${primary} w-full`}>

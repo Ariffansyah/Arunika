@@ -90,7 +90,7 @@ export default function DebriefingTrail({ result }: { result: DrillResult }) {
           {start && (
             <g transform={`translate(${start[0]}, ${start[1]})`}>
               <circle r={1.2} fill="#22c55e" fillOpacity={0.25} />
-              <circle r={0.65} fill="#22c55e" stroke="#0d1828" strokeWidth={0.2} />
+              <circle r={0.65} fill="#22c55e" stroke="#071530" strokeWidth={0.2} />
               <text textAnchor="middle" dy="0.28" fontSize="0.7" fill="#ffffff" fontWeight="bold">
                 S
               </text>
@@ -108,7 +108,7 @@ export default function DebriefingTrail({ result }: { result: DrillResult }) {
               <circle
                 r={0.65}
                 fill={result.caught ? "#ef4444" : "#f59e0b"}
-                stroke="#0d1828"
+                stroke="#071530"
                 strokeWidth={0.2}
               />
               <text textAnchor="middle" dy="0.28" fontSize="0.7" fill="#ffffff" fontWeight="bold">

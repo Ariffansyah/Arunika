@@ -1,13 +1,17 @@
 @import "tailwindcss";
 
-/* Dark by identity, not trend: Arunika is the glow before sunrise, so the base is pre-dawn navy
-   and the single accent is the sunrise orange used for evacuation routes and primary actions. */
+/* The logo's colours: its navy ground, pale and blue faces, cyan edge and orange sun. Blue carries actions,
+   cyan marks live data and focus, and orange stays as rare as the sun in the mark: evacuation routes and urgency. */
 @theme {
-  --color-malam: #0d1828;
-  --color-malam-2: #15243a;
-  --color-malam-3: #223553;
-  --color-pasir: #f4ecdc;
-  --color-redup: #aab6c8;
+  --color-malam: #071530;
+  --color-malam-2: #0b1e3f;
+  --color-malam-3: #1b3461;
+  --color-pasir: #eaf1ff;
+  --color-redup: #a6b9de;
+  --color-kabut: #afc4ec;
+  --color-laut: #1e63f0;
+  --color-laut-terang: #3d7bf5;
+  --color-langit: #22ccee;
   --color-fajar: #ff8a3d;
   --color-fajar-tua: #e5701f;
   --color-aman: #34c47c;
@@ -26,12 +30,12 @@
 html {
   color-scheme: dark;
   scrollbar-color: var(--color-malam-3) var(--color-malam);
-  caret-color: var(--color-fajar);
+  caret-color: var(--color-langit);
 }
 
 ::selection {
-  background: var(--color-fajar);
-  color: var(--color-malam);
+  background: var(--color-laut);
+  color: #fff;
 }
 
 body {
@@ -57,7 +61,7 @@ body {
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-fajar);
+    outline: 2px solid var(--color-langit);
     outline-offset: 2px;
   }
 

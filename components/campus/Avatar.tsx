@@ -27,7 +27,7 @@ export default function Avatar({
       {label && (
         <Html position={[0, height + 0.3, 0]} center zIndexRange={[20, 0]} style={{ pointerEvents: "none" }}>
           <span
-            className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold ${self ? "bg-fajar text-malam" : "bg-malam/85 text-pasir"}`}
+            className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold ${self ? "bg-laut text-white" : "bg-malam/85 text-pasir"}`}
           >
             {name}
           </span>

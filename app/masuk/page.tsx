@@ -6,7 +6,11 @@ import LoginFlow from "./LoginFlow";
 
 export const metadata: Metadata = { title: "Masuk" };
 
-const logo = "text-lg font-extrabold tracking-tight text-pasir";
+const logo = "flex min-h-11 items-center gap-2.5 text-lg font-extrabold tracking-wider text-pasir uppercase";
+const mark = (
+  // eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, nothing to optimise
+  <img src="/arunika-mark.svg" alt="" width={24} height={27} className="h-7 w-auto" />
+);
 
 export default function MasukPage() {
   return (
@@ -15,15 +19,17 @@ export default function MasukPage() {
         <StillScene />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgb(13_24_40/0.7),transparent)]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(180deg,rgb(7_21_48/0.7),transparent)]"
         />
-        <Link href="/" className={`absolute top-6 left-8 ${logo}`}>
-          Arunika<span className="text-fajar">.</span>
+        <Link href="/" className={`absolute top-4 left-8 ${logo}`}>
+          {mark}
+          Arunika
         </Link>
       </div>
       <div className="flex flex-col px-4 py-6 sm:px-10">
         <Link href="/" className={`${logo} self-start lg:hidden`}>
-          Arunika<span className="text-fajar">.</span>
+          {mark}
+          Arunika
         </Link>
         <div className="m-auto w-full max-w-sm py-10">
           <Suspense>

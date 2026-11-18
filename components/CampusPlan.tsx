@@ -1,7 +1,7 @@
 import { ASSEMBLY, GRID, H, W, buildingRects, surfaceAt, type Tile } from "@/lib/campus";
 
-const FILL: Record<string, string> = { h: "#1f4a3a", g: "#24533f", "=": "#3a4f6e" };
-const SURFACE_FILL = { paving: "#2a3d5c", court: "#264d7a", trail: "#3d3a3a" };
+const FILL: Record<string, string> = { h: "#163f4f", g: "#17485a", "=": "#2a4677" };
+const SURFACE_FILL = { paving: "#123060", court: "#1a4486", trail: "#33394d" };
 
 export default function CampusPlan({
   route,
@@ -22,7 +22,7 @@ export default function CampusPlan({
   const rects = buildingRects();
   return (
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} className="block h-auto w-full">
-      <rect width={W} height={H} fill="#1b2c45" />
+      <rect width={W} height={H} fill="#0b1e3f" />
       {GRID.flatMap((row, z) =>
         [...row].map((c, x) =>
           {
@@ -33,12 +33,12 @@ export default function CampusPlan({
         ),
       )}
       {Object.entries(rects).map(([id, r]) => (
-        <rect key={id} x={r.x0} y={r.z0} width={r.x1 - r.x0 + 1} height={r.z1 - r.z0 + 1} fill="#c96a3c" rx={0.2} />
+        <rect key={id} x={r.x0} y={r.z0} width={r.x1 - r.x0 + 1} height={r.z1 - r.z0 + 1} fill="#afc4ec" rx={0.2} />
       ))}
       {GRID.flatMap((row, z) =>
         [...row].map((c, x) =>
           c === "T" ? (
-            <circle key={`t${x}-${z}`} cx={x + 0.5} cy={z + 0.5} r={0.45} fill="#2f7d55" />
+            <circle key={`t${x}-${z}`} cx={x + 0.5} cy={z + 0.5} r={0.45} fill="#2b8a74" />
           ) : c === "-" || c === "|" ? (
             <rect key={`r${x}-${z}`} x={c === "-" ? x : x + 0.45} y={c === "-" ? z + 0.45 : z} width={c === "-" ? 1 : 0.1} height={c === "-" ? 0.1 : 1} fill="#8fb8a0" />
           ) : null,
