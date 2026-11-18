@@ -17,8 +17,13 @@
   --color-aman: #34c47c;
   --color-bahaya: #ff6b6b;
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
-  --animate-rise: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  --animate-grow: grow 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --ease-crisp: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A machined top edge instead of a drop shadow: surfaces read as layered sheets, not floating cards. */
+  --shadow-edge: inset 0 1px 0 rgb(234 241 255 / 0.06);
+  --animate-rise: rise 0.7s var(--ease-crisp) both;
+  --animate-grow: grow 0.9s var(--ease-crisp) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
 
   @keyframes rise {
     from {
@@ -32,6 +37,108 @@
       transform: scaleX(0);
     }
   }
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+}
+
+/* Paper grain at a few percent, painted between a band's own background and its content. */
+@utility grain {
+  position: relative;
+  isolation: isolate;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.035;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* A hairline of light on the border that follows the pointer; PointerLight writes --x and --y. */
+@utility track {
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    background: radial-gradient(18rem circle at var(--x, 50%) var(--y, 0%), rgb(61 123 245 / 0.85), transparent 70%);
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-crisp);
+  }
+
+  @media (hover: hover) {
+    &:hover::after {
+      opacity: 1;
+    }
+  }
+}
+
+/* A hairline track filled up to --fill, with a squared thumb. Each engine needs its own pseudo-element rule. */
+@utility range {
+  appearance: none;
+  height: 1.75rem;
+  background: transparent;
+
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--color-langit) var(--fill, 0%), var(--color-malam-3) var(--fill, 0%));
+  }
+  &::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--color-langit) var(--fill, 0%), var(--color-malam-3) var(--fill, 0%));
+  }
+  &::-webkit-slider-thumb {
+    appearance: none;
+    margin-top: -8px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-malam);
+    border-radius: 4px;
+    background: var(--color-pasir);
+    box-shadow: 0 0 0 1px var(--color-langit);
+    transition: scale 0.25s var(--ease-crisp);
+  }
+  &::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--color-malam);
+    border-radius: 4px;
+    background: var(--color-pasir);
+    box-shadow: 0 0 0 1px var(--color-langit);
+    transition: scale 0.25s var(--ease-crisp);
+  }
+  &:active::-webkit-slider-thumb {
+    scale: 1.2;
+  }
+  &:active::-moz-range-thumb {
+    scale: 1.2;
+  }
+}
+
+/* Fixed to the viewport, so one sweep crosses every placeholder block together. */
+@utility skeleton {
+  border-radius: 0.25rem;
+  background: linear-gradient(90deg, var(--color-malam-2) 30%, rgb(27 52 97 / 0.9) 50%, var(--color-malam-2) 70%) 0 0 / 200% 100% fixed;
+  animation: var(--animate-shimmer);
 }
 
 html {
@@ -89,6 +196,8 @@ body {
 
   kbd {
     font: inherit;
+    font-family: var(--font-mono);
+    font-size: 0.875em;
     font-weight: 600;
     padding: 0 0.35em;
     border: 1px solid var(--color-malam-3);
@@ -109,6 +218,13 @@ body {
       animation: reveal linear both;
       animation-timeline: view();
       animation-range: entry var(--delay, 0%) entry calc(75% + var(--delay, 0%));
+    }
+
+    .fill-in {
+      transform-origin: left;
+      animation: fill-in linear both;
+      animation-timeline: view();
+      animation-range: entry var(--delay, 0%) entry calc(60% + var(--delay, 0%));
     }
 
     .draw {
@@ -137,6 +253,12 @@ body {
   from {
     opacity: 0;
     transform: translateY(56px) scale(0.97);
+  }
+}
+
+@keyframes fill-in {
+  from {
+    transform: scaleX(0);
   }
 }
 
