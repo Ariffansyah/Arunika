@@ -93,29 +93,20 @@ export default function LiveBoard({ land, quakes, warnings }: { land: string; qu
     setRun((r) => r + 1);
     setSettled(false);
   };
-  // The replay waits until the map is on screen at full size: before that the section may sit shrunk inside the
-  // hero's Droste tablet, where an observer would already count it as visible.
   useEffect(() => {
     const el = figRef.current;
     if (!el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let frame = 0;
-    const check = () => {
-      const r = el.getBoundingClientRect();
-      if (r.width < el.offsetWidth * 0.95 || r.top > innerHeight * 0.65 || r.bottom < 0) return;
-      removeEventListener("scroll", onScroll);
-      setRun(1);
-      setSettled(false);
-    };
-    // Checked a frame later: the Droste zoom sets the section's size in the frame after the scroll event.
-    const onScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => (frame = requestAnimationFrame(check)));
-    };
-    addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(frame);
-    };
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) return;
+        io.disconnect();
+        setRun(1);
+        setSettled(false);
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
   useEffect(() => {
     if (settled) return;
@@ -199,7 +190,7 @@ export default function LiveBoard({ land, quakes, warnings }: { land: string; qu
           <path d={land} fill="#1b3461" />
 
           {show.cuaca && (
-            <g key={`cuaca-${run}`} className={run ? "motion-safe:animate-[rise_1s_var(--ease-crisp)_6s_both]" : ""}>
+            <g key={run} className={run ? "motion-safe:animate-[rise_1s_var(--ease-crisp)_6s_both]" : ""}>
               {active.map(({ i }, k) => {
                 const lit = selW === i || hoverW === i;
                 return (
@@ -220,7 +211,7 @@ export default function LiveBoard({ land, quakes, warnings }: { land: string; qu
 
           {show.gempa && (
             // Oldest first, so the newest quakes draw on top.
-            <g key={`gempa-${run}`}>
+            <g key={run}>
               {quakes
                 .map((e, i) => ({ e, i }))
                 .reverse()

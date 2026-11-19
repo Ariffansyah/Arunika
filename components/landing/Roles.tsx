@@ -7,7 +7,6 @@ import { Meter, StatusLabel, statusOf } from "@/components/dashboard/ui";
 import { HAZARD_ICON } from "@/components/hazards";
 import { HAZARD_LABEL, type Hazard } from "@/lib/gladi";
 import { ROLE_LABEL, type Role } from "@/lib/supabase";
-import { Portal } from "./Droste";
 
 const ICONS = { siswa: GraduationCap, guru: Users, kepala_sekolah: Building2, pemda: Landmark };
 const ROLES = Object.keys(ICONS) as Role[];
@@ -139,7 +138,7 @@ function View({ role }: { role: Role }) {
 export default function Roles() {
   const [role, setRole] = useState<Role>("siswa");
   return (
-    <section aria-labelledby="pantau" className="relative mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+    <section aria-labelledby="pantau" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
       <h2 id="pantau" className="max-w-[16ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
         Satu data, dari siswa sampai pemda.
       </h2>
@@ -172,7 +171,6 @@ export default function Roles() {
           </Link>
         </div>
       </div>
-      <Portal />
     </section>
   );
 }

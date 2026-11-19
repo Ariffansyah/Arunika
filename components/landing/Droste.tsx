@@ -1,113 +1,78 @@
 "use client";
 
-import { useEffect } from "react";
+import { createContext, useEffect, useRef, useState } from "react";
 
-// The landing page as a Droste chain: a section ends on a tablet whose screen holds the next section, live and shrunk
-// to fit. Scrolling on zooms into the tablet until its screen fills the view, and the next section is simply there.
-//
-// The tablet's screen sits at (--fx, --fy) as fractions of the section's last screenful and is --fs of it both ways,
-// so the next section's first screenful fits it exactly. Zooming by 1 / --fs about f = (fx, fy) / (1 − fs) carries
-// the screen onto the whole view: f is the one point that placing the screen leaves where it was.
+// False while still copies cover the hero, so its 3D scene can stop drawing.
+export const HeroLive = createContext(true);
 
-const SCREEN = {
-  left: "calc(var(--fx) * 100%)",
-  top: "calc(var(--fy) * 100%)",
-  width: "calc(var(--fs) * 100%)",
-  height: "calc(var(--fs) * 100%)",
-};
+// Times the page zooms into itself before it moves on, and copies nested inside each other: enough that the
+// innermost stays under a pixel at any zoom.
+const LOOPS = 3;
+const DEPTH = 6;
 
-// Put at the end of a section whose next sibling is a section. Unless `tail` is off, it also adds room below the
-// content, so the tablet sits in empty space rather than over it.
-export function Portal({ tail = true, className = "[--fs:0.4] [--fx:0.3] [--fy:0.45]" }: { tail?: boolean; className?: string }) {
+// The frame sits at (--fx, --fy) as fractions of the stage and is --fs of its size both ways, so it has the stage's
+// proportions and a copy of the stage fills it exactly.
+const FRAME = { transform: "translate(calc(var(--fx) * 100%), calc(var(--fy) * 100%)) scale(var(--fs))" };
+// Zooming about this point by 1 / --fs carries the frame onto the whole stage: it is the one point the frame's
+// placement leaves where it was.
+const ORIGIN = { transformOrigin: "calc(var(--fx) / (1 - var(--fs)) * 100%) calc(var(--fy) / (1 - var(--fs)) * 100%)" };
+
+// A tablet held up in the hero. Its body lies wholly outside the screen, so once the screen fills the view the body
+// has left it and nothing pops when the zoom starts over.
+function Frame({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      data-portal
-      aria-hidden="true"
-      className={`pointer-events-none motion-reduce:hidden ${className}`}
-      style={tail ? { height: "calc((1 - var(--fy)) * 100svh - 4rem)" } : undefined}
-    >
-      {/* The section's last screenful, as wide as the view even when the section is narrower. */}
-      <div className="absolute bottom-0 left-1/2 h-[100svh] w-screen -translate-x-1/2">
-        <div className="absolute" style={SCREEN}>
-          {/* The tablet's body lies wholly outside the screen, so it has left the view by the time the screen fills
-              it. The screen is the page's own ground, with the next section drawn over it. */}
-          <div className="absolute -inset-3 rounded-[1.25rem] border border-pasir/25 bg-[#0b1e3f] shadow-[0_30px_80px_rgb(0_0_0/0.55)] sm:-inset-4" />
-          <div className="absolute inset-0 bg-malam" />
-        </div>
-      </div>
+    <div className="absolute inset-0 origin-top-left" style={FRAME}>
+      <div className="absolute -inset-10 rounded-[4.5rem] bg-[#0b1e3f] shadow-[0_0_0_6px_rgb(234_241_255/0.25),0_60px_160px_rgb(0_0_0/0.7)]" />
+      <div className="absolute inset-0 overflow-hidden">{children}</div>
     </div>
   );
 }
 
-type Pair = { a: HTMLElement; b: HTMLElement; fx: number; fy: number; fs: number };
+// A still of the hero, with the tablet showing the next copy.
+function Copy({ depth }: { depth: number }) {
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      <picture>
+        <source media="(orientation: portrait)" srcSet="/droste/beranda-tegak.webp" />
+        <img src="/droste/beranda-lebar.webp" alt="" decoding="async" className="size-full object-cover" />
+      </picture>
+      {depth > 0 && (
+        <Frame>
+          <Copy depth={depth - 1} />
+        </Frame>
+      )}
+    </div>
+  );
+}
 
-// Drives every portal on the page. Layout never moves: sections only get transforms and a clip, so anchors, scroll
-// position and the scroll-driven reveals inside them keep working.
-export default function DrosteChain() {
+// The Droste effect: the hero holds a tablet showing the hero. Scrolling pins the hero and zooms into the tablet until
+// its screen fills the view, which is the hero again, three times over before the page moves on. The live hero only
+// plays the first zoom; after that identical stills take over, so each loop restarts from the same picture.
+export default function Droste({ children }: { children: React.ReactNode }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const live = useRef<HTMLDivElement>(null);
+  const loop = useRef<HTMLDivElement>(null);
+  const [onLive, setOnLive] = useState(true);
+
   useEffect(() => {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let pairs: Pair[] = [];
+    const w = wrap.current;
+    const l = live.current;
+    const o = loop.current;
+    if (!w || !l || !o || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let zoom = 1;
     let raf = 0;
     const measure = () => {
-      pairs = [...document.querySelectorAll<HTMLElement>("[data-portal]")].flatMap((portal) => {
-        const a = portal.parentElement;
-        const b = a?.nextElementSibling;
-        if (!a || !(b instanceof HTMLElement)) return [];
-        const cs = getComputedStyle(portal);
-        const v = (n: string) => parseFloat(cs.getPropertyValue(n));
-        return [{ a, b, fx: v("--fx"), fy: v("--fy"), fs: v("--fs") }];
-      });
-    };
-    // Every moved section is drawn as origin + t + k · (its own coordinates): a translation and a uniform scale.
-    const set = (el: HTMLElement, tx: number, ty: number, k: number) => {
-      el.style.transformOrigin = "0 0";
-      el.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+      zoom = 1 / parseFloat(getComputedStyle(w).getPropertyValue("--fs"));
     };
     const draw = () => {
       raf = 0;
-      const vw = innerWidth;
-      const vh = innerHeight;
-      const moved = new Map<HTMLElement, { tx: number; ty: number; k: number }>();
-      for (const { a, b, fx, fy, fs } of pairs) {
-        const [ax, ay] = [a.offsetLeft, a.offsetTop - scrollY];
-        const [bx, by] = [b.offsetLeft, b.offsetTop - scrollY];
-        const rx = fx * vw;
-        const ry = fy * vh;
-        const [cx, cy] = [rx / (1 - fs), ry / (1 - fs)];
-        // How far b has come in: 0 while its top is still at the foot of the view, 1 once it reaches the top.
-        const p = Math.min(1, 1 - by / vh);
-        const zoom = (1 / fs) ** Math.max(0, p);
-        const held = moved.get(a);
-        if (p >= 1) {
-          b.style.transform = b.style.clipPath = "";
-        } else {
-          // Shrunk onto a's tablet, which rides along with a until the zoom starts and grows with it after. A section
-          // narrower than the view keeps its place in the screenful.
-          let k = zoom * fs;
-          let tx = cx + zoom * (rx - cx) + k * bx - bx;
-          let ty = p <= 0 ? ry - vh : cy + zoom * (ry - cy) - vh * (1 - p);
-          // a may itself still sit shrunk on its own predecessor's tablet: then b goes wherever that puts a's tablet.
-          if (held) {
-            tx = ax + held.tx + held.k * (bx + tx - ax) - bx;
-            ty = ay + held.ty + held.k * (by + ty - ay) - by;
-            k *= held.k;
-          }
-          set(b, tx, ty, k);
-          moved.set(b, { tx, ty, k });
-          // Only its first screenful belongs on the tablet.
-          b.style.clipPath = `inset(0 0 ${Math.max(0, b.offsetHeight - vh)}px 0)`;
-        }
-        if (held) continue;
-        if (p > 0 && p < 1) {
-          // a is held on its last screenful against the scroll, where it stood at p = 0, and zoomed about f.
-          const tx = cx + zoom * (ax - cx) - ax;
-          const ty = cy + zoom * (ay + p * vh - cy) - ay;
-          set(a, tx, ty, zoom);
-          moved.set(a, { tx, ty, k: zoom });
-        } else {
-          a.style.transform = "";
-        }
-      }
+      const r = w.getBoundingClientRect();
+      const s = Math.min(Math.max(-r.top / (r.height - innerHeight), 0), 1) * LOOPS;
+      const first = s < 1;
+      (first ? l : o).style.transform = `scale(${zoom ** (s - Math.floor(s))})`;
+      l.style.visibility = first ? "visible" : "hidden";
+      o.style.visibility = first ? "hidden" : "visible";
+      setOnLive(first);
     };
     const onScroll = () => {
       raf ||= requestAnimationFrame(draw);
@@ -120,16 +85,30 @@ export default function DrosteChain() {
     draw();
     addEventListener("scroll", onScroll, { passive: true });
     addEventListener("resize", onResize);
-    // Content that changes height (a lesson tab, the warnings list) moves every later section.
-    const ro = new ResizeObserver(onScroll);
-    ro.observe(document.body);
     return () => {
       removeEventListener("scroll", onScroll);
       removeEventListener("resize", onResize);
-      ro.disconnect();
       cancelAnimationFrame(raf);
-      for (const { a, b } of pairs) a.style.transform = b.style.transform = b.style.clipPath = "";
     };
   }, []);
-  return null;
+
+  return (
+    <HeroLive.Provider value={onLive}>
+      <div ref={wrap} className="droste relative [--fs:0.28] [--fx:0.64] [--fy:0.2] portrait:[--fx:0.55] portrait:[--fy:0.14]">
+        <div className="sticky top-0 h-[100svh] min-h-[640px] overflow-hidden">
+          <div ref={live} className="absolute inset-0" style={ORIGIN}>
+            {children}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 motion-reduce:hidden">
+              <Frame>
+                <Copy depth={DEPTH - 1} />
+              </Frame>
+            </div>
+          </div>
+          <div ref={loop} aria-hidden="true" className="invisible absolute inset-0" style={ORIGIN}>
+            <Copy depth={DEPTH} />
+          </div>
+        </div>
+      </div>
+    </HeroLive.Provider>
+  );
 }

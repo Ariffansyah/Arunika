@@ -6,7 +6,6 @@ import { predict } from "@/components/campus/drillStore";
 import { ASSEMBLY_NAMES, GRID, SPAWN, tileAt } from "@/lib/campus";
 import { num } from "@/lib/format";
 import { INTENSITY, SCENARIO_LABEL, bestRoute, pathLength, type Scenario } from "@/lib/sim";
-import { Portal } from "./Droste";
 
 const HAZARD_COLOR = { banjir: "#22ccee", gempa: "#ff6b6b" };
 const never = () => () => {};
@@ -119,7 +118,6 @@ export default function PlanDemo() {
           </figcaption>
         </figure>
       </div>
-      <Portal />
     </section>
   );
 }

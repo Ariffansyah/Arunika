@@ -3,7 +3,6 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { latestQuake } from "@/lib/bmkg";
 import { quakeLine } from "@/lib/gladi";
-import { Portal } from "./Droste";
 
 // How a gladi reads, step by step: the AI writes and judges the situations, the campus engine judges the map moves.
 // The quake above it is live from BMKG.
@@ -78,7 +77,6 @@ export default async function GladiTeaser() {
           </p>
         </figure>
       </div>
-      <Portal />
     </section>
   );
 }
