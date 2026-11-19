@@ -1,5 +1,6 @@
 "use client";
 
+import CountUp from "@/components/CountUp";
 import type { Me } from "@/components/RequireAuth";
 import type { School } from "@/lib/supabase";
 import { STATUS, primaryBtn } from "./ui";
@@ -62,7 +63,7 @@ export default function RoleViewPemda({
     <div className="space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <h2 className="max-w-[28ch] text-3xl font-extrabold tracking-tight sm:text-4xl">
-          {rawan} dari {schools.length} sekolah rawan. Rata-rata kesiapan {avg}.
+          {rawan} dari {schools.length} sekolah rawan. Rata-rata kesiapan <CountUp value={avg} />.
         </h2>
         <button type="button" onClick={exportRegionalCsv} className={primaryBtn}>
           Ekspor CSV

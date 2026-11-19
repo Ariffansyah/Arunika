@@ -42,14 +42,17 @@ function View({ role }: { role: Role }) {
       <>
         <p className={big}>Rani lulus {REPORT.filter(([, s]) => s >= PASS).length} dari 4 skenario.</p>
         <ul>
-          {REPORT.map(([k, score]) => {
+          {REPORT.map(([k, score], i) => {
             const Icon = HAZARD_ICON[k];
             return (
               <li key={k} className={row}>
                 <Icon aria-hidden="true" className="size-5 shrink-0 text-langit" />
                 <span className="min-w-0 flex-1 font-semibold sm:w-48 sm:flex-none">{HAZARD_LABEL[k]}</span>
                 <span aria-hidden="true" className="relative h-2 w-16 shrink-0 rounded-full bg-malam-3 sm:w-auto sm:flex-1">
-                  <span className="absolute inset-y-0 left-0 rounded-full bg-langit" style={{ width: `${(score / 1200) * 100}%` }} />
+                  <span
+                    className="absolute inset-y-0 left-0 origin-left animate-grow rounded-full bg-langit"
+                    style={{ width: `${(score / 1200) * 100}%`, animationDelay: `${i * 90}ms` }}
+                  />
                   <span className="absolute -inset-y-1 w-0.5 bg-pasir/60" style={{ left: `${(PASS / 1200) * 100}%` }} />
                 </span>
                 <span className="w-14 text-right font-bold tabular-nums">{score}</span>
@@ -71,8 +74,8 @@ function View({ role }: { role: Role }) {
           {CLASS.filter((c) => c[3]).length} dari {CLASS.length} latihan terakhir di SMP Teluk Harapan lulus.
         </p>
         <ul>
-          {CLASS.map(([name, k, score, ok]) => (
-            <li key={name} className={row}>
+          {CLASS.map(([name, k, score, ok], i) => (
+            <li key={name} className={`${row} animate-rise`} style={{ animationDelay: `${i * 70}ms` }}>
               <span className="w-20 shrink-0 font-semibold">{name}</span>
               <span className="flex-1 text-redup">{HAZARD_LABEL[k]}</span>
               <span className="font-bold tabular-nums">{score}</span>
@@ -112,14 +115,17 @@ function View({ role }: { role: Role }) {
         {REGION.filter(([, r]) => r < 45).length} dari {REGION.length} sekolah rawan. Rata-rata kesiapan {regionAvg}.
       </p>
       <ul>
-        {REGION.map(([name, r]) => (
+        {REGION.map(([name, r], i) => (
           <li key={name} className={row}>
             <span className="flex-1 font-semibold">{name}</span>
             <span className="hidden sm:inline">
               <StatusLabel readiness={r} />
             </span>
             <span aria-hidden="true" className="h-2 w-16 rounded-full bg-malam-3 sm:w-28">
-              <span className="block h-full rounded-full" style={{ width: `${r}%`, background: statusOf(r).color }} />
+              <span
+                className="block h-full origin-left animate-grow rounded-full"
+                style={{ width: `${r}%`, background: statusOf(r).color, animationDelay: `${i * 90}ms` }}
+              />
             </span>
             <span className="w-8 text-right font-bold tabular-nums">{r}</span>
           </li>

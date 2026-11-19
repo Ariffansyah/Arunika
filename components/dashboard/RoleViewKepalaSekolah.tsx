@@ -3,6 +3,7 @@
 import { OctagonAlert, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import CountUp from "@/components/CountUp";
 import type { Me } from "@/components/RequireAuth";
 import { COST_LABEL, PRIORITY_LABEL, type Recommendation } from "@/lib/assessment";
 import type { School } from "@/lib/supabase";
@@ -63,7 +64,9 @@ export default function RoleViewKepalaSekolah({
             `${name} belum punya indeks kesiapan.`
           ) : (
             <>
-              Kesiapan {name} <span style={{ color: status.color }}>{readiness}</span> dari 100. {status.label}.
+              Kesiapan {name} <span className="tabular-nums" style={{ color: status.color }}>
+                <CountUp value={readiness} />
+              </span> dari 100. {status.label}.
             </>
           )}
         </h2>

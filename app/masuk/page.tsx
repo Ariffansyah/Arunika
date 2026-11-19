@@ -33,10 +33,16 @@ export default function MasukPage() {
         </Link>
         <div className="absolute inset-x-8 bottom-10 space-y-6 xl:inset-x-12 xl:bottom-14">
           <ul aria-hidden="true" className="flex -space-x-3">
-            {AVATARS.map((look) => (
-              <li key={look}>
+            {AVATARS.map((look, i) => (
+              <li key={look} className="relative animate-rise hover:z-10" style={{ animationDelay: `${300 + i * 70}ms` }}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- 128px sprites, nothing to optimise */}
-                <img src={`/characters/previews/${look}.png`} alt="" width={64} height={64} className="size-16 rounded-full border-4 border-malam bg-malam-2" />
+                <img
+                  src={`/characters/previews/${look}.png`}
+                  alt=""
+                  width={64}
+                  height={64}
+                  className="size-16 rounded-full border-4 border-malam bg-malam-2 transition-[translate,border-color] duration-300 ease-crisp hover:-translate-y-2 hover:border-laut"
+                />
               </li>
             ))}
           </ul>

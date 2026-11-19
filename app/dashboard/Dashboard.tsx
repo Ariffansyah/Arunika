@@ -423,10 +423,14 @@ function Board({ me }: { me: Me }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-malam-3">
-                {filteredSchools.map(({ row, exp }) => {
+                {filteredSchools.map(({ row, exp }, i) => {
                   const active = row.id === current.row.id;
                   return (
-                    <tr key={row.id} className={`transition-colors duration-200 ${active ? "bg-laut/10" : "hover:bg-malam-2/60"}`}>
+                    <tr
+                      key={row.id}
+                      style={{ animationDelay: `${i * 40}ms` }}
+                      className={`animate-rise transition-colors duration-200 ${active ? "bg-laut/10" : "hover:bg-malam-2/60"}`}
+                    >
                       <th scope="row" className={`p-0 font-semibold ${active ? "shadow-[inset_2px_0_0_var(--color-laut)]" : ""}`}>
                         <button
                           type="button"
@@ -441,7 +445,19 @@ function Board({ me }: { me: Me }) {
                       <td className={cell}>
                         <StatusLabel readiness={row.readiness} />
                       </td>
-                      <td className={`${cell} text-right tabular-nums`}>{row.readiness ?? "–"}</td>
+                      <td className={`${cell} text-right tabular-nums`}>
+                        <span className="inline-flex items-center gap-3">
+                          {row.readiness !== null && (
+                            <span aria-hidden="true" className="h-1.5 w-14 rounded-full bg-malam-3 max-sm:hidden">
+                              <span
+                                className="block h-full origin-left animate-grow rounded-full"
+                                style={{ width: `${row.readiness}%`, background: statusOf(row.readiness).color, animationDelay: `${i * 40}ms` }}
+                              />
+                            </span>
+                          )}
+                          {row.readiness ?? "–"}
+                        </span>
+                      </td>
                       <td className={`${cell} text-right tabular-nums max-sm:hidden`}>{exp}</td>
                       <td className={`${cell} text-right tabular-nums max-sm:hidden`}>{row.drills ?? 0}</td>
                     </tr>

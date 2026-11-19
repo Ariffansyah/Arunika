@@ -1,4 +1,5 @@
 import { CircleCheck, CircleDashed, OctagonAlert, TriangleAlert } from "lucide-react";
+import CountUp from "@/components/CountUp";
 import { num } from "@/lib/format";
 
 export const primaryBtn =
@@ -45,7 +46,15 @@ export function Meter({ label, value, max, href }: { label: string; value: numbe
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <span className="text-redup">{label}</span>
-        <span className="font-semibold tabular-nums">{value === null ? href ?? "Belum ada" : `${num(value)} / ${num(max)}`}</span>
+        <span className="font-semibold tabular-nums">
+          {value === null ? (
+            (href ?? "Belum ada")
+          ) : (
+            <>
+              <CountUp value={value} /> / {num(max)}
+            </>
+          )}
+        </span>
       </div>
       <div className="mt-1.5 h-2 rounded-full bg-malam-3" aria-hidden="true">
         {value !== null && <div className="h-full origin-left rounded-full bg-langit motion-safe:animate-grow" style={{ width: `${Math.min(100, (value / max) * 100)}%` }} />}
