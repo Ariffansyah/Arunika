@@ -68,7 +68,7 @@ Sekolah bertanda *(demo)* di dasbor adalah data contoh, bukan data lapangan.
 
 - **Gempa dan cuaca ekstrem di satu peta.** Beranda memuat 15 gempa M5+ terakhir dan 15 gempa dirasakan terakhir dari BMKG, digabung berdasarkan waktunya, beserta peringatan dini cuaca yang sedang berlaku. Area tiap peringatan diambil dari poligon kecamatan di dokumen CAP BMKG dan digambar sebagai petak 0,2°.
 - **Diputar ulang sesuai urutan kejadian.** Saat bagian ini terlihat, gempa muncul satu per satu mengikuti garis waktu yang dipadatkan ke belakang, sehingga hari-hari terakhir mendapat ruang lebih. Gempa yang dipilih menampilkan gelombang seismik di peta, penampang kedalamannya, dan keterangan dirasakan serta potensi tsunami dari BMKG.
-- **Terhubung ke pelajaran dan dasbor.** Peringatan yang menyebut banjir atau angin kencang membuka langkah selamat bencana itu di beranda. Di dasbor, tiap sekolah menampilkan gempa terdekat dan peringatan cuaca yang mencakup lokasinya. Pita berjalan di bagian atas beranda menampilkan gempa dan peringatan terbaru.
+- **Terhubung ke pelajaran dan dasbor.** Peringatan yang menyebut banjir atau angin kencang membuka langkah selamat bencana itu di beranda. Di dasbor, tiap sekolah menampilkan gempa terdekat dan peringatan cuaca yang mencakup lokasinya.
 
 ### Beranda dan tampilan
 

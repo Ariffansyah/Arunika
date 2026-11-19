@@ -10,7 +10,7 @@ import { MAPS } from "@/lib/maps";
 
 const HeroScene = dynamic(() => import("./HeroScene"), { ssr: false });
 
-export default function Hero({ ticker }: { ticker?: React.ReactNode }) {
+export default function Hero() {
   const reduced = useReducedMotion();
   const [choice, setChoice] = useState<boolean | null>(null);
   const paused = choice ?? reduced;
@@ -56,7 +56,6 @@ export default function Hero({ ticker }: { ticker?: React.ReactNode }) {
           Hafal jalan selamat <span className="text-fajar">sebelum</span> bencana datang.
         </h1>
       </div>
-      {ticker}
       <nav aria-label="Pilih sekolah latihan" className="border-t border-pasir/15 bg-malam/90">
         <ul className="mx-auto grid max-w-6xl divide-y divide-pasir/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0 lg:border-x lg:border-pasir/10">
           {CAMPUSES.map(({ id, hazard }, i) => (

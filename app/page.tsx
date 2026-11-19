@@ -8,7 +8,6 @@ import { TRACE } from "@/components/landing/Instrument";
 import Lessons from "@/components/landing/Lessons";
 import PlanDemo from "@/components/landing/PlanDemo";
 import Roles from "@/components/landing/Roles";
-import Ticker from "@/components/landing/Ticker";
 import SiteHeader from "@/components/SiteHeader";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
 import { recentQuakes, weatherWarnings } from "@/lib/bmkg";
@@ -36,7 +35,7 @@ export default async function Home() {
         <SiteHeader overlay />
         {/* Clipped sideways: sections zoom past the screen edges as they scroll out. */}
         <main className="overflow-x-clip">
-          <Hero ticker={<Ticker quakes={quakes} warnings={warnings.map(({ headline, until, untilMs }) => ({ headline, until, untilMs }))} />} />
+          <Hero />
           <Bmkg quakes={quakes} warnings={warnings} />
           <nav aria-label="Alur Arunika" className="border-b border-malam-3">
             <ol className="mx-auto grid max-w-6xl grid-cols-2 sm:grid-cols-4">
