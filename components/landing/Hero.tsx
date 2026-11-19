@@ -3,17 +3,20 @@
 import { ArrowRight, Pause, Play } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useContext, useRef, useState } from "react";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
 import { useReducedMotion } from "@/components/useReducedMotion";
 import { MAPS } from "@/lib/maps";
+import { HeroLive } from "./Droste";
 
 const HeroScene = dynamic(() => import("./HeroScene"), { ssr: false });
 
 export default function Hero() {
   const reduced = useReducedMotion();
   const [choice, setChoice] = useState<boolean | null>(null);
-  const paused = choice ?? reduced;
+  const live = useContext(HeroLive);
+  // Played or paused by choice, still for reduced motion, and stopped whenever Droste copies cover the scene.
+  const paused = (choice ?? reduced) || !live;
   const levelRef = useRef<HTMLSpanElement>(null);
   // Written straight to the DOM: the scene reports every frame and a re-render per frame would be waste.
   const onLevel = useCallback((m: number) => {
@@ -23,7 +26,7 @@ export default function Hero() {
   return (
     // The gradient matches the dawn sky, so nothing flashes while the 3D chunk loads.
     <section className="relative isolate flex h-[100svh] min-h-[640px] flex-col overflow-hidden bg-[linear-gradient(180deg,#1d2c4b_0%,#4a4a66_55%,#b86f50_100%)]">
-      <div className="parallax-back absolute inset-0 -z-10">
+      <div className="absolute inset-0 -z-10">
         <HeroScene paused={paused} startAt={6} onLevel={onLevel} />
       </div>
       <div
@@ -51,7 +54,7 @@ export default function Hero() {
           {paused ? <Play aria-hidden="true" className="size-5" /> : <Pause aria-hidden="true" className="size-5" />}
         </button>
       </div>
-      <div className="parallax-fore mx-auto flex w-full max-w-6xl flex-1 items-end px-4 pb-10 sm:px-6 lg:items-center lg:pb-0">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 items-end px-4 pb-10 sm:px-6 lg:items-center lg:pb-0">
         <h1 className="max-w-[11ch] animate-rise text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl lg:text-[5.75rem]">
           Hafal jalan selamat <span className="text-fajar">sebelum</span> bencana datang.
         </h1>

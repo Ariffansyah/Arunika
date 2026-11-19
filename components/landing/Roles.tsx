@@ -138,7 +138,7 @@ function View({ role }: { role: Role }) {
 export default function Roles() {
   const [role, setRole] = useState<Role>("siswa");
   return (
-    <section aria-labelledby="pantau" className="scene mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+    <section aria-labelledby="pantau" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
       <h2 id="pantau" className="max-w-[16ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
         Satu data, dari siswa sampai pemda.
       </h2>

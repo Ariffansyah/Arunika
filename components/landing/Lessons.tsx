@@ -30,7 +30,7 @@ export default function Lessons() {
   }, []);
 
   return (
-    <section aria-labelledby="pelajari" className="scene mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+    <section aria-labelledby="pelajari" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-end lg:gap-16">
         <div className="flex flex-col gap-10">
           <h2 id="pelajari" className="max-w-[20ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">

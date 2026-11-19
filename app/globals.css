@@ -474,6 +474,11 @@ body::before {
     scroll-behavior: smooth;
   }
 
+  /* The Droste hero stays pinned for this much scroll while it zooms into itself (see Droste.tsx). */
+  .droste {
+    height: 340svh;
+  }
+
   @supports (animation-timeline: view()) {
     .reveal {
       animation: reveal linear both;
@@ -495,36 +500,11 @@ body::before {
       animation-range: entry 30% cover 55%;
     }
 
-    .parallax-fore,
-    .parallax-back {
-      animation: var(--name) linear both;
-      animation-timeline: scroll(root);
-      animation-range: 0 90svh;
-    }
-    /* The landing page zooms through itself: each section grows out of the distance as it scrolls in and flies past
-       the viewer as it scrolls out. The way out only fills forwards: before it starts, the way in owns the transform. */
-    .scene {
-      animation:
-        scene-in linear both,
-        scene-out linear forwards;
-      animation-timeline: view(), view();
-      animation-range:
-        entry 0% entry 65%,
-        exit 30% exit 100%;
-    }
-
     .scroll-progress {
       display: block;
       transform-origin: left;
       animation: fill-in linear both;
       animation-timeline: scroll(root);
-    }
-
-    .parallax-fore {
-      --name: hero-fore;
-    }
-    .parallax-back {
-      --name: hero-back;
     }
   }
 }
@@ -545,48 +525,6 @@ body::before {
 @keyframes draw {
   from {
     stroke-dashoffset: 1;
-  }
-}
-
-/* Each zooms about the edge that is on screen, its top coming in and its bottom going out, so neighbours never
-   overlap at the seam. */
-@keyframes scene-in {
-  from {
-    opacity: 0;
-    transform: scale(0.75);
-    transform-origin: 50% 0;
-  }
-  /* Readable well before the zoom settles: the heading is on screen early in a tall section. */
-  45% {
-    opacity: 1;
-  }
-  to {
-    transform-origin: 50% 0;
-  }
-}
-
-@keyframes scene-out {
-  from {
-    transform-origin: 50% 100%;
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.3);
-    transform-origin: 50% 100%;
-  }
-}
-
-/* Scrolling off the hero flies into the school: the scene zooms in while the headline rushes past. */
-@keyframes hero-fore {
-  to {
-    opacity: 0;
-    transform: scale(1.5) translateY(-6%);
-  }
-}
-
-@keyframes hero-back {
-  to {
-    transform: scale(1.8);
   }
 }
 

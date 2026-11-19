@@ -2,6 +2,7 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Bmkg from "@/components/landing/Bmkg";
 import Drill from "@/components/landing/Drill";
+import Droste from "@/components/landing/Droste";
 import GladiTeaser from "@/components/landing/GladiTeaser";
 import Hero from "@/components/landing/Hero";
 import { TRACE } from "@/components/landing/Instrument";
@@ -33,9 +34,10 @@ export default async function Home() {
       <div aria-hidden="true" className="scroll-progress fixed inset-x-0 top-0 z-50 hidden h-0.5 bg-langit" />
       <div className="relative">
         <SiteHeader overlay />
-        {/* Clipped sideways: sections zoom past the screen edges as they scroll out. */}
-        <main className="overflow-x-clip">
-          <Hero />
+        <main>
+          <Droste>
+            <Hero />
+          </Droste>
           <Bmkg quakes={quakes} warnings={warnings} />
           <nav aria-label="Alur Arunika" className="border-b border-malam-3">
             <ol className="mx-auto grid max-w-6xl grid-cols-2 sm:grid-cols-4">
@@ -58,7 +60,7 @@ export default async function Home() {
           <Drill />
           <GladiTeaser />
           <Roles />
-          <section aria-labelledby="ajak" className="scene grain overflow-hidden border-t border-malam-3">
+          <section aria-labelledby="ajak" className="grain overflow-hidden border-t border-malam-3">
             <div aria-hidden="true" className="absolute inset-0 -z-10 flex items-center justify-center gap-6 opacity-[0.14] sm:gap-10">
               {CAMPUSES.map(({ id }, i) => (
                 <SitePlan key={id} id={id} className={`h-auto w-[60%] shrink-0 sm:w-[34%] ${i === 1 ? "translate-y-10" : "-translate-y-6"}`} />
