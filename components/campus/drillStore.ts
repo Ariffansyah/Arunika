@@ -185,8 +185,10 @@ export const player = {
   // What the body is doing, for the clip and for the other players.
   anim: "idle" as Anim,
 };
-// `jump` is a press, cleared once read; the others are held.
-export const input = { up: false, down: false, left: false, right: false, crouch: false, run: false, jump: false };
+// `jump` is a press, cleared once read; the others are held. `mx` and `my` are the touch stick, -1 to 1 right and forward.
+export const input = { up: false, down: false, left: false, right: false, crouch: false, run: false, jump: false, mx: 0, my: 0 };
+export type Held = "up" | "down" | "left" | "right" | "crouch" | "run";
+const REST = { ...input };
 // Set by the room connection; actions here use it to tell the other players.
 export const net = { send: null as ((event: string, payload: Record<string, unknown>) => void) | null };
 // yaw 0 puts the camera south of the player, looking north. cine is how far the camera is into its aerial shot, 0 to 1.
@@ -363,7 +365,7 @@ export function trackDrill(dt: number, t: number, moved: number, depth: number) 
 export const CLASSMATE_SEATS = [1, 2, 6, 9, 11, 14, 17, 20, 22, 25, 27, 30];
 export const roomSeats = (room: string) => PLAN.seats.filter((s) => s.room === room);
 
-export const resetInput = () => Object.keys(input).forEach((k) => (input[k as keyof typeof input] = false));
+export const resetInput = () => Object.assign(input, REST);
 
 // The chat takes focus, so held movement keys are released first.
 export function openChat() {

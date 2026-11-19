@@ -71,11 +71,11 @@ const KEYBOARD: [string[], string][] = [
 ];
 
 const TOUCH: [string[], string][] = [
-  [["↑", "←", "↓", "→"], "Tahan untuk bergerak"],
-  [["Lari"], "Tahan untuk berlari"],
-  [["Merunduk"], "Tahan untuk merunduk dan melindungi kepala"],
-  [["Aksi"], "Tombol atas; namanya berganti sesuai benda di dekatmu"],
-  [["Lompat"], "Muncul saat ada rintangan yang bisa dilompati"],
+  [["Joystick"], "Kiri bawah: geser untuk bergerak, makin jauh makin cepat"],
+  [["Aksi"], "Tombol besar; namanya muncul sesuai benda di dekatmu"],
+  [["Lari"], "Ketuk untuk mulai atau berhenti berlari"],
+  [["Merunduk"], "Ketuk untuk merunduk dan melindungi kepala, ketuk lagi untuk berdiri"],
+  [["Lompat"], "Menyala saat ada rintangan yang bisa dilompati"],
   [["Seret layar"], "Melihat ke sekeliling"],
 ];
 
@@ -107,7 +107,7 @@ function Guide({ open, onClose }: { open: boolean; onClose: () => void }) {
         <Rows rows={KEYBOARD} />
       </section>
       <section className="hidden space-y-2 pointer-coarse:block">
-        <h3 className="font-semibold text-redup">Tombol sentuh (kanan bawah)</h3>
+        <h3 className="font-semibold text-redup">Kontrol sentuh</h3>
         <Rows rows={TOUCH} />
       </section>
       <section className="space-y-2">

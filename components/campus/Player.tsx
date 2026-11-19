@@ -14,6 +14,7 @@ import {
   getState,
   input,
   look,
+  type Held,
   player,
   resetInput,
   run,
@@ -26,7 +27,7 @@ import { closedDoors, findPrompt, interact, wardenSpot } from "./interact";
 import { play, splash } from "./sound";
 import { MAP, SITE_D, SITE_W, TILE, elevationAt, surfaceAt } from "@/lib/campus";
 
-const KEYS: Record<string, keyof typeof input> = {
+const KEYS: Record<string, Held> = {
   KeyW: "up",
   ArrowUp: "up",
   KeyS: "down",
@@ -197,8 +198,8 @@ export default function Player({ look: character, name }: { look: Look; name: st
     if (first && !wasFirst.current) look.eyePitch = -0.05;
     wasFirst.current = first;
 
-    const ahead = Number(input.up) - Number(input.down);
-    const side = Number(input.right) - Number(input.left);
+    const ahead = clamp(Number(input.up) - Number(input.down) + input.my, -1, 1);
+    const side = clamp(Number(input.right) - Number(input.left) + input.mx, -1, 1);
     // Camera-relative: "up" walks away from the camera, whichever way it faces.
     let dx = -Math.sin(look.yaw) * ahead + Math.cos(look.yaw) * side;
     let dz = -Math.cos(look.yaw) * ahead - Math.sin(look.yaw) * side;
@@ -238,11 +239,13 @@ export default function Player({ look: character, name }: { look: Look; name: st
       player.wading = depth > 0.3;
       player.running = player.moving && input.run && !player.wading && !player.crouch;
       if (player.moving) {
+        // A stick pushed partway walks slower, down to half pace; keys are always all the way.
+        const push = Math.max(0.5, Math.min(1, len));
         dx /= len;
         dz /= len;
         const water = depth > 1 ? 0.2 : depth > 0.3 ? 0.55 : 1;
-        const speed = (player.crouch ? CROUCH_SPEED : player.running ? RUN_SPEED : WALK_SPEED) * water;
-        pace.current = water;
+        const speed = (player.crouch ? CROUCH_SPEED : player.running ? RUN_SPEED : WALK_SPEED) * water * push;
+        pace.current = water * push;
         // Small steps so a long frame can't carry the player through a wall corner.
         const steps = Math.ceil(dt / 0.04);
         const step = (speed * dt) / steps;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Eye, Layers, Link2, Map as MapIcon, Volume2, VolumeX, X } from "lucide-react";
+import { Check, ChevronUp, ChevronsDown, ChevronsUp, Circle, Eye, Footprints, Hand, Layers, Link2, Map as MapIcon, Volume2, VolumeX, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -481,59 +481,106 @@ function ActionPrompt() {
   );
 }
 
+// A thumb stick: the knob follows the finger up to the rim, and its offset is the walking direction and pace.
+function Stick({ className }: { className: string }) {
+  const knob = useRef<HTMLSpanElement>(null);
+  const finger = useRef<number | null>(null);
+  const set = (x: number, y: number) => {
+    input.mx = x;
+    input.my = y;
+    // The knob travels to the rim of the 8rem base: (128 − 56) / 2 px.
+    if (knob.current) knob.current.style.translate = `${x * 36}px ${-y * 36}px`;
+  };
+  const move = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerId !== finger.current) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const reach = r.width / 2 - 8;
+    const x = (e.clientX - r.left - r.width / 2) / reach;
+    const y = (r.top + r.height / 2 - e.clientY) / reach;
+    const m = Math.hypot(x, y);
+    // A small dead zone, so a resting thumb doesn't creep.
+    if (m < 0.15) set(0, 0);
+    else set(x / Math.max(1, m), y / Math.max(1, m));
+  };
+  const release = () => {
+    finger.current = null;
+    set(0, 0);
+  };
+  return (
+    <div
+      aria-hidden="true"
+      onPointerDown={(e) => {
+        finger.current = e.pointerId;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        move(e);
+      }}
+      onPointerMove={move}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onContextMenu={(e) => e.preventDefault()}
+      className={`pointer-events-auto absolute bottom-4 flex size-32 touch-none items-center justify-center rounded-full border-2 border-pasir/25 bg-malam/45 backdrop-blur-sm select-none ${className}`}
+    >
+      <span className="absolute inset-5 rounded-full border border-dashed border-pasir/15" />
+      <span ref={knob} className="size-14 rounded-full bg-pasir/85 shadow-lg ring-4 ring-malam/30 transition-[translate] duration-75" />
+    </div>
+  );
+}
+
+// Touch screens: the stick on the left thumb, and on the right an action button ringed by run, crouch and jump.
+// Run and crouch toggle, so that thumb stays free to drag the view.
 function TouchPad() {
   const prompt = useDrill((s) => s.prompt);
   const canJump = useDrill((s) => s.vaultAt !== null);
-  const hold = (k: keyof typeof input) => ({
-    onPointerDown: (e: React.PointerEvent) => {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      input[k] = true;
-    },
-    onPointerUp: () => (input[k] = false),
-    onPointerCancel: () => (input[k] = false),
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  });
   const idle = useDrill((s) => s.phase === "idle");
-  const pad = "flex size-12 items-center justify-center rounded-md bg-malam/85 text-pasir active:bg-malam-3 touch-none select-none";
-  // On phones the menu sheet covers the bottom of the screen until a drill starts.
+  const [, redraw] = useState(0);
+  const toggle = (k: "run" | "crouch") => {
+    input[k] = !input[k];
+    redraw((n) => n + 1);
+  };
+  const round =
+    "absolute flex flex-col items-center justify-center gap-0.5 rounded-full border-2 font-bold backdrop-blur-sm transition-colors touch-none select-none [&_svg]:size-5";
+  const small = `${round} size-14 border-pasir/25 bg-malam/70 text-[0.65rem] text-pasir active:bg-malam-3 aria-pressed:border-laut aria-pressed:bg-laut`;
+  // Until a drill starts, the menu covers the bottom of a phone, or the left of a wider screen; only walking and the
+  // action are needed then, to reach the warden.
+  const later = idle ? "hidden" : "";
   return (
-    <div
-      className={`pointer-events-auto absolute right-3 bottom-3 hidden grid-cols-[3rem_auto_3rem] justify-items-center gap-1 pointer-coarse:grid ${idle ? "max-sm:hidden!" : ""}`}
-    >
-      <button
-        type="button"
-        onClick={interact}
-        disabled={!prompt}
-        className={`${pad} col-span-3 w-full px-3 text-sm font-bold disabled:opacity-50`}
-      >
-        {prompt?.label ?? "Aksi"}
-      </button>
-      <button type="button" className={`${pad} text-xs font-bold`} {...hold("run")}>
-        Lari
-      </button>
-      <button type="button" aria-label="Maju" className={pad} {...hold("up")}>
-        <ChevronUp aria-hidden="true" />
-      </button>
-      <span />
-      <button type="button" aria-label="Kiri" className={pad} {...hold("left")}>
-        <ChevronLeft aria-hidden="true" />
-      </button>
-      <button type="button" className={`${pad} w-auto px-2.5 text-xs font-bold`} {...hold("crouch")}>
-        Merunduk
-      </button>
-      <button type="button" aria-label="Kanan" className={pad} {...hold("right")}>
-        <ChevronRight aria-hidden="true" />
-      </button>
-      {canJump ? (
-        <button type="button" className={`${pad} text-xs font-bold`} onClick={() => (input.jump = true)}>
+    <div className={`hidden pointer-coarse:contents ${idle ? "max-sm:hidden!" : ""}`}>
+      <Stick className={idle ? "left-4 sm:left-[26.5rem]" : "left-4"} />
+      <div className="pointer-events-auto absolute right-4 bottom-4 size-44" onContextMenu={(e) => e.preventDefault()}>
+        {prompt && (
+          <span className="absolute right-full bottom-7 mr-2 animate-rise whitespace-nowrap rounded-md bg-pasir px-2.5 py-1 text-sm font-semibold text-malam shadow-lg">
+            {prompt.label}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={interact}
+          disabled={!prompt}
+          aria-label={prompt?.label ?? "Aksi"}
+          className={`${round} right-0 bottom-0 size-20 border-pasir/40 bg-pasir text-xs text-malam active:bg-white disabled:bg-malam/70 disabled:text-pasir/50`}
+        >
+          {prompt && <span className="absolute inset-0 rounded-full ring-4 ring-langit motion-safe:animate-ping" />}
+          <Hand aria-hidden="true" />
+          Aksi
+        </button>
+        <button type="button" aria-pressed={input.crouch} onClick={() => toggle("crouch")} className={`${small} right-24 bottom-1 ${later}`}>
+          <ChevronsDown aria-hidden="true" />
+          Merunduk
+        </button>
+        <button type="button" aria-pressed={input.run} onClick={() => toggle("run")} className={`${small} right-[5.25rem] bottom-[5.25rem] ${later}`}>
+          <Footprints aria-hidden="true" />
+          Lari
+        </button>
+        <button
+          type="button"
+          disabled={!canJump}
+          onClick={() => (input.jump = true)}
+          className={`${small} right-3 bottom-24 disabled:opacity-40 ${canJump ? "border-langit ring-4 ring-langit/40" : ""} ${later}`}
+        >
+          <ChevronsUp aria-hidden="true" />
           Lompat
         </button>
-      ) : (
-        <span />
-      )}
-      <button type="button" aria-label="Mundur" className={pad} {...hold("down")}>
-        <ChevronDown aria-hidden="true" />
-      </button>
+      </div>
     </div>
   );
 }
@@ -659,7 +706,7 @@ export default function Hud({
           <RoomInfo room={room} peers={peers} status={status} school={school} />
         </section>
       )}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 [grid-template-areas:'status_tools'_'goal_goal'_'acts_acts'_'list_list'] md:grid-cols-[minmax(0,1fr)_minmax(0,36rem)_minmax(0,1fr)] md:[grid-template-areas:'left_goal_tools']">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 [grid-template-areas:'status_tools'_'goal_goal'_'acts_acts'_'list_list'] md:grid-cols-[minmax(7rem,1fr)_minmax(0,36rem)_auto] md:[grid-template-areas:'left_goal_tools'] lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)_minmax(0,1fr)]">
         {phase === "running" && t >= 0 && (
           <>
             <DrillSide t={t} />

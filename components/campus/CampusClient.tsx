@@ -10,6 +10,7 @@ import type { Scenario } from "@/lib/sim";
 import { avatarOf } from "@/lib/supabase";
 import { player, setState, startDrill } from "./drillStore";
 import Hud, { ROOM_PATTERN } from "./Hud";
+import Landscape from "./Landscape";
 import Loading from "./Loading";
 import MapMenu from "./MapMenu";
 import { useRoom } from "./useRoom";
@@ -67,6 +68,7 @@ function Campus({ me, roomParam }: { me: Me; roomParam: string | null }) {
         <WardenChat school={me.school} name={self.name} />
       </div>
       <Loading id={MAP.id} ready={ready} />
+      <Landscape />
     </div>
   );
 }

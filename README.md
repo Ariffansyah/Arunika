@@ -76,7 +76,8 @@ Sekolah bertanda *(demo)* di dasbor adalah data contoh, bukan data lapangan.
 
 - **Bisa dicoba tanpa akun.** Beranda memuat langkah selamat dan kuis per bencana, denah yang jalurnya dihitung ulang saat tinggi air atau kekuatan gempa digeser, contoh penilaian jejak evakuasi, contoh jawaban Petugas AI, gladi ruang dari gempa terkini BMKG, dan pratinjau dasbor tiap peran.
 - **Mode gelap dan terang.** Tombol di kepala halaman mengganti tema dengan transisi lingkaran yang tumbuh dari tombol itu ke seluruh halaman. Pilihan tersimpan di peramban. Latihan 3D tetap gelap di kedua tema.
-- **Ponsel sampai desktop.** Latihan 3D punya kontrol sentuh, dan semua halaman menyesuaikan lebar layar.
+- **Ponsel sampai desktop.** Di layar sentuh, latihan 3D dikendalikan dengan joystick di kiri bawah (makin jauh digeser, makin cepat berjalan) dan tombol Aksi, Lari, Merunduk, serta Lompat di kanan bawah. Ketukan pertama membuka layar penuh dan mengunci posisi mendatar bila peramban mengizinkan (Chrome Android); di peramban lain, ponsel yang tegak diminta memutar layar. Semua halaman menyesuaikan lebar layar.
+- **Peralihan antarbagian.** Tiap bagian beranda naik saat masuk layar dan mundur perlahan saat ditinggalkan, dengan pita kata yang terus bergeser di antaranya; pita ini makin cepat saat halaman digulir dan berbalik arah saat digulir ke atas.
 
 ![Mode terang: kontur peta topografi di latar, langkah selamat gempa, dan kuis](docs/screenshots/terang.webp)
 
