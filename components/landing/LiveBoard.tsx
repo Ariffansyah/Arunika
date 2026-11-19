@@ -190,7 +190,7 @@ export default function LiveBoard({ land, quakes, warnings }: { land: string; qu
           <path d={land} fill="#1b3461" />
 
           {show.cuaca && (
-            <g key={run} className={run ? "motion-safe:animate-[rise_1s_var(--ease-crisp)_6s_both]" : ""}>
+            <g key={`cuaca-${run}`} className={run ? "motion-safe:animate-[rise_1s_var(--ease-crisp)_6s_both]" : ""}>
               {active.map(({ i }, k) => {
                 const lit = selW === i || hoverW === i;
                 return (
@@ -211,7 +211,7 @@ export default function LiveBoard({ land, quakes, warnings }: { land: string; qu
 
           {show.gempa && (
             // Oldest first, so the newest quakes draw on top.
-            <g key={run}>
+            <g key={`gempa-${run}`}>
               {quakes
                 .map((e, i) => ({ e, i }))
                 .reverse()

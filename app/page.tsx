@@ -2,7 +2,6 @@ import { ArrowDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Bmkg from "@/components/landing/Bmkg";
 import Drill from "@/components/landing/Drill";
-import Droste from "@/components/landing/Droste";
 import GladiTeaser from "@/components/landing/GladiTeaser";
 import Hero from "@/components/landing/Hero";
 import { TRACE } from "@/components/landing/Instrument";
@@ -35,9 +34,7 @@ export default async function Home() {
       <div className="relative">
         <SiteHeader overlay />
         <main>
-          <Droste>
-            <Hero />
-          </Droste>
+          <Hero />
           <Bmkg quakes={quakes} warnings={warnings} />
           <nav aria-label="Alur Arunika" className="border-b border-malam-3">
             <ol className="mx-auto grid max-w-6xl grid-cols-2 sm:grid-cols-4">

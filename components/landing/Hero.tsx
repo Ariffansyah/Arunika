@@ -3,20 +3,18 @@
 import { ArrowRight, Pause, Play } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useContext, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
 import { useReducedMotion } from "@/components/useReducedMotion";
 import { MAPS } from "@/lib/maps";
-import { HeroLive } from "./Droste";
 
 const HeroScene = dynamic(() => import("./HeroScene"), { ssr: false });
 
 export default function Hero() {
   const reduced = useReducedMotion();
   const [choice, setChoice] = useState<boolean | null>(null);
-  const live = useContext(HeroLive);
-  // Played or paused by choice, still for reduced motion, and stopped whenever Droste copies cover the scene.
-  const paused = (choice ?? reduced) || !live;
+  // Played or paused by choice, still for reduced motion.
+  const paused = choice ?? reduced;
   const levelRef = useRef<HTMLSpanElement>(null);
   // Written straight to the DOM: the scene reports every frame and a re-render per frame would be waste.
   const onLevel = useCallback((m: number) => {
