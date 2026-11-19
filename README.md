@@ -62,6 +62,14 @@ Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga sekolah: b
 
 Sekolah bertanda *(demo)* di dasbor adalah data contoh, bukan data lapangan.
 
+### Pantauan BMKG langsung
+
+![Pantauan BMKG di beranda: gempa M5+ dan gempa dirasakan di peta Indonesia, area peringatan dini cuaca, dan garis waktu gempa](docs/screenshots/bmkg.webp)
+
+- **Gempa dan cuaca ekstrem di satu peta.** Beranda memuat 15 gempa M5+ terakhir dan 15 gempa dirasakan terakhir dari BMKG, digabung berdasarkan waktunya, beserta peringatan dini cuaca yang sedang berlaku. Area tiap peringatan diambil dari poligon kecamatan di dokumen CAP BMKG dan digambar sebagai petak 0,2°.
+- **Diputar ulang sesuai urutan kejadian.** Saat bagian ini terlihat, gempa muncul satu per satu mengikuti garis waktu yang dipadatkan ke belakang, sehingga hari-hari terakhir mendapat ruang lebih. Gempa yang dipilih menampilkan gelombang seismik di peta, penampang kedalamannya, dan keterangan dirasakan serta potensi tsunami dari BMKG.
+- **Terhubung ke pelajaran dan dasbor.** Peringatan yang menyebut banjir atau angin kencang membuka langkah selamat bencana itu di beranda. Di dasbor, tiap sekolah menampilkan gempa terdekat dan peringatan cuaca yang mencakup lokasinya. Pita berjalan di bagian atas beranda menampilkan gempa dan peringatan terbaru.
+
 ### Beranda dan tampilan
 
 ![Denah interaktif di beranda: geser tinggi air, jalur evakuasi dihitung ulang](docs/screenshots/denah.webp)
@@ -94,7 +102,7 @@ Kedua rute AI (`/api/warden`, `/api/gladi`) hanya melayani pengguna yang masuk, 
 | Tampilan | Tailwind CSS 4, Lucide (ikon), Plus Jakarta Sans dan JetBrains Mono |
 | Data dan akun | Supabase: PostgreSQL dengan Row Level Security, Auth (termasuk masuk sebagai tamu), Realtime Broadcast dan Presence |
 | AI | Groq SDK dengan `openai/gpt-oss-120b` dan `qwen/qwen3.8-27b` |
-| Data publik | BMKG `autogempa.json`, di-*cache* satu menit dengan `"use cache"` Next.js |
+| Data publik | BMKG `autogempa.json`, `gempaterkini.json`, `gempadirasakan.json` (di-*cache* satu menit) dan peringatan dini cuaca (RSS nowcast dan dokumen CAP, di-*cache* sepuluh menit), dengan `"use cache"` Next.js |
 | Pengujian | Node.js test runner bawaan |
 | Hosting | Vercel |
 
@@ -193,7 +201,8 @@ Daftar ini memenuhi ketentuan IT RUSH 2026 bagian V poin 5.
 
 **Data dan pedoman**
 
-- Gempa terkini dari umpan publik BMKG (`https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json`).
+- Gempa terkini, gempa M5+, dan gempa dirasakan dari umpan publik BMKG (`https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json`, `gempaterkini.json`, `gempadirasakan.json`).
+- Peringatan dini cuaca BMKG (`https://www.bmkg.go.id/alerts/nowcast/id/rss.xml` dan dokumen CAP tiap peringatan).
 - Urutan tindakan evakuasi mengikuti panduan Satuan Pendidikan Aman Bencana (SPAB) BNPB.
 - Garis pantai Indonesia untuk peta 3D dasbor: `public/data/indonesia.json`.
 

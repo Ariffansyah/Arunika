@@ -5,6 +5,10 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import RequireAuth, { Notice, type Me } from "@/components/RequireAuth";
+import { ago, useNow } from "@/components/useNow";
+import type { QuakeEvent, Warning } from "@/lib/bmkgFeed";
+import { num } from "@/lib/format";
+import { distanceKm } from "@/lib/gladi";
 import {
   COST_LABEL,
   PRIORITY_LABEL,
@@ -76,9 +80,18 @@ function exposure(s: School) {
   );
 }
 
-function Detail({ row, exp }: { row: Row; exp: number }) {
+type Live = { quakes: QuakeEvent[]; warnings: Warning[] };
+
+function Detail({ row, exp, live }: { row: Row; exp: number; live: Live }) {
   const [recs, setRecs] = useState<Recommendation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const now = useNow();
+  // BMKG's feeds seen from this school: the nearest recent quake, and a live warning whose squares reach it.
+  const near = live.quakes.map((q) => ({ q, km: distanceKm(row, q) })).sort((a, b) => a.km - b.km)[0];
+  const [cx, cy] = [Math.round(row.lon * 5), Math.round(row.lat * 5)];
+  const warn = live.warnings.find(
+    (w) => (!now || w.untilMs > now) && w.cells.some(([x, y]) => Math.abs(x - cx) <= 1 && Math.abs(y - cy) <= 1),
+  );
 
   useEffect(() => {
     let live = true;
@@ -114,6 +127,16 @@ function Detail({ row, exp }: { row: Row; exp: number }) {
         <dd>{row.hazards.join(", ")}</dd>
         <dt className="text-redup">Latihan</dt>
         <dd className="tabular-nums">{row.drills ? `${row.drills} kali oleh ${row.participants ?? 0} peserta` : "Belum ada"}</dd>
+        {near && (
+          <>
+            <dt className="text-redup">Gempa terdekat</dt>
+            <dd className="tabular-nums">
+              M{num(near.q.magnitude, 1)}, {num(near.km)} km, {ago(near.q.at, now) ?? near.q.time}
+            </dd>
+          </>
+        )}
+        <dt className="text-redup">Cuaca</dt>
+        <dd className={warn ? "font-semibold text-bahaya" : ""}>{warn ? `${warn.headline}, hingga ${warn.until}` : "Tidak ada peringatan BMKG"}</dd>
       </dl>
       <div className="space-y-4">
         <Meter label="Indeks kesiapan" value={row.readiness} max={100} />
@@ -167,7 +190,7 @@ const ROLE_ICONS: Record<Role, React.ComponentType<{ className?: string }>> = {
   pemda: Landmark,
 };
 
-function Board({ me }: { me: Me }) {
+function Board({ me, live }: { me: Me; live: Live }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -403,7 +426,7 @@ function Board({ me }: { me: Me }) {
               <span className="text-redup">Tinggi kolom: paparan risiko. Seret untuk memutar, klik kolom untuk memilih.</span>
             </div>
           </div>
-          <Detail key={current.row.id} row={current.row} exp={current.exp} />
+          <Detail key={current.row.id} row={current.row} exp={current.exp} live={live} />
         </div>
 
         <div aria-labelledby="prioritas">
@@ -487,6 +510,6 @@ function Board({ me }: { me: Me }) {
   );
 }
 
-export default function Dashboard() {
-  return <RequireAuth loading={<Skeleton />}>{(me) => <Board me={me} />}</RequireAuth>;
+export default function Dashboard({ live }: { live: Live }) {
+  return <RequireAuth loading={<Skeleton />}>{(me) => <Board me={me} live={live} />}</RequireAuth>;
 }
