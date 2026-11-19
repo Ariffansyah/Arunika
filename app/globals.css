@@ -474,11 +474,6 @@ body::before {
     scroll-behavior: smooth;
   }
 
-  /* The Droste hero stays pinned for this much scroll while it zooms into itself (see Droste.tsx). */
-  .droste {
-    height: 340svh;
-  }
-
   @supports (animation-timeline: view()) {
     .reveal {
       animation: reveal linear both;

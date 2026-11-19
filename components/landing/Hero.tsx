@@ -3,20 +3,18 @@
 import { ArrowRight, Pause, Play } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useContext, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
 import { useReducedMotion } from "@/components/useReducedMotion";
 import { MAPS } from "@/lib/maps";
-import { HeroLive } from "./Droste";
+import { Portal } from "./Droste";
 
 const HeroScene = dynamic(() => import("./HeroScene"), { ssr: false });
 
 export default function Hero() {
   const reduced = useReducedMotion();
   const [choice, setChoice] = useState<boolean | null>(null);
-  const live = useContext(HeroLive);
-  // Played or paused by choice, still for reduced motion, and stopped whenever Droste copies cover the scene.
-  const paused = (choice ?? reduced) || !live;
+  const paused = choice ?? reduced;
   const levelRef = useRef<HTMLSpanElement>(null);
   // Written straight to the DOM: the scene reports every frame and a re-render per frame would be waste.
   const onLevel = useCallback((m: number) => {
@@ -59,6 +57,8 @@ export default function Hero() {
           Hafal jalan selamat <span className="text-fajar">sebelum</span> bencana datang.
         </h1>
       </div>
+      {/* A tablet over the school, showing the BMKG section that the scroll zooms into. */}
+      <Portal tail={false} className="[--fs:0.28] [--fx:0.64] [--fy:0.2] portrait:[--fx:0.55] portrait:[--fy:0.14]" />
       <nav aria-label="Pilih sekolah latihan" className="border-t border-pasir/15 bg-malam/90">
         <ul className="mx-auto grid max-w-6xl divide-y divide-pasir/10 lg:grid-cols-3 lg:divide-x lg:divide-y-0 lg:border-x lg:border-pasir/10">
           {CAMPUSES.map(({ id, hazard }, i) => (

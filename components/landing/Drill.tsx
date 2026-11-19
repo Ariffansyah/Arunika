@@ -8,6 +8,7 @@ import { ASSEMBLY, ASSEMBLY_NAMES, GRID, SPAWN, TILE, findTiles, tileAt } from "
 import { num } from "@/lib/format";
 import { WALK_SPEED, bestRoute, pathLength } from "@/lib/sim";
 import { AVATARS } from "@/lib/supabase";
+import { Portal } from "./Droste";
 
 const CLASS = ["Rani", "Bayu", "Sekar", "Dimas", "Ayu", "Nina", "Raka"];
 
@@ -58,7 +59,7 @@ export default function Drill() {
   }, [typed, words.length]);
 
   return (
-    <section aria-labelledby="bersama" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+    <section aria-labelledby="bersama" className="relative mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
       <h2 id="bersama" className="max-w-[18ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
         Sekelas evakuasi bersama, dinilai sampai titik kumpul.
       </h2>
@@ -204,6 +205,7 @@ export default function Drill() {
           </Link>
         </article>
       </div>
+      <Portal />
     </section>
   );
 }
