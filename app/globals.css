@@ -368,6 +368,12 @@
   }
 }
 
+/* A band with its own background melts into the page above and below instead of starting on a ruled line. The fade
+   is shorter than every band's padding, so content is never masked. */
+@utility seam {
+  mask-image: linear-gradient(transparent, #000 4.5rem, #000 calc(100% - 4.5rem), transparent);
+}
+
 /* The site plan's survey grid. */
 @utility survey {
   background-image: linear-gradient(var(--garis) 1px, transparent 1px), linear-gradient(90deg, var(--garis) 1px, transparent 1px);
@@ -501,6 +507,59 @@ body::before {
       animation: fill-in linear both;
       animation-timeline: scroll(root);
     }
+
+    /* Each landing section hands over to the next: its content settles in as its top comes up and recedes as its
+       bottom leaves, while the next one settles in beneath. The way out only fills forwards, so until it starts the
+       way in owns opacity and translate. Separate translate and scale keep clear of transforms set inside. */
+    .scene {
+      animation:
+        scene-in ease-out both,
+        scene-out ease-in forwards;
+      animation-timeline: view(), view();
+      animation-range:
+        entry 0% entry 60%,
+        exit 40% exit 100%;
+    }
+
+    /* Scrolling off the hero, the headline lifts away faster than the page while the school sinks slower. */
+    .hero-fore,
+    .hero-back {
+      animation: hero-fore linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 100svh;
+    }
+    .hero-back {
+      animation-name: hero-back;
+    }
+  }
+}
+
+@keyframes scene-in {
+  from {
+    opacity: 0;
+    translate: 0 3rem;
+  }
+}
+
+@keyframes scene-out {
+  to {
+    opacity: 0;
+    translate: 0 -2.5rem;
+    scale: 0.98;
+  }
+}
+
+@keyframes hero-fore {
+  to {
+    opacity: 0;
+    translate: 0 -35%;
+  }
+}
+
+@keyframes hero-back {
+  to {
+    translate: 0 30%;
+    scale: 1.06;
   }
 }
 

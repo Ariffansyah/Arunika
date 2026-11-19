@@ -37,7 +37,7 @@ export default async function Home() {
           <Hero />
           <Bmkg quakes={quakes} warnings={warnings} />
           <nav aria-label="Alur Arunika" className="border-b border-malam-3">
-            <ol className="mx-auto grid max-w-6xl grid-cols-2 sm:grid-cols-4">
+            <ol className="scene mx-auto grid max-w-6xl grid-cols-2 sm:grid-cols-4">
               {FLOW.map(({ href, label }, i) => (
                 <li key={href} className="border-malam-3 max-sm:odd:border-r max-sm:nth-[-n+2]:border-b sm:not-last:border-r">
                   <a
@@ -57,13 +57,16 @@ export default async function Home() {
           <Drill />
           <GladiTeaser />
           <Roles />
-          <section aria-labelledby="ajak" className="grain overflow-hidden border-t border-malam-3">
-            <div aria-hidden="true" className="absolute inset-0 -z-10 flex items-center justify-center gap-6 opacity-[0.14] sm:gap-10">
+          <section aria-labelledby="ajak" className="grain overflow-hidden">
+            {/* Faded by a mask rather than a solid vignette, so the contour backdrop runs on behind and the band has no edge. */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 flex items-center justify-center gap-6 opacity-[0.14] [mask-image:radial-gradient(rgb(0_0_0/0.6),transparent_75%)] sm:gap-10"
+            >
               {CAMPUSES.map(({ id }, i) => (
                 <SitePlan key={id} id={id} className={`h-auto w-[60%] shrink-0 sm:w-[34%] ${i === 1 ? "translate-y-10" : "-translate-y-6"}`} />
               ))}
             </div>
-            <div aria-hidden="true" className="absolute inset-0 -z-10 bg-radial from-malam/40 to-malam to-75%" />
             <svg
               aria-hidden="true"
               viewBox="0 40 400 120"
@@ -72,7 +75,7 @@ export default async function Home() {
             >
               <path d={TRACE} vectorEffect="non-scaling-stroke" className="fill-none stroke-fajar motion-safe:animate-scroll" strokeWidth={1.5} strokeLinejoin="round" />
             </svg>
-            <div className="mx-auto flex max-w-6xl flex-col items-start gap-10 px-4 py-28 sm:px-6 lg:py-40">
+            <div className="scene mx-auto flex max-w-6xl flex-col items-start gap-10 px-4 py-28 sm:px-6 lg:py-40">
               <h2 id="ajak" className="max-w-[16ch] text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl">
                 Gempa berikutnya tidak menunggu sekolah <span className="text-fajar">siap</span>.
               </h2>
@@ -95,7 +98,7 @@ export default async function Home() {
           </section>
         </main>
       </div>
-      <footer className="grain border-t border-malam-3 bg-malam-2">
+      <footer className="grain bg-malam-2 [mask-image:linear-gradient(transparent,#000_3rem)]">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto] md:items-center">
           <span className="flex items-center gap-2.5 text-lg font-extrabold tracking-wider uppercase">
             {/* eslint-disable-next-line @next/next/no-img-element -- static SVG logo mark, nothing to optimise */}

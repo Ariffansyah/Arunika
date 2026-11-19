@@ -14,8 +14,8 @@ const LAND = (islands as [number, number][][])
 // The live BMKG band. It keeps the night palette in either theme: it is a monitor, like the maps and the drill.
 export default function Bmkg({ quakes, warnings }: { quakes: QuakeEvent[]; warnings: Warning[] }) {
   return (
-    <section aria-labelledby="bmkg" data-theme="dark" className="grain survey border-b border-malam-3 bg-malam">
-      <div className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+    <section aria-labelledby="bmkg" data-theme="dark" className="grain survey seam bg-malam">
+      <div className="scene mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
         <h2 id="bmkg" className="max-w-[17ch] text-4xl leading-[1.02] font-extrabold tracking-tight sm:text-6xl">
           Indonesia hari ini, <span className="text-langit">langsung</span> dari BMKG.
         </h2>

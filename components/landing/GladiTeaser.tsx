@@ -18,8 +18,8 @@ const VERDICTS = ["bg-aman", "bg-aman", "bg-fajar", "bg-aman"];
 export default async function GladiTeaser() {
   const quake = await latestQuake();
   return (
-    <section aria-labelledby="gladi" className="grain border-y border-malam-3 bg-malam-2">
-      <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] lg:items-center lg:gap-16 lg:py-32">
+    <section aria-labelledby="gladi" className="grain seam bg-malam-2">
+      <div className="scene mx-auto grid w-full max-w-6xl gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)] lg:items-center lg:gap-16 lg:py-32">
         <div className="flex flex-col items-start gap-10">
           <h2 id="gladi" className="max-w-[13ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
             Tim siaga sekolah berlatih dari gempa sungguhan.

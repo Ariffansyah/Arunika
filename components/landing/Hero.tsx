@@ -24,7 +24,7 @@ export default function Hero() {
   return (
     // The gradient matches the dawn sky, so nothing flashes while the 3D chunk loads.
     <section className="relative isolate flex h-[100svh] min-h-[640px] flex-col overflow-hidden bg-[linear-gradient(180deg,#1d2c4b_0%,#4a4a66_55%,#b86f50_100%)]">
-      <div className="absolute inset-0 -z-10">
+      <div className="hero-back absolute inset-0 -z-10">
         <HeroScene paused={paused} startAt={6} onLevel={onLevel} />
       </div>
       <div
@@ -52,7 +52,7 @@ export default function Hero() {
           {paused ? <Play aria-hidden="true" className="size-5" /> : <Pause aria-hidden="true" className="size-5" />}
         </button>
       </div>
-      <div className="mx-auto flex w-full max-w-6xl flex-1 items-end px-4 pb-10 sm:px-6 lg:items-center lg:pb-0">
+      <div className="hero-fore mx-auto flex w-full max-w-6xl flex-1 items-end px-4 pb-10 sm:px-6 lg:items-center lg:pb-0">
         <h1 className="max-w-[11ch] animate-rise text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl lg:text-[5.75rem]">
           Hafal jalan selamat <span className="text-fajar">sebelum</span> bencana datang.
         </h1>
