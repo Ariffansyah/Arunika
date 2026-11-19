@@ -6,8 +6,10 @@ import { useState } from "react";
 import { HAZARD_ICON } from "@/components/hazards";
 import { HAZARDS, type Hazard } from "@/lib/gladi";
 import { LESSONS } from "@/lib/lessons";
+import Instrument from "./Instrument";
 
 const TAB = { gempa: "Gempa", banjir: "Banjir", angin: "Angin", longsor: "Longsor" };
+const GAUGE = { gempa: "Seismograf", banjir: "Papan duga air", angin: "Anemometer", longsor: "Pemantau lereng" };
 
 // The same steps and quiz the drill teaches before it starts, one hazard at a time.
 export default function Lessons() {
@@ -18,37 +20,48 @@ export default function Lessons() {
 
   return (
     <section aria-labelledby="pelajari" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
-      <div className="flex flex-col gap-10">
-        <h2 id="pelajari" className="max-w-[20ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
-          Tiap bencana, urutan selamatnya beda.
-        </h2>
-        <fieldset className="sm:max-w-2xl">
-          <legend className="sr-only">Bencana</legend>
-          <div className="grid grid-cols-2 gap-1 rounded-lg border border-malam-3 bg-malam-2 p-1 shadow-edge sm:grid-cols-4">
-            {HAZARDS.map((k) => {
-              const Icon = HAZARD_ICON[k];
-              return (
-                <label
-                  key={k}
-                  className="flex min-h-14 items-center justify-center gap-2.5 rounded-md px-3 text-lg font-bold text-redup transition-colors duration-300 ease-crisp hover:bg-malam-3/50 hover:text-pasir has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit"
-                >
-                  <input
-                    type="radio"
-                    name="lesson-kind"
-                    className="sr-only"
-                    checked={kind === k}
-                    onChange={() => {
-                      setKind(k);
-                      setPicked(null);
-                    }}
-                  />
-                  <Icon aria-hidden="true" className="size-5 shrink-0" />
-                  {TAB[k]}
-                </label>
-              );
-            })}
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-end lg:gap-16">
+        <div className="flex flex-col gap-10">
+          <h2 id="pelajari" className="max-w-[20ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
+            Tiap bencana, urutan selamatnya beda.
+          </h2>
+          <fieldset className="sm:max-w-2xl">
+            <legend className="sr-only">Bencana</legend>
+            <div className="grid grid-cols-2 gap-1 rounded-lg border border-malam-3 bg-malam-2 p-1 shadow-edge sm:grid-cols-4">
+              {HAZARDS.map((k) => {
+                const Icon = HAZARD_ICON[k];
+                return (
+                  <label
+                    key={k}
+                    className="flex min-h-14 items-center justify-center gap-2.5 rounded-md px-3 text-lg font-bold text-redup transition-colors duration-300 ease-crisp hover:bg-malam-3/50 hover:text-pasir has-checked:bg-laut has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-langit"
+                  >
+                    <input
+                      type="radio"
+                      name="lesson-kind"
+                      className="sr-only"
+                      checked={kind === k}
+                      onChange={() => {
+                        setKind(k);
+                        setPicked(null);
+                      }}
+                    />
+                    <Icon aria-hidden="true" className="size-5 shrink-0" />
+                    {TAB[k]}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        </div>
+        <figure className="track flex flex-col overflow-hidden rounded-lg border border-malam-3 bg-malam-2 shadow-edge">
+          <figcaption className="flex items-center gap-2 border-b border-malam-3 px-4 py-2.5 font-semibold">
+            <span aria-hidden="true" className="size-2 animate-pulse rounded-full bg-langit" />
+            {GAUGE[kind]}
+          </figcaption>
+          <div className="survey">
+            <Instrument key={kind} kind={kind} className="block h-auto w-full animate-rise" />
           </div>
-        </fieldset>
+        </figure>
       </div>
 
       <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_26rem] lg:gap-16">

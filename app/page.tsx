@@ -3,6 +3,7 @@ import Link from "next/link";
 import Drill from "@/components/landing/Drill";
 import GladiTeaser from "@/components/landing/GladiTeaser";
 import Hero from "@/components/landing/Hero";
+import { TRACE } from "@/components/landing/Instrument";
 import Lessons from "@/components/landing/Lessons";
 import PlanDemo from "@/components/landing/PlanDemo";
 import Roles from "@/components/landing/Roles";
@@ -26,6 +27,7 @@ const FOOTER = [
 export default function Home() {
   return (
     <>
+      <div aria-hidden="true" className="scroll-progress fixed inset-x-0 top-0 z-50 hidden h-0.5 bg-langit" />
       <div className="relative">
         <SiteHeader overlay />
         <main>
@@ -58,6 +60,14 @@ export default function Home() {
               ))}
             </div>
             <div aria-hidden="true" className="absolute inset-0 -z-10 bg-radial from-malam/40 to-malam to-75%" />
+            <svg
+              aria-hidden="true"
+              viewBox="0 40 400 120"
+              preserveAspectRatio="none"
+              className="absolute inset-x-0 bottom-0 -z-10 h-28 w-full opacity-60 [mask-image:linear-gradient(90deg,transparent,#000_20%,#000_80%,transparent)] sm:h-36"
+            >
+              <path d={TRACE} vectorEffect="non-scaling-stroke" className="fill-none stroke-fajar motion-safe:animate-scroll" strokeWidth={1.5} strokeLinejoin="round" />
+            </svg>
             <div className="mx-auto flex max-w-6xl flex-col items-start gap-10 px-4 py-28 sm:px-6 lg:py-40">
               <h2 id="ajak" className="max-w-[16ch] text-5xl font-extrabold leading-[0.98] tracking-[-0.04em] sm:text-7xl">
                 Gempa berikutnya tidak menunggu sekolah <span className="text-fajar">siap</span>.
