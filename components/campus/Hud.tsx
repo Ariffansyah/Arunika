@@ -16,7 +16,7 @@ import { aftershockAt, fallenAt, finishDrill, input, liveChecks, player, run, se
 import SimControls from "./Controls";
 import { interact } from "./interact";
 import Learn from "./Learn";
-import { GraphicsPicker, KindPicker, NpcPicker, ToolButton, ghost, panel, primary } from "./ui";
+import { GraphicsPicker, KindPicker, NpcPicker, PressButton, ToolButton, ghost, panel, primary } from "./ui";
 import { falloff, isMuted, play, rumble, setMuted, siren } from "./sound";
 import type { Peer } from "./useRoom";
 
@@ -102,7 +102,7 @@ function Minimap() {
   const dot = useYouDot();
   const route = useDrill((s) => (s.showRoute ? s.route : null));
   return (
-    <div className="hidden w-52 overflow-hidden rounded-lg border border-malam-3 shadow-lg sm:block lg:w-64">
+    <div className="hidden w-52 overflow-hidden rounded-lg border border-malam-3 shadow-lg sm:block lg:w-64 short:w-[calc((100dvh-17rem)*1.4)] [@media(max-height:22.5rem)]:hidden">
       <CampusPlan labels={1.9} path={route?.map(([x, , z]) => [x / TILE, z / TILE])} label="Peta mini sekolah dengan nama gedung dan posisi kamu">
         {/* North is up on every plan; the 3D camera turns, so say so. */}
         <text x={W - 1.4} y={2.1} textAnchor="middle" fontSize={1.5} fontWeight={800} fill="#a6b9de">
@@ -224,8 +224,8 @@ const TONE: Record<Tone, string> = { danger: "bg-bahaya", done: "bg-aman", info:
 // The one line that matters mid-drill, at the top like a mission objective; it slides in fresh when it changes.
 function Objective({ message, tone }: { message: string; tone: Tone }) {
   return (
-    <div role="status" className="[grid-area:goal] md:justify-self-center">
-      <p key={message} className={`animate-rise rounded-lg px-4 py-3 text-center font-bold leading-snug text-malam shadow-lg md:text-lg ${TONE[tone]}`}>
+    <div role="status" className="[grid-area:goal] md:justify-self-center short:justify-self-center">
+      <p key={message} className={`animate-rise rounded-lg px-4 py-3 text-center font-bold leading-snug text-malam shadow-lg md:text-lg short:py-2 short:text-base ${TONE[tone]}`}>
         {message}
       </p>
     </div>
@@ -242,7 +242,7 @@ function DrillSide({ t }: { t: number }) {
   const guided = useDrill((s) => s.guided);
   const { wind } = run.timeline;
   return (
-    <div className="contents md:flex md:flex-col md:items-start md:gap-2 md:[grid-area:left]">
+    <div className="contents md:flex md:flex-col md:items-start md:gap-2 md:[grid-area:left] short:flex short:max-h-[calc(100dvh-10.5rem)] short:flex-col short:items-start short:gap-2 short:[grid-area:left]">
       <p className="pointer-events-auto rounded-lg border border-malam-3 bg-malam/90 px-3 py-2 text-sm font-semibold tabular-nums shadow-lg [grid-area:status] justify-self-start">
         <span className="max-sm:hidden">{SCENARIO_LABEL[scenario.kind]} · </span>
         {num(t, 1)} dtk
@@ -260,7 +260,7 @@ function DrillSide({ t }: { t: number }) {
         </button>
       </div>
       {guided && (
-        <div className={`${panel} pointer-events-auto max-w-xs text-sm [grid-area:list]`}>
+        <div className={`${panel} pointer-events-auto max-w-xs text-sm [grid-area:list] short:min-h-0 short:overflow-y-auto short:overscroll-contain`}>
           <LiveChecks />
         </div>
       )}
@@ -538,7 +538,7 @@ function TouchPad() {
     redraw((n) => n + 1);
   };
   const round =
-    "absolute flex flex-col items-center justify-center gap-0.5 rounded-full border-2 font-bold backdrop-blur-sm transition-colors touch-none select-none [&_svg]:size-5";
+    "pointer-events-auto absolute flex flex-col items-center justify-center gap-0.5 rounded-full border-2 font-bold backdrop-blur-sm transition-colors touch-none select-none [&_svg]:size-5";
   const small = `${round} size-14 border-pasir/25 bg-malam/70 text-[0.65rem] text-pasir active:bg-malam-3 aria-pressed:border-laut aria-pressed:bg-laut`;
   // Until a drill starts, the menu covers the bottom of a phone, or the left of a wider screen; only walking and the
   // action are needed then, to reach the warden.
@@ -546,15 +546,14 @@ function TouchPad() {
   return (
     <div className={`hidden pointer-coarse:contents ${idle ? "max-sm:hidden!" : ""}`}>
       <Stick className={idle ? "left-4 sm:left-[26.5rem]" : "left-4"} />
-      <div className="pointer-events-auto absolute right-4 bottom-4 size-44" onContextMenu={(e) => e.preventDefault()}>
+      <div className="absolute right-4 bottom-4 size-44" onContextMenu={(e) => e.preventDefault()}>
         {prompt && (
           <span className="absolute right-full bottom-7 mr-2 animate-rise whitespace-nowrap rounded-md bg-pasir px-2.5 py-1 text-sm font-semibold text-malam shadow-lg">
             {prompt.label}
           </span>
         )}
-        <button
-          type="button"
-          onClick={interact}
+        <PressButton
+          act={() => prompt && interact()}
           disabled={!prompt}
           aria-label={prompt?.label ?? "Aksi"}
           className={`${round} right-0 bottom-0 size-20 border-pasir/40 bg-pasir text-xs text-malam active:bg-white disabled:bg-malam/70 disabled:text-pasir/50`}
@@ -562,24 +561,25 @@ function TouchPad() {
           {prompt && <span className="absolute inset-0 rounded-full ring-4 ring-langit motion-safe:animate-ping" />}
           <Hand aria-hidden="true" />
           Aksi
-        </button>
-        <button type="button" aria-pressed={input.crouch} onClick={() => toggle("crouch")} className={`${small} right-24 bottom-1 ${later}`}>
+        </PressButton>
+        <PressButton aria-pressed={input.crouch} act={() => toggle("crouch")} className={`${small} right-24 bottom-1 ${later}`}>
           <ChevronsDown aria-hidden="true" />
           Merunduk
-        </button>
-        <button type="button" aria-pressed={input.run} onClick={() => toggle("run")} className={`${small} right-[5.25rem] bottom-[5.25rem] ${later}`}>
+        </PressButton>
+        <PressButton aria-pressed={input.run} act={() => toggle("run")} className={`${small} right-[5.25rem] bottom-[5.25rem] ${later}`}>
           <Footprints aria-hidden="true" />
           Lari
-        </button>
-        <button
-          type="button"
+        </PressButton>
+        <PressButton
           disabled={!canJump}
-          onClick={() => (input.jump = true)}
+          act={() => {
+            if (canJump) input.jump = true;
+          }}
           className={`${small} right-3 bottom-24 disabled:opacity-40 ${canJump ? "border-langit ring-4 ring-langit/40" : ""} ${later}`}
         >
           <ChevronsUp aria-hidden="true" />
           Lompat
-        </button>
+        </PressButton>
       </div>
     </div>
   );
@@ -706,7 +706,7 @@ export default function Hud({
           <RoomInfo room={room} peers={peers} status={status} school={school} />
         </section>
       )}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 [grid-template-areas:'status_tools'_'goal_goal'_'acts_acts'_'list_list'] md:grid-cols-[minmax(7rem,1fr)_minmax(0,36rem)_auto] md:[grid-template-areas:'left_goal_tools'] lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 [grid-template-areas:'status_tools'_'goal_goal'_'acts_acts'_'list_list'] md:grid-cols-[minmax(7rem,1fr)_minmax(0,36rem)_auto] md:[grid-template-areas:'left_goal_tools'] lg:grid-cols-[minmax(0,1fr)_minmax(0,36rem)_minmax(0,1fr)] short:grid-cols-[12rem_minmax(0,1fr)_auto] short:[grid-template-areas:'left_goal_tools']">
         {phase === "running" && t >= 0 && (
           <>
             <DrillSide t={t} />

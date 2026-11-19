@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ComponentProps, MouseEvent, PointerEvent, ReactNode } from "react";
 import { MAP } from "@/lib/campus";
 import { INTENSITY, SCENARIO_LABEL } from "@/lib/sim";
 import { NPC_COUNTS, QUALITIES, setNpc, setQuality, setState, useDrill, type Quality } from "./drillStore";
@@ -10,6 +10,19 @@ export const btn =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 font-semibold transition-colors active:translate-y-px disabled:opacity-60";
 export const primary = `${btn} bg-laut text-white hover:bg-laut-terang`;
 export const ghost = `${btn} border border-malam-3 text-pasir hover:border-redup`;
+// Phones send no click for a tap made while another finger is down, such as a thumb on the stick, so drill controls
+// act as soon as they are pressed. The click that follows a press is skipped; a keyboard's click (detail 0) still acts.
+export const press = (act: () => void) => ({
+  onPointerDown: (e: PointerEvent) => {
+    if (e.button === 0) act();
+  },
+  onClick: (e: MouseEvent) => {
+    if (e.detail === 0) act();
+  },
+});
+
+export const PressButton = ({ act, ...props }: ComponentProps<"button"> & { act: () => void }) => <button type="button" {...props} {...press(act)} />;
+
 // Icon buttons in the HUD toolbar; the name shows as a tooltip on hover or keyboard focus.
 export function ToolButton({
   label,
@@ -30,8 +43,8 @@ export function ToolButton({
       aria-label={label}
       aria-pressed={pressed}
       aria-haspopup={dialog ? "dialog" : undefined}
-      onClick={onClick}
-      className="group relative flex size-10 items-center justify-center rounded-md text-pasir hover:bg-malam-3 aria-pressed:bg-laut aria-pressed:text-white [&_svg]:size-5"
+      {...press(onClick)}
+      className="group relative flex size-10 items-center justify-center rounded-md short:size-9 text-pasir hover:bg-malam-3 aria-pressed:bg-laut aria-pressed:text-white [&_svg]:size-5"
     >
       {children}
       <span className="pointer-events-none absolute top-full right-0 z-10 mt-2 whitespace-nowrap rounded-md bg-pasir px-2 py-1 text-xs font-semibold text-malam opacity-0 shadow-md transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">

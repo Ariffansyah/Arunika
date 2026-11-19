@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Screens too short for the drill HUD's stacked side column: phones on their side. */
+@custom-variant short {
+  @media (max-height: 32rem) {
+    @slot;
+  }
+}
+
 /* The logo's colours: its navy ground, pale and blue faces, cyan edge and orange sun. Blue carries actions,
    cyan marks live data and focus, and orange stays as rare as the sun in the mark: evacuation routes and urgency. */
 @theme {
