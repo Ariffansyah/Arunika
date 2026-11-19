@@ -36,6 +36,78 @@
   --animate-rain: rain 0.9s linear infinite;
   --animate-slide: slide 3.6s ease-in infinite;
   --animate-shake: shake 0.32s linear infinite;
+  /* The BMKG monitor: seismic waves, quakes popping in on the replay, the radar sweep, the replay's playhead and the
+     hero's ticker. Translations in percent refer to the SVG's viewBox through transform-box: view-box. */
+  --animate-wave: wave 3s cubic-bezier(0.2, 0.6, 0.4, 1) infinite both;
+  --animate-pop: pop 0.6s var(--ease-crisp) both;
+  --animate-ripple: ripple 1.4s ease-out both;
+  --animate-sweep: sweep 8s linear infinite;
+  --animate-playhead: playhead 7s linear both;
+  --animate-marquee: marquee 70s linear infinite;
+
+  @keyframes wave {
+    from {
+      opacity: 0.9;
+      transform: scale(0.05);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes pop {
+    from {
+      transform: scale(0);
+    }
+    60% {
+      transform: scale(1.4);
+    }
+  }
+
+  /* Starts invisible, so a ripple still waiting for its delay does not show. */
+  @keyframes ripple {
+    from {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    1% {
+      opacity: 0.9;
+    }
+    to {
+      opacity: 0;
+      transform: scale(3.5);
+    }
+  }
+
+  @keyframes sweep {
+    from {
+      transform: translateX(-15%);
+    }
+    to {
+      transform: translateX(105%);
+    }
+  }
+
+  @keyframes playhead {
+    from {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    96% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
 
   @keyframes march {
     to {
@@ -199,6 +271,9 @@
   --color-bahaya: #ff6b6b;
   --color-kuning: #f0b429;
   --color-abu: #7f93b8;
+  --garis: rgb(175 196 236 / 0.05);
+  --butir: #fff;
+  --butir-kuat: 0.035;
 }
 
 /* Paper grain at a few percent, painted between a band's own background and its content. */

@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import Bmkg from "@/components/landing/Bmkg";
 import Drill from "@/components/landing/Drill";
 import GladiTeaser from "@/components/landing/GladiTeaser";
 import Hero from "@/components/landing/Hero";
@@ -7,8 +8,10 @@ import { TRACE } from "@/components/landing/Instrument";
 import Lessons from "@/components/landing/Lessons";
 import PlanDemo from "@/components/landing/PlanDemo";
 import Roles from "@/components/landing/Roles";
+import Ticker from "@/components/landing/Ticker";
 import SiteHeader from "@/components/SiteHeader";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
+import { recentQuakes, weatherWarnings } from "@/lib/bmkg";
 
 const FLOW = [
   { href: "#pelajari", label: "Pelajari" },
@@ -24,14 +27,16 @@ const FOOTER = [
   { href: "/masuk", label: "Masuk" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const [quakes, warnings] = await Promise.all([recentQuakes(), weatherWarnings()]);
   return (
     <>
       <div aria-hidden="true" className="scroll-progress fixed inset-x-0 top-0 z-50 hidden h-0.5 bg-langit" />
       <div className="relative">
         <SiteHeader overlay />
         <main>
-          <Hero />
+          <Hero ticker={<Ticker quakes={quakes} warnings={warnings.map(({ headline, until, untilMs }) => ({ headline, until, untilMs }))} />} />
+          <Bmkg quakes={quakes} warnings={warnings} />
           <nav aria-label="Alur Arunika" className="border-b border-malam-3">
             <ol className="mx-auto grid max-w-6xl grid-cols-2 sm:grid-cols-4">
               {FLOW.map(({ href, label }, i) => (

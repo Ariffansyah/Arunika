@@ -3,7 +3,6 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { latestQuake } from "@/lib/bmkg";
 import { quakeLine } from "@/lib/gladi";
-import QuakeMap from "./QuakeMap";
 
 // How a gladi reads, step by step: the AI writes and judges the situations, the campus engine judges the map moves.
 // The quake above it is live from BMKG.
@@ -32,7 +31,6 @@ export default async function GladiTeaser() {
             Mulai gladi ruang
             <ArrowRight aria-hidden="true" className="size-5 transition-transform group-hover:translate-x-1" />
           </Link>
-          <QuakeMap quake={quake} />
         </div>
         <figure className="track overflow-hidden rounded-lg border border-malam-3 bg-malam shadow-edge">
           {quake && (

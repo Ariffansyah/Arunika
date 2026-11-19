@@ -1,14 +1,16 @@
 import type { CSSProperties } from "react";
 import type { Hazard } from "@/lib/gladi";
 
-// One period of a seismogram, 400 units wide: background noise, the small P wave, the large S wave and its coda.
-// It is quiet at both ends, so two periods side by side scroll without a seam.
-function seismogram() {
+// One period of a seismogram, 400 units wide: background noise, the small P wave, the large S wave and its coda,
+// whose peak is `amp` units. It is quiet at both ends, so two periods side by side scroll without a seam. `seed`
+// shifts the wobble, so two quakes of one size still draw different traces.
+export function seismogram(amp = 54, seed = 0) {
   const pts: string[] = [];
+  const p = Math.min(9, amp / 6);
   for (let x = 0; x <= 800; x += 2) {
     const u = x % 400;
-    const env = u < 110 ? 2 : u < 160 ? 9 : u < 175 ? 9 + (u - 160) * 3 : u < 330 ? 54 * Math.exp(-(u - 175) / 55) + 2 : 2;
-    pts.push(`${x},${(100 + env * Math.sin(x * 2.3) * (0.55 + 0.45 * Math.sin(x * 0.37 + 1.3))).toFixed(1)}`);
+    const env = u < 110 ? 2 : u < 160 ? p : u < 175 ? p + ((u - 160) * (amp - p)) / 15 : u < 330 ? amp * Math.exp(-(u - 175) / 55) + 2 : 2;
+    pts.push(`${x},${(100 + env * Math.sin(x * 2.3 + seed) * (0.55 + 0.45 * Math.sin(x * 0.37 + 1.3 + seed))).toFixed(1)}`);
   }
   return `M${pts.join("L")}`;
 }

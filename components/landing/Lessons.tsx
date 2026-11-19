@@ -2,13 +2,15 @@
 
 import { ArrowRight, CircleCheck, OctagonX } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HAZARD_ICON } from "@/components/hazards";
 import { HAZARDS, type Hazard } from "@/lib/gladi";
 import { LESSONS } from "@/lib/lessons";
 import Instrument from "./Instrument";
 
 const TAB = { gempa: "Gempa", banjir: "Banjir", angin: "Angin", longsor: "Longsor" };
+// Fired with a hazard to open its lesson, e.g. from a BMKG warning on the live board.
+export const LEARN_EVENT = "arunika:pelajari";
 const GAUGE = { gempa: "Seismograf", banjir: "Papan duga air", angin: "Anemometer", longsor: "Pemantau lereng" };
 
 // The same steps and quiz the drill teaches before it starts, one hazard at a time.
@@ -17,6 +19,15 @@ export default function Lessons() {
   const [picked, setPicked] = useState<number | null>(null);
   const { steps, quiz } = LESSONS[kind];
   const q = quiz[0];
+
+  useEffect(() => {
+    const open = (e: Event) => {
+      setKind((e as CustomEvent<Hazard>).detail);
+      setPicked(null);
+    };
+    addEventListener(LEARN_EVENT, open);
+    return () => removeEventListener(LEARN_EVENT, open);
+  }, []);
 
   return (
     <section aria-labelledby="pelajari" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
