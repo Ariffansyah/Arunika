@@ -1,6 +1,5 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import Band from "@/components/landing/Band";
 import Bmkg from "@/components/landing/Bmkg";
 import Drill from "@/components/landing/Drill";
 import GladiTeaser from "@/components/landing/GladiTeaser";
@@ -35,7 +34,8 @@ export default async function Home() {
       <div aria-hidden="true" className="scroll-progress fixed inset-x-0 top-0 z-50 hidden h-0.5 bg-langit" />
       <div className="relative">
         <SiteHeader overlay />
-        <main>
+        {/* Clipped sideways: sections zoom past the screen edges as they scroll out. */}
+        <main className="overflow-x-clip">
           <Hero ticker={<Ticker quakes={quakes} warnings={warnings.map(({ headline, until, untilMs }) => ({ headline, until, untilMs }))} />} />
           <Bmkg quakes={quakes} warnings={warnings} />
           <nav aria-label="Alur Arunika" className="border-b border-malam-3">
@@ -56,11 +56,9 @@ export default async function Home() {
           </nav>
           <Lessons />
           <PlanDemo />
-          <Band words={["Merunduk", "Berlindung", "Bertahan", "Berjalan tertib", "Titik kumpul"]} />
           <Drill />
           <GladiTeaser />
           <Roles />
-          <Band words={["Gempa", "Banjir", "Angin puting beliung", "Longsor", "Siaga"]} reverse />
           <section aria-labelledby="ajak" className="scene grain overflow-hidden border-t border-malam-3">
             <div aria-hidden="true" className="absolute inset-0 -z-10 flex items-center justify-center gap-6 opacity-[0.14] sm:gap-10">
               {CAMPUSES.map(({ id }, i) => (
