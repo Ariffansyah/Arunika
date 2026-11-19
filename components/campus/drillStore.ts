@@ -159,11 +159,20 @@ export function setQuality(q: Quality | null) {
   }
 }
 
-// The frame-rate monitor steps an automatic tier down; a tier the player chose is left alone.
+// The frame-rate monitor steps an automatic tier down; a tier the player chose is left alone. Turning shadows off
+// recompiles every material and stalls the screen, so mid-drill that step waits until the drill is over.
 export function lowerQuality() {
-  if (!state.qualityAuto) return;
   const i = QUALITIES.indexOf(state.quality);
-  if (i > 0) setState({ quality: QUALITIES[i - 1] });
+  if (!state.qualityAuto || i <= 0) return;
+  if (state.phase === "running" && TIER[QUALITIES[i - 1]].shadows !== TIER[state.quality].shadows) {
+    const after = subscribe(() => {
+      if (state.phase === "running") return;
+      after();
+      lowerQuality();
+    });
+    return;
+  }
+  setState({ quality: QUALITIES[i - 1] });
 }
 
 // Per-frame values live outside React so 60 fps updates never re-render the HUD.

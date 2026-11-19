@@ -15,7 +15,7 @@ function Turntable({ look }: { look: Look }) {
   });
   return (
     <group ref={ref} rotation-y={-0.4}>
-      <Character key={look} look={look} anim={() => "idle"} height={1.6} shadow="blob" />
+      <Character look={look} anim={() => "idle"} height={1.6} shadow="blob" />
     </group>
   );
 }

@@ -22,19 +22,22 @@ const url = (look: Look) => `/characters/${look}.glb`;
 const BLOB = new CircleGeometry(0.24, 20).rotateX(-Math.PI / 2);
 const BLOB_MAT = new MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.22, depthWrite: false });
 
-// `anim` is read every frame, so callers switch clips without re-rendering. With a rate, a stepping clip
-// plays that much faster, so feet keep pace with a walker slowed by water or a slower classmate.
-export default function Character({
-  look,
-  anim,
-  height = 1.6,
-  shadow = "cast",
-}: {
+type Props = {
   look: Look;
   anim: () => Anim | [Anim, number];
   height?: number;
   shadow?: "cast" | "blob";
-}) {
+};
+
+// `anim` is read every frame, so callers switch clips without re-rendering. With a rate, a stepping clip
+// plays that much faster, so feet keep pace with a walker slowed by water or a slower classmate.
+// Each clone gets its own rig: an action keeps animating the bones it was first bound to, so a new clone under a
+// live mixer (another look, or shadows turned off by a lower graphics tier) would stand frozen while it moves.
+export default function Character(props: Props) {
+  return <Rig key={`${props.look}/${props.height}/${props.shadow}`} {...props} />;
+}
+
+function Rig({ look, anim, height = 1.6, shadow = "cast" }: Props) {
   const { scene, animations } = useGLTF(url(look));
   // Skinned meshes need their skeleton cloned too, or every copy would share one pose.
   const { model, scale } = useMemo(() => {
