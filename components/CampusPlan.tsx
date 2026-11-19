@@ -1,3 +1,4 @@
+import { useReducedMotion } from "@/components/useReducedMotion";
 import { ASSEMBLY, BUILDINGS, GRID, H, W, buildingRects, shortName, surfaceAt, type Tile } from "@/lib/campus";
 
 const FILL: Record<string, string> = { h: "#163f4f", g: "#17485a", "=": "#2a4677" };
@@ -94,9 +95,29 @@ export default function CampusPlan({
           strokeDasharray="0.7 0.45"
           strokeLinecap="round"
           strokeLinejoin="round"
+          className="motion-safe:animate-march"
         />
       )}
       {children}
     </svg>
+  );
+}
+
+// A dot walking `points` (plan units) that arrives at `arrive` of each `seconds`-long loop and waits there, so walkers
+// sharing a loop length start together. Left out for reduced motion: SMIL ignores the CSS that stills everything else.
+export function Walker({ points, seconds, arrive = 0.8, fill }: { points: [number, number][]; seconds: number; arrive?: number; fill: string }) {
+  const reduced = useReducedMotion();
+  if (reduced || points.length < 2) return null;
+  return (
+    <circle r={0.65} fill={fill} stroke="#071530" strokeWidth={0.2}>
+      <animateMotion
+        dur={`${seconds}s`}
+        repeatCount="indefinite"
+        path={`M${points.map(([x, z]) => `${x},${z}`).join("L")}`}
+        keyPoints="0;1;1"
+        keyTimes={`0;${arrive};1`}
+        calcMode="linear"
+      />
+    </circle>
   );
 }

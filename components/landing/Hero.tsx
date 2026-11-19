@@ -3,21 +3,15 @@
 import { ArrowRight, Pause, Play } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useRef, useState } from "react";
 import SitePlan, { CAMPUSES } from "@/components/SitePlan";
+import { useReducedMotion } from "@/components/useReducedMotion";
 import { MAPS } from "@/lib/maps";
 
 const HeroScene = dynamic(() => import("./HeroScene"), { ssr: false });
 
-const REDUCED = "(prefers-reduced-motion: reduce)";
-const subscribe = (cb: () => void) => {
-  const mq = matchMedia(REDUCED);
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
-};
-
 export default function Hero() {
-  const reduced = useSyncExternalStore(subscribe, () => matchMedia(REDUCED).matches, () => false);
+  const reduced = useReducedMotion();
   const [choice, setChoice] = useState<boolean | null>(null);
   const paused = choice ?? reduced;
   const levelRef = useRef<HTMLSpanElement>(null);

@@ -26,6 +26,105 @@
   --animate-rise: rise 0.7s var(--ease-crisp) both;
   --animate-grow: grow 0.9s var(--ease-crisp) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
+  /* One period of the plan route's dashes (0.7 + 0.45 tiles), so the loop has no seam. */
+  --animate-march: march 1.15s linear infinite;
+  /* Hazard illustrations. Lengths in their keyframes are SVG user units: they live inside a viewBox. */
+  --animate-scroll: scroll 6s linear infinite;
+  --animate-sway: sway 3.2s ease-in-out infinite;
+  --animate-tide: tide 9s ease-in-out infinite;
+  --animate-gust: gust 2.6s ease-in infinite;
+  --animate-rain: rain 0.9s linear infinite;
+  --animate-slide: slide 3.6s ease-in infinite;
+  --animate-shake: shake 0.32s linear infinite;
+
+  @keyframes march {
+    to {
+      stroke-dashoffset: -1.15;
+    }
+  }
+
+  @keyframes scroll {
+    to {
+      transform: translateX(-400px);
+    }
+  }
+
+  @keyframes sway {
+    0%,
+    100% {
+      transform: rotate(2deg);
+    }
+    50% {
+      transform: rotate(9deg);
+    }
+  }
+
+  @keyframes tide {
+    0%,
+    100% {
+      transform: translateY(46px);
+    }
+    45%,
+    70% {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes gust {
+    from {
+      opacity: 0;
+      transform: translateX(-140px);
+    }
+    25%,
+    75% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      transform: translateX(420px);
+    }
+  }
+
+  @keyframes rain {
+    from {
+      opacity: 0;
+      transform: translate(6px, -24px);
+    }
+    30% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      transform: translate(-6px, 36px);
+    }
+  }
+
+  @keyframes slide {
+    0%,
+    25% {
+      opacity: 0;
+      transform: translate(0, 0) rotate(0);
+    }
+    35% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      transform: translate(150px, 102px) rotate(200deg);
+    }
+  }
+
+  @keyframes shake {
+    25% {
+      transform: translate(-2px, 1px) rotate(-0.6deg);
+    }
+    75% {
+      transform: translate(2px, -1px) rotate(0.6deg);
+    }
+  }
 
   @keyframes rise {
     from {
@@ -322,6 +421,13 @@ body::before {
       animation-timeline: scroll(root);
       animation-range: 0 90svh;
     }
+    .scroll-progress {
+      display: block;
+      transform-origin: left;
+      animation: fill-in linear both;
+      animation-timeline: scroll(root);
+    }
+
     .parallax-fore {
       --name: hero-fore;
     }

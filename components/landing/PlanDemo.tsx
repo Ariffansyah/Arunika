@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
-import CampusPlan from "@/components/CampusPlan";
+import CampusPlan, { Walker } from "@/components/CampusPlan";
 import { predict } from "@/components/campus/drillStore";
 import { ASSEMBLY_NAMES, GRID, SPAWN, tileAt } from "@/lib/campus";
 import { num } from "@/lib/format";
@@ -89,7 +89,11 @@ export default function PlanDemo() {
             hazards={hazards}
             hazardColor={HAZARD_COLOR[scenario.kind]}
             label={`Denah sekolah, ${SCENARIO_LABEL[scenario.kind]} ${num(scenario.intensity, 1)} ${meta.unit}`.trim() + ", dengan jalur evakuasi"}
-          />
+          >
+            {route && (
+              <Walker key={route.join()} points={route.map(([x, z]) => [x + 0.5, z + 0.5])} seconds={pathLength(route) * 0.2} fill="#eaf1ff" />
+            )}
+          </CampusPlan>
           <figcaption className="flex flex-wrap gap-x-6 gap-y-1 border-t border-malam-3 px-4 py-3">
             <span className="inline-flex items-center gap-2">
               <svg aria-hidden="true" width="28" height="6" viewBox="0 0 28 6">

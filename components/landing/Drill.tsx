@@ -3,7 +3,7 @@
 import { ArrowRight, Link2, Mic, Plus, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import CampusPlan from "@/components/CampusPlan";
+import CampusPlan, { Walker } from "@/components/CampusPlan";
 import { ASSEMBLY, ASSEMBLY_NAMES, GRID, SPAWN, TILE, findTiles, tileAt } from "@/lib/campus";
 import { num } from "@/lib/format";
 import { WALK_SPEED, bestRoute, pathLength } from "@/lib/sim";
@@ -38,7 +38,9 @@ const gate = findTiles("G")[0];
 const trail = [...(bestRoute(GRID, SPAWN, [gate], none) ?? []), ...(bestRoute(GRID, gate, [goal], none) ?? []).slice(1)];
 const bestM = Math.round(pathLength(best) * TILE);
 const trailM = Math.round(pathLength(trail) * TILE);
-const centre = (t: [number, number][]) => t.map(([x, z]) => `${x + 0.5},${z + 0.5}`).join(" ");
+const centre = (t: [number, number][]) => t.map(([x, z]) => [x + 0.5, z + 0.5] as [number, number]);
+// Both walkers share one loop at the same pace, so the best route visibly arrives first.
+const loopS = (pathLength(trail) * 0.16) / 0.8;
 
 const card = "track rounded-lg border border-malam-3 bg-malam-2 p-5 shadow-edge sm:p-7";
 const cardTitle = "text-2xl leading-snug font-extrabold tracking-tight sm:text-3xl";
@@ -66,7 +68,7 @@ export default function Drill() {
           <div className="self-start overflow-hidden rounded-md border border-malam-3 lg:order-last">
             <CampusPlan labels={1.2} route={best} label="Contoh jejak evakuasi seorang siswa yang memutar lewat gerbang, dan rute terbaik ke titik kumpul">
               <polyline
-                points={centre(trail)}
+                points={centre(trail).join(" ")}
                 pathLength={1}
                 className="draw"
                 fill="none"
@@ -77,6 +79,8 @@ export default function Drill() {
                 strokeLinejoin="round"
               />
               <circle cx={SPAWN[0] + 0.5} cy={SPAWN[1] + 0.5} r={0.7} fill="#3d7bf5" stroke="#071530" strokeWidth={0.2} />
+              <Walker points={centre(trail)} seconds={loopS} fill="#3d7bf5" />
+              <Walker points={centre(best)} seconds={loopS} arrive={(0.8 * pathLength(best)) / pathLength(trail)} fill="#ff8a3d" />
             </CampusPlan>
           </div>
           <div className="flex flex-col gap-6 lg:py-2">
@@ -117,7 +121,7 @@ export default function Drill() {
           </h3>
           <ul className="grid grid-cols-4 gap-2">
             {AVATARS.map((look, i) => (
-              <li key={look} className="relative">
+              <li key={look} className="relative transition-[translate] duration-300 ease-crisp hover:-translate-y-1">
                 {/* eslint-disable-next-line @next/next/no-img-element -- 128px sprites, nothing to optimise */}
                 <img src={`/characters/previews/${look}.png`} alt="" width={128} height={128} loading="lazy" className="aspect-square w-full rounded-md bg-malam" />
                 <span className="absolute inset-x-1 bottom-1 flex items-center justify-center gap-1.5 rounded-sm bg-malam/85 py-0.5 text-sm font-semibold sm:text-base">

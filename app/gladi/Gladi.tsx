@@ -138,6 +138,20 @@ function Board({
               strokeWidth={selected === id || from === id ? 0.3 : 0.15}
               strokeDasharray={clickable && selected !== id ? "0.5 0.35" : undefined}
             />
+            {risks[id] >= 60 && (
+              <rect
+                x={r.x0 - 0.45}
+                y={r.z0 - 0.45}
+                width={r.x1 - r.x0 + 1.9}
+                height={r.z1 - r.z0 + 1.9}
+                rx={0.5}
+                fill="none"
+                stroke="#ff6b6b"
+                strokeWidth={0.2}
+                pointerEvents="none"
+                className="motion-safe:animate-pulse"
+              />
+            )}
             <text x={cx} y={reveal ? cz - 0.2 : cz + 0.35} textAnchor="middle" fontSize={short(id).length > 7 ? 0.72 : 0.95} fontWeight={700} fill="#071530">
               {short(id)}
             </text>
