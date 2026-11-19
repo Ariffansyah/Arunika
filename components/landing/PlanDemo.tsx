@@ -28,7 +28,7 @@ export default function PlanDemo() {
     // A faint survey grid: this section is the site plan the drill is played on.
     <section
       aria-labelledby="coba"
-      className="grain survey border-y border-malam-3 bg-malam-2"
+      className="scene grain survey border-y border-malam-3 bg-malam-2"
     >
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[minmax(0,25rem)_1fr] lg:gap-16 lg:py-28">
         <div className="flex flex-col gap-8">

@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import Band from "@/components/landing/Band";
 import Bmkg from "@/components/landing/Bmkg";
 import Drill from "@/components/landing/Drill";
 import GladiTeaser from "@/components/landing/GladiTeaser";
@@ -55,10 +56,12 @@ export default async function Home() {
           </nav>
           <Lessons />
           <PlanDemo />
+          <Band words={["Merunduk", "Berlindung", "Bertahan", "Berjalan tertib", "Titik kumpul"]} />
           <Drill />
           <GladiTeaser />
           <Roles />
-          <section aria-labelledby="ajak" className="grain overflow-hidden border-t border-malam-3">
+          <Band words={["Gempa", "Banjir", "Angin puting beliung", "Longsor", "Siaga"]} reverse />
+          <section aria-labelledby="ajak" className="scene grain overflow-hidden border-t border-malam-3">
             <div aria-hidden="true" className="absolute inset-0 -z-10 flex items-center justify-center gap-6 opacity-[0.14] sm:gap-10">
               {CAMPUSES.map(({ id }, i) => (
                 <SitePlan key={id} id={id} className={`h-auto w-[60%] shrink-0 sm:w-[34%] ${i === 1 ? "translate-y-10" : "-translate-y-6"}`} />

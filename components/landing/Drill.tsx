@@ -58,7 +58,7 @@ export default function Drill() {
   }, [typed, words.length]);
 
   return (
-    <section aria-labelledby="bersama" className="mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
+    <section aria-labelledby="bersama" className="scene mx-auto w-full max-w-6xl px-4 py-24 sm:px-6 lg:py-32">
       <h2 id="bersama" className="max-w-[18ch] text-4xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl">
         Sekelas evakuasi bersama, dinilai sampai titik kumpul.
       </h2>

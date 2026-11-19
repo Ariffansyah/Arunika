@@ -44,6 +44,9 @@
   --animate-sweep: sweep 8s linear infinite;
   --animate-playhead: playhead 7s linear both;
   --animate-marquee: marquee 70s linear infinite;
+  --animate-turn: turn 2.6s var(--ease-crisp) infinite;
+  /* The landing page's word bands, slid by one copy's width; the scroll speeds them up and turns them. */
+  --animate-band: marquee 28s linear infinite;
 
   @keyframes wave {
     from {
@@ -100,6 +103,17 @@
     to {
       opacity: 0;
       transform: translateX(100%);
+    }
+  }
+
+  @keyframes turn {
+    0%,
+    25% {
+      transform: rotate(0);
+    }
+    55%,
+    85% {
+      transform: rotate(-90deg);
     }
   }
 
@@ -496,6 +510,18 @@ body::before {
       animation-timeline: scroll(root);
       animation-range: 0 90svh;
     }
+    /* Each landing section rises in as it enters and sinks back as it leaves, so one hands over to the next.
+       The way out only fills forwards: before it starts, the way in must own opacity and transform. */
+    .scene {
+      animation:
+        scene-in linear both,
+        scene-out linear forwards;
+      animation-timeline: view(), view();
+      animation-range:
+        entry 0% entry 55%,
+        exit 35% exit 100%;
+    }
+
     .scroll-progress {
       display: block;
       transform-origin: left;
@@ -528,6 +554,20 @@ body::before {
 @keyframes draw {
   from {
     stroke-dashoffset: 1;
+  }
+}
+
+@keyframes scene-in {
+  from {
+    opacity: 0.15;
+    transform: translateY(72px) scale(0.97);
+  }
+}
+
+@keyframes scene-out {
+  to {
+    opacity: 0.35;
+    transform: scale(0.96);
   }
 }
 
