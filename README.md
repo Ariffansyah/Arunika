@@ -37,13 +37,14 @@ Arunika menjadikan latihan itu bisa diulang kapan saja, dinilai, dan terkumpul. 
 
 Gladi ruang (*tabletop exercise*) adalah latihan BNPB untuk tim siaga sekolah: bencana dibahas langkah demi langkah di atas peta. Mejanya denah sekolah yang sama dengan latihan 3D, dan yang menghitung bahaya adalah mesin simulasi Arunika, bukan AI.
 
-- **Peta dihitung mesin simulasi.** Risiko runtuh atau rusak tiap gedung (dari material, umur bangunan, jenis tanah, dan jarak ke pantai), petak tergenang atau rawan reruntuhan, dan titik kumpul yang aman. Peta berubah begitu skenario diganti, sebelum AI dipanggil.
+- **Peta dihitung mesin simulasi.** Risiko runtuh atau rusak tiap gedung (dari material, umur bangunan, jenis tanah, dan jarak ke pantai), petak tergenang atau rawan reruntuhan, dan titik kumpul yang aman. Peta berubah begitu skenario diganti atau kekuatannya digeser, sebelum AI dipanggil. Di bawah denah tampak jumlah penghuni tiap gedung, lalu bilah risikonya setelah gedung pertama dipilih.
 - **Skenario dari gempa sungguhan.** Gempa terkini diambil dari umpan publik BMKG (`autogempa.json`). Jarak episentrum ke sekolah dihitung dengan rumus haversine; bila jauh, gempa yang sama dipindahkan ke dekat sekolah. Banjir, longsor, dan angin puting beliung juga bisa dipilih.
 - **Empat langkah, dua penilai.**
   1. AI menyusun detik-detik pertama di sebuah kelas. Peserta memilih atau menulis tindakannya, lalu AI menilainya.
   2. Di peta: gedung mana yang dikosongkan lebih dulu. Dinilai mesin dari peringkat risiko.
   3. Di peta: ke mana penghuninya dievakuasi. *Pathfinder* A* menggambar rute, menghitung meter, detik berjalan, dan petak bahaya yang dilewati, lalu membandingkannya dengan rute terbaik.
   4. AI menyusun komplikasi yang lahir dari keputusan di peta (misalnya absen kurang di titik kumpul yang dipilih), lalu menilai tindakan peserta.
+- **Tandai dulu, lalu kunci.** Pilihan di peta ditandai lebih dulu, sehingga rute, jarak, dan petak bahayanya terlihat sebelum keputusan dikunci, juga di layar sentuh. Pilihan AI bisa dijawab dengan tombol 1 sampai 3, dan hasil akhirnya merinci nilai tiap langkah.
 - **Rencana tindak lanjut.** AI menyusun perbaikan rencana siaga sekolah, masing-masing dengan prioritas dan kelas biaya, lalu menyimpannya ke dasbor. Skor gladi adalah rata-rata nilai keempat langkah, bukan angka bebas dari model.
 - **Tahan manipulasi.** Setiap langkah ditandatangani HMAC di server, sehingga peramban tidak bisa mengubah situasi atau putusan AI. Keputusan di peta dinilai ulang di server dengan aturan yang sama, dan jawaban peserta dikirim ke model sebagai data JSON untuk menahan *prompt injection*.
 
@@ -75,6 +76,7 @@ Sekolah bertanda *(demo)* di dasbor adalah data contoh, bukan data lapangan.
 ![Denah interaktif di beranda: geser tinggi air, jalur evakuasi dihitung ulang](docs/screenshots/denah.webp)
 
 - **Bisa dicoba tanpa akun.** Beranda memuat langkah selamat dan kuis per bencana, denah yang jalurnya dihitung ulang saat tinggi air atau kekuatan gempa digeser, contoh penilaian jejak evakuasi, contoh jawaban Petugas AI, gladi ruang dari gempa terkini BMKG, dan pratinjau dasbor tiap peran.
+- **Transisi antarbagian.** Tepi tiap bagian beranda melebur ke latar, dan isinya masuk lalu mundur mengikuti gulir dengan CSS *scroll-driven animations*, tanpa JavaScript. Bila pengguna meminta gerak dikurangi, halaman diam.
 - **Mode gelap dan terang.** Tombol di kepala halaman mengganti tema dengan transisi lingkaran yang tumbuh dari tombol itu ke seluruh halaman. Pilihan tersimpan di peramban. Latihan 3D tetap gelap di kedua tema.
 - **Ponsel sampai desktop.** Di layar sentuh, latihan 3D dikendalikan dengan joystick di kiri bawah (makin jauh digeser, makin cepat berjalan) dan tombol Aksi, Lari, Merunduk, serta Lompat di kanan bawah. Ketukan pertama membuka layar penuh dan mengunci posisi mendatar bila peramban mengizinkan (Chrome Android); di peramban lain, ponsel yang tegak diminta memutar layar. Semua halaman menyesuaikan lebar layar.
 
